@@ -70,7 +70,7 @@ export default function PlayerRenewPage() {
 
   if (result?.success) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
         <Card className="text-center py-10">
           <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
             <Check className="w-7 h-7 text-emerald-600" />
@@ -88,7 +88,7 @@ export default function PlayerRenewPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           {activeSubscription ? "Renew Subscription" : "Choose a Package"}

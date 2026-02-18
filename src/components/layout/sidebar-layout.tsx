@@ -32,9 +32,9 @@ const portalConfig: Record<Portal, { label: string; accent: string; accentBg: st
   },
   admin: {
     label: "Admin Portal",
-    accent: "bg-brand-admin",
-    accentBg: "bg-brand-admin/10",
-    accentText: "text-brand-admin",
+    accent: "bg-primary",
+    accentBg: "bg-primary/10",
+    accentText: "text-primary",
   },
 };
 

@@ -42,7 +42,7 @@ export default async function AdminDashboard() {
       .limit(5),
     supabase
       .from("profiles")
-      .select("*, subscriptions(status, packages(name)), payments(status)")
+      .select("*, subscriptions!subscriptions_player_id_fkey(status, packages(name))")
       .eq("role", "player")
       .order("created_at", { ascending: false })
       .limit(5),

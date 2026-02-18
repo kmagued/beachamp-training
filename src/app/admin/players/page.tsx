@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Input, Select } from "@/components/ui";
+import { Card, Badge, Input, Select, Skeleton, TableRowSkeleton } from "@/components/ui";
 import { Search } from "lucide-react";
 
 interface PlayerRow {
@@ -25,6 +25,7 @@ type StatusFilter = "all" | "active" | "expiring" | "pending" | "inactive";
 
 export default function AdminPlayersPage() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -41,6 +42,7 @@ export default function AdminPlayersPage() {
         .eq("role", "player")
         .order("created_at", { ascending: false });
       if (data) setPlayers(data as unknown as PlayerRow[]);
+      setLoading(false);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,6 +145,54 @@ export default function AdminPlayersPage() {
         </Select>
       </div>
 
+      {loading ? (
+        <>
+          {/* Desktop Skeleton */}
+          <Card className="hidden sm:block overflow-hidden p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    {["Player", "Package", "Sessions", "Expires", "Level", "Status"].map((h) => (
+                      <th key={h} className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <TableRowSkeleton key={i} columns={6} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          {/* Mobile Skeleton */}
+          <div className="sm:hidden space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <div key={j} className="space-y-1">
+                      <Skeleton className="h-3 w-14" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      ) : (
+      <>
       {/* Desktop Table */}
       <Card className="hidden sm:block overflow-hidden p-0">
         <div className="overflow-x-auto">
@@ -267,6 +317,8 @@ export default function AdminPlayersPage() {
           </p>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

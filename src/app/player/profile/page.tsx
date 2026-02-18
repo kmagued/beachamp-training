@@ -53,7 +53,7 @@ export default function PlayerProfilePage() {
 
   if (!profile) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
         <Card className="animate-pulse p-6">
           <div className="h-6 bg-slate-200 rounded w-32 mb-4" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -68,7 +68,7 @@ export default function PlayerProfilePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Profile</h1>
         <p className="text-slate-500 text-sm">Update your personal information</p>

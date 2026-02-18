@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Input } from "@/components/ui";
+import { Card, Badge, Button, Input, Skeleton } from "@/components/ui";
 import { Package as PackageIcon, Plus, X, Pencil } from "lucide-react";
 import { createPackage, updatePackage, togglePackageStatus } from "./actions";
 import type { Package } from "@/types/database";
 
 export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<(Package & { subscriber_count: number })[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -39,6 +40,7 @@ export default function AdminPackagesPage() {
       );
       setPackages(withCounts);
     }
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -140,6 +142,32 @@ export default function AdminPackagesPage() {
       )}
 
       {/* Package Cards */}
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-9 h-9 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-14 rounded-full" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 mb-4">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="flex justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                ))}
+              </div>
+              <Skeleton className="h-8 w-full rounded-lg" />
+            </Card>
+          ))}
+        </div>
+      ) : (
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {packages.map((pkg) => (
           <Card key={pkg.id} className={!pkg.is_active ? "opacity-60" : ""}>
@@ -236,6 +264,7 @@ export default function AdminPackagesPage() {
           </Card>
         ))}
       </div>
+      )}
     </div>
   );
 }

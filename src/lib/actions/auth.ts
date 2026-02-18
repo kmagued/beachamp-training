@@ -30,7 +30,7 @@ export async function login(formData: FormData) {
     .returns<Pick<Profile, "role" | "profile_completed">[]>()
     .single();
 
-  if (profile && !profile.profile_completed) {
+  if (profile && !profile.profile_completed && profile.role === "player") {
     redirect("/complete-profile");
   }
 
