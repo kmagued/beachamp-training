@@ -22,11 +22,12 @@ interface UsersTableProps {
   onRoleChange: (userId: string, newRole: UserRole) => void;
   changingRoleId: string | null;
   currentUserId: string;
+  onRowClick: (user: UserRow) => void;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
 const thSortable = `${thBase} cursor-pointer select-none hover:text-slate-600 transition-colors`;
-const tdBase = "px-4 py-3 border-b border-slate-100";
+const tdBase = "px-4 py-3 border-b border-slate-100 whitespace-nowrap";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
   if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
@@ -173,10 +174,18 @@ export function UsersTableView(props: UsersTableProps) {
   const {
     users, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    hasActiveFilters, onRoleChange, changingRoleId, currentUserId,
+    hasActiveFilters, onRoleChange, changingRoleId, currentUserId, onRowClick,
   } = props;
 
+  const selectionMode = selectedIds.size > 0;
   const emptyMessage = hasActiveFilters ? "No users match your filters" : "No users found";
+
+  function handleRowClick(e: React.MouseEvent, user: UserRow) {
+    const target = e.target as HTMLElement;
+    if (target.closest("input, button, a, select")) return;
+    if (selectionMode) toggleSelect(user.id);
+    else onRowClick(user);
+  }
 
   return (
     <>
@@ -214,25 +223,29 @@ export function UsersTableView(props: UsersTableProps) {
             <tbody>
               {users.map((user, i) => {
                 const highlighted = isHighlighted(user.id);
-                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const selected = selectedIds.has(user.id);
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
                     key={user.id}
                     id={getRowId(user.id)}
+                    onClick={(e) => handleRowClick(e, user)}
                     className={cn(
-                      i % 2 === 1 && "bg-[#FAFBFC]",
+                      "group cursor-pointer hover:bg-primary-50 transition-colors",
+                      selected && "bg-primary-100 hover:bg-primary-100",
+                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
                       highlighted && "row-highlight"
                     )}
                   >
-                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(user.id)}
+                        checked={selected}
                         onChange={() => toggleSelect(user.id)}
                         className="table-checkbox"
                       />
                     </td>
-                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
                         {user.first_name} {user.last_name}
                       </p>
@@ -240,10 +253,10 @@ export function UsersTableView(props: UsersTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {user.email || "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {user.phone || "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {user.area || "—"}
                     </td>
                     <td className={tdBase}>
@@ -263,7 +276,7 @@ export function UsersTableView(props: UsersTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 text-center", rowBg)}>
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 text-center transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex justify-center">
                         <ContactMenu phone={user.phone} email={user.email} />
                       </div>
@@ -285,11 +298,18 @@ export function UsersTableView(props: UsersTableProps) {
 
       {/* Mobile Cards */}
       <div className="sm:hidden space-y-3">
-        {users.map((user) => (
+        {users.map((user) => {
+          const selected = selectedIds.has(user.id);
+          return (
           <Card
             key={user.id}
             id={getRowId(user.id)}
-            className={cn("p-4", isHighlighted(user.id) && "row-highlight")}
+            onClick={(e: React.MouseEvent) => handleRowClick(e, user)}
+            className={cn(
+              "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
+              selected && "bg-primary-100 border-primary-200",
+              isHighlighted(user.id) && "row-highlight"
+            )}
           >
             <div className="flex items-start gap-3 mb-2">
               <input
@@ -342,7 +362,8 @@ export function UsersTableView(props: UsersTableProps) {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
         {users.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-8">{emptyMessage}</p>
         )}

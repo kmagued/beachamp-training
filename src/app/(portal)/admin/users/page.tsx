@@ -9,6 +9,7 @@ import type { UserRole } from "@/types/database";
 import { UsersPageSkeleton, UsersInlineSkeleton } from "./_components/skeleton";
 import { UsersFilters } from "./_components/filters";
 import { UsersTableView } from "./_components/table";
+import { UserDrawer } from "./_components/user-drawer";
 import { updateUserRole } from "./actions";
 
 export default function AdminUsersPage() {
@@ -30,6 +31,7 @@ function AdminUsersContent() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+  const [drawerUser, setDrawerUser] = useState<UserRow | null>(null);
   const PAGE_SIZE = 10;
 
   const { getRowId, isHighlighted } = useHighlightRow();
@@ -65,6 +67,7 @@ function AdminUsersContent() {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
       );
+      setDrawerUser((prev) => prev && prev.id === userId ? { ...prev, role: newRole } : prev);
     }
     setChangingRoleId(null);
   }, []);
@@ -200,6 +203,7 @@ function AdminUsersContent() {
             onRoleChange={handleRoleChange}
             changingRoleId={changingRoleId}
             currentUserId={currentUserId}
+            onRowClick={setDrawerUser}
           />
         )}
       </div>
@@ -208,6 +212,14 @@ function AdminUsersContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+      />
+
+      <UserDrawer
+        user={drawerUser}
+        onClose={() => setDrawerUser(null)}
+        onRoleChange={handleRoleChange}
+        changingRoleId={changingRoleId}
+        currentUserId={currentUserId}
       />
     </div>
   );

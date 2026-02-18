@@ -1,5 +1,6 @@
 import { RefObject, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -136,7 +137,20 @@ export function PlayersTableView(props: PlayersTableProps) {
     hasActiveFilters,
   } = props;
 
+  const router = useRouter();
   const emptyMessage = hasActiveFilters ? "No players match your filters" : "No players found";
+
+  const selectionMode = selectedIds.size > 0;
+
+  function handleRowClick(e: React.MouseEvent, playerId: string) {
+    const target = e.target as HTMLElement;
+    if (target.closest("input, button, a")) return;
+    if (selectionMode) {
+      toggleSelect(playerId);
+    } else {
+      router.push(`/admin/players/${playerId}`);
+    }
+  }
 
   return (
     <>
@@ -186,27 +200,31 @@ export function PlayersTableView(props: PlayersTableProps) {
                 const activeSub = player.subscriptions?.find((s) => s.status === "active");
                 const status = getPlayerStatus(player);
                 const highlighted = isHighlighted(player.id);
-                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const selected = selectedIds.has(player.id);
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
                     key={player.id}
                     id={getRowId(player.id)}
+                    onClick={(e) => handleRowClick(e, player.id)}
                     className={cn(
-                      i % 2 === 1 && "bg-[#FAFBFC]",
+                      "group cursor-pointer hover:bg-primary-50 transition-colors",
+                      selected && "bg-primary-100 hover:bg-primary-100",
+                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
                       highlighted && "row-highlight"
                     )}
                   >
                     {/* Sticky left: checkbox */}
-                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(player.id)}
+                        checked={selected}
                         onChange={() => toggleSelect(player.id)}
                         className="table-checkbox"
                       />
                     </td>
                     {/* Sticky left: player */}
-                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
                         {player.first_name} {player.last_name}
                       </p>
@@ -242,7 +260,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       {new Date(player.created_at).toLocaleDateString()}
                     </td>
                     {/* Sticky right: status + contact */}
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex items-center gap-3 justify-between">
                         <StatusBadge status={status} />
                         <ContactMenu phone={player.phone} email={player.email} />
@@ -268,11 +286,17 @@ export function PlayersTableView(props: PlayersTableProps) {
         {players.map((player) => {
           const activeSub = player.subscriptions?.find((s) => s.status === "active");
           const status = getPlayerStatus(player);
+          const selected = selectedIds.has(player.id);
           return (
             <Card
               key={player.id}
               id={getRowId(player.id)}
-              className={cn("p-4", isHighlighted(player.id) && "row-highlight")}
+              onClick={(e: React.MouseEvent) => handleRowClick(e, player.id)}
+              className={cn(
+                "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
+                selected && "bg-primary-100 border-primary-200",
+                isHighlighted(player.id) && "row-highlight"
+              )}
             >
               <div className="flex items-start gap-3 mb-2">
                 <input

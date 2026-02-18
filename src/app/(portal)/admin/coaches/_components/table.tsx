@@ -115,7 +115,14 @@ export function CoachesTableView(props: CoachesTableProps) {
     hasActiveFilters,
   } = props;
 
+  const selectionMode = selectedIds.size > 0;
   const emptyMessage = hasActiveFilters ? "No coaches match your filters" : "No coaches found";
+
+  function handleRowClick(e: React.MouseEvent, coachId: string) {
+    const target = e.target as HTMLElement;
+    if (target.closest("input, button, a, select")) return;
+    if (selectionMode) toggleSelect(coachId);
+  }
 
   return (
     <>
@@ -154,25 +161,29 @@ export function CoachesTableView(props: CoachesTableProps) {
             <tbody>
               {coaches.map((coach, i) => {
                 const highlighted = isHighlighted(coach.id);
-                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const selected = selectedIds.has(coach.id);
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
                     key={coach.id}
                     id={getRowId(coach.id)}
+                    onClick={(e) => handleRowClick(e, coach.id)}
                     className={cn(
-                      i % 2 === 1 && "bg-[#FAFBFC]",
+                      "group cursor-pointer hover:bg-primary-50 transition-colors",
+                      selected && "bg-primary-100 hover:bg-primary-100",
+                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
                       highlighted && "row-highlight"
                     )}
                   >
-                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(coach.id)}
+                        checked={selected}
                         onChange={() => toggleSelect(coach.id)}
                         className="table-checkbox"
                       />
                     </td>
-                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
                         {coach.first_name} {coach.last_name}
                       </p>
@@ -189,7 +200,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {new Date(coach.created_at).toLocaleDateString()}
                     </td>
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex items-center gap-3 justify-between">
                         <Badge variant={coach.is_active ? "success" : "neutral"}>
                           {coach.is_active ? "Active" : "Inactive"}
@@ -214,11 +225,18 @@ export function CoachesTableView(props: CoachesTableProps) {
 
       {/* Mobile Cards */}
       <div className="sm:hidden space-y-3">
-        {coaches.map((coach) => (
+        {coaches.map((coach) => {
+          const selected = selectedIds.has(coach.id);
+          return (
           <Card
             key={coach.id}
             id={getRowId(coach.id)}
-            className={cn("p-4", isHighlighted(coach.id) && "row-highlight")}
+            onClick={(e: React.MouseEvent) => handleRowClick(e, coach.id)}
+            className={cn(
+              "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
+              selected && "bg-primary-100 border-primary-200",
+              isHighlighted(coach.id) && "row-highlight"
+            )}
           >
             <div className="flex items-start gap-3 mb-2">
               <input
@@ -259,7 +277,8 @@ export function CoachesTableView(props: CoachesTableProps) {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
         {coaches.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-8">{emptyMessage}</p>
         )}

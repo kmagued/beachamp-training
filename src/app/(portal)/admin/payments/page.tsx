@@ -11,6 +11,7 @@ import { PaymentsPageSkeleton, PaymentsInlineSkeleton } from "./_components/skel
 import { PaymentsFilters } from "./_components/filters";
 import { PaymentsTableView } from "./_components/table";
 import { RejectModal, ScreenshotLightbox } from "./_components/modals";
+import { PaymentDrawer } from "./_components/payment-drawer";
 
 export default function AdminPaymentsPage() {
   return (
@@ -28,6 +29,7 @@ function AdminPaymentsContent() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const [drawerPayment, setDrawerPayment] = useState<PaymentRow | null>(null);
 
   const searchParams = useSearchParams();
   const initialStatusParam = searchParams.get("status");
@@ -248,6 +250,7 @@ function AdminPaymentsContent() {
             isPending={isPending}
             actionId={actionId}
             onViewScreenshot={handleViewScreenshot}
+            onRowClick={setDrawerPayment}
             search={search}
             statusFilter={statusFilter}
           />
@@ -273,6 +276,16 @@ function AdminPaymentsContent() {
       <ScreenshotLightbox
         url={screenshotUrl}
         onClose={() => setScreenshotUrl(null)}
+      />
+
+      <PaymentDrawer
+        payment={drawerPayment}
+        onClose={() => setDrawerPayment(null)}
+        onConfirm={(id) => { setDrawerPayment(null); handleConfirm(id); }}
+        onReject={(id) => { setDrawerPayment(null); setRejectingId(id); }}
+        onViewScreenshot={handleViewScreenshot}
+        isPending={isPending}
+        actionId={actionId}
       />
     </div>
   );

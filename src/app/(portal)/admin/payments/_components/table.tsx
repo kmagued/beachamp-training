@@ -21,6 +21,7 @@ interface PaymentsTableProps {
   isPending: boolean;
   actionId: string | null;
   onViewScreenshot: (path: string) => void;
+  onRowClick: (payment: PaymentRow) => void;
   search: string;
   statusFilter: string;
 }
@@ -43,8 +44,20 @@ export function PaymentsTableView(props: PaymentsTableProps) {
   const {
     payments, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    onConfirm, onReject, isPending, actionId, onViewScreenshot, search, statusFilter,
+    onConfirm, onReject, isPending, actionId, onViewScreenshot, onRowClick, search, statusFilter,
   } = props;
+
+  const selectionMode = selectedIds.size > 0;
+
+  function handleRowClick(e: React.MouseEvent, payment: PaymentRow) {
+    const target = e.target as HTMLElement;
+    if (target.closest("input, button, a")) return;
+    if (selectionMode) {
+      toggleSelect(payment.id);
+    } else {
+      onRowClick(payment);
+    }
+  }
 
   const emptyMessage = search || statusFilter
     ? "No payments match your filters"
@@ -93,27 +106,31 @@ export function PaymentsTableView(props: PaymentsTableProps) {
             <tbody>
               {payments.map((payment, i) => {
                 const highlighted = isHighlighted(payment.id);
-                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const selected = selectedIds.has(payment.id);
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
                     key={payment.id}
                     id={getRowId(payment.id)}
+                    onClick={(e) => handleRowClick(e, payment)}
                     className={cn(
-                      i % 2 === 1 && "bg-[#FAFBFC]",
+                      "group cursor-pointer hover:bg-primary-50 transition-colors",
+                      selected && "bg-primary-100 hover:bg-primary-100",
+                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
                       highlighted && "row-highlight"
                     )}
                   >
                     {/* Sticky left: checkbox */}
-                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(payment.id)}
+                        checked={selected}
                         onChange={() => toggleSelect(payment.id)}
                         className="table-checkbox"
                       />
                     </td>
                     {/* Sticky left: player */}
-                    <td className={cn(tdBase, "sticky left-12 z-10 text-sm font-medium text-slate-900 min-w-[150px] border-r border-r-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-12 z-10 text-sm font-medium text-slate-900 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       {payment.profiles?.first_name} {payment.profiles?.last_name}
                     </td>
                     {/* Scrollable middle */}
@@ -142,7 +159,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                       )}
                     </td>
                     {/* Sticky right: screenshot + actions */}
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex items-center justify-center gap-1.5">
                         {payment.screenshot_url && (
                           <button
@@ -198,11 +215,18 @@ export function PaymentsTableView(props: PaymentsTableProps) {
 
       {/* Mobile Cards */}
       <div className="sm:hidden space-y-3">
-        {payments.map((payment) => (
+        {payments.map((payment) => {
+          const selected = selectedIds.has(payment.id);
+          return (
           <Card
             key={payment.id}
             id={getRowId(payment.id)}
-            className={cn("p-4", isHighlighted(payment.id) && "row-highlight")}
+            onClick={(e: React.MouseEvent) => handleRowClick(e, payment)}
+            className={cn(
+              "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
+              selected && "bg-primary-100 border-primary-200",
+              isHighlighted(payment.id) && "row-highlight"
+            )}
           >
             <div className="flex items-start gap-3 mb-2">
               <input
@@ -274,7 +298,8 @@ export function PaymentsTableView(props: PaymentsTableProps) {
               </div>
             )}
           </Card>
-        ))}
+          );
+        })}
         {payments.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-8">{emptyMessage}</p>
         )}
