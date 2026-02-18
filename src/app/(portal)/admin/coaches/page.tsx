@@ -4,27 +4,24 @@ import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "rea
 import { createBrowserClient } from "@supabase/ssr";
 import { Pagination, SelectionBar } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import type { PlayerRow, SortField, SortDir } from "./_components/types";
-import { getPlayerStatus } from "./_components/types";
-import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
-import { PlayersFilters } from "./_components/filters";
-import { PlayersTableView } from "./_components/table";
+import type { CoachRow, SortField, SortDir } from "./_components/types";
+import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
+import { CoachesFilters } from "./_components/filters";
+import { CoachesTableView } from "./_components/table";
 
-export default function AdminPlayersPage() {
+export default function AdminCoachesPage() {
   return (
-    <Suspense fallback={<PlayersPageSkeleton />}>
-      <AdminPlayersContent />
+    <Suspense fallback={<CoachesPageSkeleton />}>
+      <AdminCoachesContent />
     </Suspense>
   );
 }
 
-function AdminPlayersContent() {
-  const [players, setPlayers] = useState<PlayerRow[]>([]);
+function AdminCoachesContent() {
+  const [coaches, setCoaches] = useState<CoachRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [levelFilter, setLevelFilter] = useState("");
-  const [packageFilter, setPackageFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -41,86 +38,61 @@ function AdminPlayersContent() {
     async function load() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, health_conditions, playing_level, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
-        .eq("role", "player")
+        .select("id, first_name, last_name, email, phone, area, is_active, created_at")
+        .eq("role", "coach")
         .order("created_at", { ascending: false });
-      if (data) setPlayers(data as unknown as PlayerRow[]);
+      if (data) setCoaches(data as CoachRow[]);
       setLoading(false);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Unique package names for filter dropdown
-  const packageNames = useMemo(() => {
-    const names = new Set<string>();
-    players.forEach((p) => {
-      p.subscriptions?.forEach((s) => {
-        if (s.packages?.name) names.add(s.packages.name);
-      });
-    });
-    return Array.from(names).sort();
-  }, [players]);
-
-  const levelOrder: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, professional: 3 };
-
-  const filteredPlayers = useMemo(() => {
-    const result = players.filter((p) => {
+  const filteredCoaches = useMemo(() => {
+    const result = coaches.filter((c) => {
       if (search) {
         const q = search.toLowerCase();
-        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+        const fullName = `${c.first_name} ${c.last_name}`.toLowerCase();
         const matchesSearch =
           fullName.includes(q) ||
-          (p.email?.toLowerCase().includes(q) ?? false);
+          (c.email?.toLowerCase().includes(q) ?? false);
         if (!matchesSearch) return false;
       }
       if (statusFilter) {
         const selected = statusFilter.split(",").map((s) => s.toLowerCase());
-        if (!selected.includes(getPlayerStatus(p))) return false;
-      }
-      if (levelFilter) {
-        const selected = levelFilter.split(",").map((s) => s.toLowerCase());
-        if (!p.playing_level || !selected.includes(p.playing_level)) return false;
-      }
-      if (packageFilter) {
-        const selected = packageFilter.split(",");
-        const activePackage = p.subscriptions?.find((s) => s.status === "active")?.packages?.name;
-        if (!activePackage || !selected.includes(activePackage)) return false;
+        const status = c.is_active ? "active" : "inactive";
+        if (!selected.includes(status)) return false;
       }
       return true;
     });
 
     return [...result].sort((a, b) => {
       let cmp = 0;
-      if (sortField === "date") {
+      if (sortField === "name") {
+        cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      } else {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      } else if (sortField === "level") {
-        cmp = (levelOrder[a.playing_level ?? ""] ?? 99) - (levelOrder[b.playing_level ?? ""] ?? 99);
-      } else if (sortField === "package") {
-        const aName = a.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
-        const bName = b.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
-        cmp = aName.localeCompare(bName);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, search, statusFilter, levelFilter, packageFilter, sortField, sortDir]);
+  }, [coaches, search, statusFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredPlayers.length / PAGE_SIZE);
-  const paginatedPlayers = filteredPlayers.slice(
+  const totalPages = Math.ceil(filteredCoaches.length / PAGE_SIZE);
+  const paginatedCoaches = filteredCoaches.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, levelFilter, packageFilter]);
+  }, [search, statusFilter]);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const pageIds = paginatedPlayers.map((p) => p.id);
+  const pageIds = paginatedCoaches.map((c) => c.id);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageIds.some((id) => selectedIds.has(id));
 
@@ -156,29 +128,24 @@ function AdminPlayersContent() {
     }
   }
 
-  const hasActiveFilters = !!search || !!statusFilter || !!levelFilter || !!packageFilter;
+  const hasActiveFilters = !!search || !!statusFilter;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Players</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Coaches</h1>
         <p className="text-slate-500 text-sm">
-          {players.length} total players
-          {hasActiveFilters && ` · ${filteredPlayers.length} matching`}
+          {coaches.length} total coaches
+          {hasActiveFilters && ` · ${filteredCoaches.length} matching`}
         </p>
       </div>
 
-      <PlayersFilters
+      <CoachesFilters
         search={search}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        levelFilter={levelFilter}
-        onLevelFilterChange={setLevelFilter}
-        packageFilter={packageFilter}
-        onPackageFilterChange={setPackageFilter}
-        packageOptions={packageNames}
-        onReset={() => { setSearch(""); setStatusFilter(""); setLevelFilter(""); setPackageFilter(""); }}
+        onReset={() => { setSearch(""); setStatusFilter(""); }}
         hasActiveFilters={hasActiveFilters}
       />
 
@@ -186,10 +153,10 @@ function AdminPlayersContent() {
 
       <div className="flex-1">
         {loading ? (
-          <PlayersInlineSkeleton />
+          <CoachesInlineSkeleton />
         ) : (
-          <PlayersTableView
-            players={paginatedPlayers}
+          <CoachesTableView
+            coaches={paginatedCoaches}
             selectedIds={selectedIds}
             toggleSelect={toggleSelect}
             toggleSelectAll={toggleSelectAll}

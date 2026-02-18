@@ -4,11 +4,10 @@ import { cn } from "@/lib/utils/cn";
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  totalItems?: number;
   onPageChange: (page: number) => void;
 }
 
-export function Pagination({ currentPage, totalPages, totalItems, onPageChange }: PaginationProps) {
+export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
   const effectiveTotal = Math.max(totalPages, 1);
 
   // Build page numbers to show (max 5 around current)
@@ -61,11 +60,6 @@ export function Pagination({ currentPage, totalPages, totalItems, onPageChange }
             )
           )}
         </div>
-        {totalItems !== undefined && (
-          <span className="text-xs text-slate-400 hidden sm:inline">
-            ({totalItems} {totalItems === 1 ? "item" : "items"})
-          </span>
-        )}
       </div>
 
       <button

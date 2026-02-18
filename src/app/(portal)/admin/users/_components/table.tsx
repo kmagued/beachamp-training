@@ -1,13 +1,13 @@
 import { RefObject, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Card, Badge } from "@/components/ui";
-import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import type { PlayerRow, SortField, SortDir } from "./types";
-import { getPlayerStatus } from "./types";
+import type { UserRow, SortField, SortDir } from "./types";
+import type { UserRole } from "@/types/database";
 
-interface PlayersTableProps {
-  players: PlayerRow[];
+interface UsersTableProps {
+  users: UserRow[];
   selectedIds: Set<string>;
   toggleSelect: (id: string) => void;
   toggleSelectAll: () => void;
@@ -19,6 +19,9 @@ interface PlayersTableProps {
   sortDir: SortDir;
   toggleSort: (field: SortField) => void;
   hasActiveFilters: boolean;
+  onRoleChange: (userId: string, newRole: UserRole) => void;
+  changingRoleId: string | null;
+  currentUserId: string;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -30,24 +33,61 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
   return sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "active": return <Badge variant="success">Active</Badge>;
-    case "expiring": return <Badge variant="warning">Expiring</Badge>;
-    case "pending": return <Badge variant="warning">Pending</Badge>;
-    default: return <Badge variant="neutral">Inactive</Badge>;
+function RoleBadge({ role }: { role: UserRole }) {
+  switch (role) {
+    case "admin": return <Badge variant="danger">Admin</Badge>;
+    case "coach": return <Badge variant="info">Coach</Badge>;
+    default: return <Badge variant="neutral">Player</Badge>;
   }
 }
 
-function LevelBadge({ level }: { level: string | null }) {
-  if (!level) return <Badge variant="neutral">—</Badge>;
-  switch (level) {
-    case "beginner": return <Badge variant="info">Beginner</Badge>;
-    case "intermediate": return <Badge variant="info">Intermediate</Badge>;
-    case "advanced": return <Badge variant="success">Advanced</Badge>;
-    case "professional": return <Badge variant="success">Professional</Badge>;
-    default: return <Badge variant="neutral">{level}</Badge>;
+function RoleSelect({
+  userId,
+  currentRole,
+  onRoleChange,
+  isChanging,
+  isSelf,
+}: {
+  userId: string;
+  currentRole: UserRole;
+  onRoleChange: (userId: string, newRole: UserRole) => void;
+  isChanging: boolean;
+  isSelf: boolean;
+}) {
+  if (isSelf) {
+    return <RoleBadge role={currentRole} />;
   }
+
+  return (
+    <div className="relative inline-flex items-center">
+      {isChanging ? (
+        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+      ) : (
+        <select
+          value={currentRole}
+          onChange={(e) => {
+            const newRole = e.target.value as UserRole;
+            if (newRole === currentRole) return;
+            if (newRole === "admin" || currentRole === "admin") {
+              const confirmed = window.confirm(
+                `Are you sure you want to change this user's role ${currentRole === "admin" ? "from" : "to"} Admin?`
+              );
+              if (!confirmed) {
+                e.target.value = currentRole;
+                return;
+              }
+            }
+            onRoleChange(userId, newRole);
+          }}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+        >
+          <option value="player">Player</option>
+          <option value="coach">Coach</option>
+          <option value="admin">Admin</option>
+        </select>
+      )}
+    </div>
+  );
 }
 
 function ContactMenu({ phone, email }: { phone: string | null; email: string | null }) {
@@ -129,14 +169,14 @@ function ContactMenu({ phone, email }: { phone: string | null; email: string | n
   );
 }
 
-export function PlayersTableView(props: PlayersTableProps) {
+export function UsersTableView(props: UsersTableProps) {
   const {
-    players, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
+    users, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    hasActiveFilters,
+    hasActiveFilters, onRoleChange, changingRoleId, currentUserId,
   } = props;
 
-  const emptyMessage = hasActiveFilters ? "No players match your filters" : "No players found";
+  const emptyMessage = hasActiveFilters ? "No users match your filters" : "No users found";
 
   return (
     <>
@@ -146,7 +186,6 @@ export function PlayersTableView(props: PlayersTableProps) {
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr>
-                {/* Sticky left */}
                 <th className="sticky left-0 z-20 bg-white px-4 py-3 w-12 border-b border-slate-200">
                   <input
                     ref={selectAllRef}
@@ -156,102 +195,83 @@ export function PlayersTableView(props: PlayersTableProps) {
                     className="table-checkbox"
                   />
                 </th>
-                <th className={cn(thBase, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")}>
-                  Player
+                <th className={cn(thSortable, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")} onClick={() => toggleSort("name")}>
+                  <span className="inline-flex items-center gap-1">Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                {/* Scrollable middle */}
-                <th className={thSortable} onClick={() => toggleSort("package")}>
-                  <span className="inline-flex items-center gap-1">Package <SortIcon field="package" sortField={sortField} sortDir={sortDir} /></span>
+                <th className={thBase}>Email</th>
+                <th className={thBase}>Phone</th>
+                <th className={thBase}>Area</th>
+                <th className={thSortable} onClick={() => toggleSort("role")}>
+                  <span className="inline-flex items-center gap-1">Role <SortIcon field="role" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                <th className={thBase}>Sessions</th>
-                <th className={thBase}>Expires</th>
-                <th className={thSortable} onClick={() => toggleSort("level")}>
-                  <span className="inline-flex items-center gap-1">Level <SortIcon field="level" sortField={sortField} sortDir={sortDir} /></span>
-                </th>
-                <th className={thBase}>Health Conditions</th>
+                <th className={thBase}>Status</th>
                 <th className={thSortable} onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1">Registered <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                {/* Sticky right */}
-                <th className={cn(thBase, "sticky right-0 z-20 bg-white border-l border-l-slate-200")}>
-                  <div className="flex items-center gap-3 justify-between">
-                    <span>Status</span>
-                    <span>Contact</span>
-                  </div>
-                </th>
+                <th className={cn(thBase, "sticky right-0 z-20 bg-white border-l border-l-slate-200 text-center")}>Contact</th>
               </tr>
             </thead>
             <tbody>
-              {players.map((player, i) => {
-                const activeSub = player.subscriptions?.find((s) => s.status === "active");
-                const status = getPlayerStatus(player);
-                const highlighted = isHighlighted(player.id);
+              {users.map((user, i) => {
+                const highlighted = isHighlighted(user.id);
                 const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
-                    key={player.id}
-                    id={getRowId(player.id)}
+                    key={user.id}
+                    id={getRowId(user.id)}
                     className={cn(
                       i % 2 === 1 && "bg-[#FAFBFC]",
                       highlighted && "row-highlight"
                     )}
                   >
-                    {/* Sticky left: checkbox */}
                     <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(player.id)}
-                        onChange={() => toggleSelect(player.id)}
+                        checked={selectedIds.has(user.id)}
+                        onChange={() => toggleSelect(user.id)}
                         className="table-checkbox"
                       />
                     </td>
-                    {/* Sticky left: player */}
                     <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
-                        {player.first_name} {player.last_name}
+                        {user.first_name} {user.last_name}
                       </p>
-                      <p className="text-xs text-slate-400">{player.email}</p>
-                    </td>
-                    {/* Scrollable middle */}
-                    <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {activeSub?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {activeSub
-                        ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}`
-                        : "—"}
+                      {user.email || "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {activeSub?.end_date
-                        ? new Date(activeSub.end_date).toLocaleDateString()
-                        : "—"}
+                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                      {user.phone || "—"}
+                    </td>
+                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                      {user.area || "—"}
                     </td>
                     <td className={tdBase}>
-                      <LevelBadge level={player.playing_level} />
+                      <RoleSelect
+                        userId={user.id}
+                        currentRole={user.role}
+                        onRoleChange={onRoleChange}
+                        isChanging={changingRoleId === user.id}
+                        isSelf={user.id === currentUserId}
+                      />
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-700 max-w-[200px]")}>
-                      {player.health_conditions ? (
-                        <span className="truncate block" title={player.health_conditions}>
-                          {player.health_conditions}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                    <td className={tdBase}>
+                      <Badge variant={user.is_active ? "success" : "neutral"}>
+                        {user.is_active ? "Active" : "Inactive"}
+                      </Badge>
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {new Date(player.created_at).toLocaleDateString()}
+                      {new Date(user.created_at).toLocaleDateString()}
                     </td>
-                    {/* Sticky right: status + contact */}
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
-                      <div className="flex items-center gap-3 justify-between">
-                        <StatusBadge status={status} />
-                        <ContactMenu phone={player.phone} email={player.email} />
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 text-center", rowBg)}>
+                      <div className="flex justify-center">
+                        <ContactMenu phone={user.phone} email={user.email} />
                       </div>
                     </td>
                   </tr>
                 );
               })}
-              {players.length === 0 && (
+              {users.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
@@ -265,73 +285,65 @@ export function PlayersTableView(props: PlayersTableProps) {
 
       {/* Mobile Cards */}
       <div className="sm:hidden space-y-3">
-        {players.map((player) => {
-          const activeSub = player.subscriptions?.find((s) => s.status === "active");
-          const status = getPlayerStatus(player);
-          return (
-            <Card
-              key={player.id}
-              id={getRowId(player.id)}
-              className={cn("p-4", isHighlighted(player.id) && "row-highlight")}
-            >
-              <div className="flex items-start gap-3 mb-2">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(player.id)}
-                  onChange={() => toggleSelect(player.id)}
-                  className="table-checkbox mt-0.5"
-                />
-                <div className="flex items-start justify-between flex-1 min-w-0">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {player.first_name} {player.last_name}
-                    </p>
-                    <p className="text-xs text-slate-400">{player.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={status} />
-                    <ContactMenu phone={player.phone} email={player.email} />
-                  </div>
+        {users.map((user) => (
+          <Card
+            key={user.id}
+            id={getRowId(user.id)}
+            className={cn("p-4", isHighlighted(user.id) && "row-highlight")}
+          >
+            <div className="flex items-start gap-3 mb-2">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(user.id)}
+                onChange={() => toggleSelect(user.id)}
+                className="table-checkbox mt-0.5"
+              />
+              <div className="flex items-start justify-between flex-1 min-w-0">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {user.first_name} {user.last_name}
+                  </p>
+                  <p className="text-xs text-slate-400">{user.email || "No email"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={user.is_active ? "success" : "neutral"}>
+                    {user.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                  <ContactMenu phone={user.phone} email={user.email} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                <div>
-                  <span className="text-slate-400">Package</span>
-                  <p className="text-slate-700 font-medium">{activeSub?.packages?.name || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Sessions</span>
-                  <p className="text-slate-700 font-medium">
-                    {activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Expires</span>
-                  <p className="text-slate-700 font-medium">
-                    {activeSub?.end_date ? new Date(activeSub.end_date).toLocaleDateString() : "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Level</span>
-                  <div className="mt-0.5"><LevelBadge level={player.playing_level} /></div>
-                </div>
-                {player.health_conditions && (
-                  <div className="col-span-2">
-                    <span className="text-slate-400">Health Conditions</span>
-                    <p className="text-slate-700 font-medium">{player.health_conditions}</p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-slate-400">Registered</span>
-                  <p className="text-slate-700 font-medium">
-                    {new Date(player.created_at).toLocaleDateString()}
-                  </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+              <div>
+                <span className="text-slate-400">Role</span>
+                <div className="mt-0.5">
+                  <RoleSelect
+                    userId={user.id}
+                    currentRole={user.role}
+                    onRoleChange={onRoleChange}
+                    isChanging={changingRoleId === user.id}
+                    isSelf={user.id === currentUserId}
+                  />
                 </div>
               </div>
-            </Card>
-          );
-        })}
-        {players.length === 0 && (
+              <div>
+                <span className="text-slate-400">Phone</span>
+                <p className="text-slate-700 font-medium">{user.phone || "—"}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Area</span>
+                <p className="text-slate-700 font-medium">{user.area || "—"}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Registered</span>
+                <p className="text-slate-700 font-medium">
+                  {new Date(user.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {users.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-8">{emptyMessage}</p>
         )}
       </div>

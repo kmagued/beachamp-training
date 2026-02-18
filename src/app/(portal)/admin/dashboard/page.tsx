@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard, Card, Badge } from "@/components/ui";
-import { Users, CreditCard, DollarSign, CalendarDays, Package, BarChart3, Activity } from "lucide-react";
+import { Users, CreditCard, CalendarDays, Package, Activity } from "lucide-react";
+import { RevenueCard } from "./revenue-card";
 
 // --- Helpers for grouping data ---
 function groupBy<T>(items: T[], keyFn: (item: T) => string | null): Record<string, number> {
@@ -168,11 +169,9 @@ export default async function AdminDashboard() {
           accentColor="bg-primary"
           icon={<Users className="w-5 h-5" />}
         />
-        <StatCard
+        <RevenueCard
           label={`Revenue (${currentMonth})`}
           value={`${monthlyRevenue.toLocaleString()} EGP`}
-          accentColor="bg-emerald-500"
-          icon={<DollarSign className="w-5 h-5" />}
         />
         <StatCard
           label="Pending Payments"

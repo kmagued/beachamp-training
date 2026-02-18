@@ -14,6 +14,8 @@ import {
   Users,
   CreditCard,
   Package,
+  UserCheck,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -49,6 +51,8 @@ const iconMap = {
   players: Users,
   payments: CreditCard,
   packages: Package,
+  coaches: UserCheck,
+  users: ShieldCheck,
 } as const;
 
 const playerNav = [
@@ -62,8 +66,10 @@ const playerNav = [
 const adminNav = [
   { key: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { key: "players", label: "Players", href: "/admin/players" },
+  { key: "coaches", label: "Coaches", href: "/admin/coaches" },
   { key: "payments", label: "Payments", href: "/admin/payments" },
   { key: "packages", label: "Packages", href: "/admin/packages" },
+  { key: "users", label: "User Mgmt", href: "/admin/users" },
 ] as const;
 
 interface SidebarLayoutProps {

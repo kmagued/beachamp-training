@@ -3,6 +3,8 @@ export interface PlayerRow {
   first_name: string;
   last_name: string;
   email: string | null;
+  phone: string | null;
+  health_conditions: string | null;
   playing_level: string | null;
   created_at: string;
   subscriptions: {

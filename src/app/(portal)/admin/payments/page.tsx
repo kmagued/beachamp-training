@@ -200,7 +200,10 @@ function AdminPaymentsContent() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
-        <p className="text-slate-500 text-sm">Review and manage player payments</p>
+        <p className="text-slate-500 text-sm">
+          {payments.length} total payments
+          {(!!search || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
+        </p>
       </div>
 
       <div className="flex gap-3 mb-6">
@@ -254,7 +257,6 @@ function AdminPaymentsContent() {
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        totalItems={filteredPayments.length}
         onPageChange={setCurrentPage}
       />
 

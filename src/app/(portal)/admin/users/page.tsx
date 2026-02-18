@@ -4,30 +4,32 @@ import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "rea
 import { createBrowserClient } from "@supabase/ssr";
 import { Pagination, SelectionBar } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import type { PlayerRow, SortField, SortDir } from "./_components/types";
-import { getPlayerStatus } from "./_components/types";
-import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
-import { PlayersFilters } from "./_components/filters";
-import { PlayersTableView } from "./_components/table";
+import type { UserRow, SortField, SortDir } from "./_components/types";
+import type { UserRole } from "@/types/database";
+import { UsersPageSkeleton, UsersInlineSkeleton } from "./_components/skeleton";
+import { UsersFilters } from "./_components/filters";
+import { UsersTableView } from "./_components/table";
+import { updateUserRole } from "./actions";
 
-export default function AdminPlayersPage() {
+export default function AdminUsersPage() {
   return (
-    <Suspense fallback={<PlayersPageSkeleton />}>
-      <AdminPlayersContent />
+    <Suspense fallback={<UsersPageSkeleton />}>
+      <AdminUsersContent />
     </Suspense>
   );
 }
 
-function AdminPlayersContent() {
-  const [players, setPlayers] = useState<PlayerRow[]>([]);
+function AdminUsersContent() {
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [levelFilter, setLevelFilter] = useState("");
-  const [packageFilter, setPackageFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const PAGE_SIZE = 10;
 
   const { getRowId, isHighlighted } = useHighlightRow();
@@ -39,88 +41,85 @@ function AdminPlayersContent() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, phone, health_conditions, playing_level, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
-        .eq("role", "player")
-        .order("created_at", { ascending: false });
-      if (data) setPlayers(data as unknown as PlayerRow[]);
+      const [{ data: { user } }, { data }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, phone, area, role, is_active, created_at")
+          .order("created_at", { ascending: false }),
+      ]);
+      if (user) setCurrentUserId(user.id);
+      if (data) setUsers(data as UserRow[]);
       setLoading(false);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Unique package names for filter dropdown
-  const packageNames = useMemo(() => {
-    const names = new Set<string>();
-    players.forEach((p) => {
-      p.subscriptions?.forEach((s) => {
-        if (s.packages?.name) names.add(s.packages.name);
-      });
-    });
-    return Array.from(names).sort();
-  }, [players]);
+  const handleRoleChange = useCallback(async (userId: string, newRole: UserRole) => {
+    setChangingRoleId(userId);
+    const result = await updateUserRole(userId, newRole);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+      );
+    }
+    setChangingRoleId(null);
+  }, []);
 
-  const levelOrder: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, professional: 3 };
-
-  const filteredPlayers = useMemo(() => {
-    const result = players.filter((p) => {
+  const filteredUsers = useMemo(() => {
+    const result = users.filter((u) => {
       if (search) {
         const q = search.toLowerCase();
-        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+        const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
         const matchesSearch =
           fullName.includes(q) ||
-          (p.email?.toLowerCase().includes(q) ?? false);
+          (u.email?.toLowerCase().includes(q) ?? false);
         if (!matchesSearch) return false;
+      }
+      if (roleFilter) {
+        const selected = roleFilter.split(",").map((s) => s.toLowerCase());
+        if (!selected.includes(u.role)) return false;
       }
       if (statusFilter) {
         const selected = statusFilter.split(",").map((s) => s.toLowerCase());
-        if (!selected.includes(getPlayerStatus(p))) return false;
-      }
-      if (levelFilter) {
-        const selected = levelFilter.split(",").map((s) => s.toLowerCase());
-        if (!p.playing_level || !selected.includes(p.playing_level)) return false;
-      }
-      if (packageFilter) {
-        const selected = packageFilter.split(",");
-        const activePackage = p.subscriptions?.find((s) => s.status === "active")?.packages?.name;
-        if (!activePackage || !selected.includes(activePackage)) return false;
+        const status = u.is_active ? "active" : "inactive";
+        if (!selected.includes(status)) return false;
       }
       return true;
     });
 
     return [...result].sort((a, b) => {
       let cmp = 0;
-      if (sortField === "date") {
+      if (sortField === "name") {
+        cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      } else if (sortField === "role") {
+        cmp = a.role.localeCompare(b.role);
+      } else {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      } else if (sortField === "level") {
-        cmp = (levelOrder[a.playing_level ?? ""] ?? 99) - (levelOrder[b.playing_level ?? ""] ?? 99);
-      } else if (sortField === "package") {
-        const aName = a.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
-        const bName = b.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
-        cmp = aName.localeCompare(bName);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, search, statusFilter, levelFilter, packageFilter, sortField, sortDir]);
+  }, [users, search, roleFilter, statusFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredPlayers.length / PAGE_SIZE);
-  const paginatedPlayers = filteredPlayers.slice(
+  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE);
+  const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, levelFilter, packageFilter]);
+  }, [search, roleFilter, statusFilter]);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const pageIds = paginatedPlayers.map((p) => p.id);
+  const pageIds = paginatedUsers.map((u) => u.id);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageIds.some((id) => selectedIds.has(id));
 
@@ -156,29 +155,26 @@ function AdminPlayersContent() {
     }
   }
 
-  const hasActiveFilters = !!search || !!statusFilter || !!levelFilter || !!packageFilter;
+  const hasActiveFilters = !!search || !!roleFilter || !!statusFilter;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Players</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">User Management</h1>
         <p className="text-slate-500 text-sm">
-          {players.length} total players
-          {hasActiveFilters && ` · ${filteredPlayers.length} matching`}
+          {users.length} total users
+          {hasActiveFilters && ` · ${filteredUsers.length} matching`}
         </p>
       </div>
 
-      <PlayersFilters
+      <UsersFilters
         search={search}
         onSearchChange={setSearch}
+        roleFilter={roleFilter}
+        onRoleFilterChange={setRoleFilter}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        levelFilter={levelFilter}
-        onLevelFilterChange={setLevelFilter}
-        packageFilter={packageFilter}
-        onPackageFilterChange={setPackageFilter}
-        packageOptions={packageNames}
-        onReset={() => { setSearch(""); setStatusFilter(""); setLevelFilter(""); setPackageFilter(""); }}
+        onReset={() => { setSearch(""); setRoleFilter(""); setStatusFilter(""); }}
         hasActiveFilters={hasActiveFilters}
       />
 
@@ -186,10 +182,10 @@ function AdminPlayersContent() {
 
       <div className="flex-1">
         {loading ? (
-          <PlayersInlineSkeleton />
+          <UsersInlineSkeleton />
         ) : (
-          <PlayersTableView
-            players={paginatedPlayers}
+          <UsersTableView
+            users={paginatedUsers}
             selectedIds={selectedIds}
             toggleSelect={toggleSelect}
             toggleSelectAll={toggleSelectAll}
@@ -201,6 +197,9 @@ function AdminPlayersContent() {
             sortDir={sortDir}
             toggleSort={toggleSort}
             hasActiveFilters={hasActiveFilters}
+            onRoleChange={handleRoleChange}
+            changingRoleId={changingRoleId}
+            currentUserId={currentUserId}
           />
         )}
       </div>
