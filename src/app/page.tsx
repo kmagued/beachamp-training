@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
-import { Logo, buttonVariants, buttonSizes } from "@/components/ui";
+import { Navbar, buttonVariants, buttonSizes } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/user";
 import type { Package } from "@/types/database";
 
 const programs = [
@@ -107,9 +108,13 @@ const fallbackPackages = branding.packages.map((p) => ({
 }));
 
 export default async function LandingPage() {
-  // Fetch packages from database
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = await createClient() as any;
+
+  // Check if user is logged in
+  const currentUser = await getCurrentUser();
+
+  // Fetch packages from database
   const { data: dbPackages } = await supabase
     .from("packages")
     .select("*")
@@ -126,32 +131,13 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Nav ── */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-7xl mx-auto">
-          <Logo showName className="text-slate-900" />
-          <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="hidden sm:inline-block text-slate-600 hover:text-slate-900 font-medium text-sm px-4 py-2 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/login"
-              className="sm:hidden text-slate-600 hover:text-slate-900 font-medium text-xs px-2 py-1.5 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className={cn(buttonVariants.primary, "text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg")}
-            >
-              Join Now
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar
+        user={
+          currentUser
+            ? { initials: currentUser.initials, email: currentUser.email }
+            : null
+        }
+      />
 
       {/* ── Hero ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-24 pb-16 sm:pb-28">
@@ -174,28 +160,30 @@ export default async function LandingPage() {
             {branding.description}
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link
-              href="/register"
-              className={cn(
-                buttonVariants.primary,
-                buttonSizes.md,
-                "w-full sm:w-auto hover:shadow-lg hover:shadow-primary/20"
-              )}
-            >
-              Start Training
-            </Link>
-            <Link
-              href="/login"
-              className={cn(
-                "border border-slate-300 hover:border-slate-400 text-slate-700 hover:text-slate-900 font-medium transition-all",
-                buttonSizes.md,
-                "w-full sm:w-auto"
-              )}
-            >
-              Sign In
-            </Link>
-          </div>
+          {!currentUser && (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+              <Link
+                href="/register"
+                className={cn(
+                  buttonVariants.primary,
+                  buttonSizes.md,
+                  "w-full sm:w-auto hover:shadow-lg hover:shadow-primary/20"
+                )}
+              >
+                Start Training
+              </Link>
+              <Link
+                href="/login"
+                className={cn(
+                  "border border-slate-300 hover:border-slate-400 text-slate-700 hover:text-slate-900 font-medium transition-all",
+                  buttonSizes.md,
+                  "w-full sm:w-auto"
+                )}
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Stats */}
@@ -367,16 +355,29 @@ export default async function LandingPage() {
             Register today, pick a training package, and start improving your
             game.
           </p>
-          <Link
-            href="/register"
-            className={cn(
-              buttonVariants.primary,
-              "text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl",
-              "inline-block hover:shadow-lg hover:shadow-primary/25"
-            )}
-          >
-            Join {branding.name}
-          </Link>
+          {currentUser ? (
+            <Link
+              href="/player/dashboard"
+              className={cn(
+                buttonVariants.primary,
+                "text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl",
+                "inline-block hover:shadow-lg hover:shadow-primary/25"
+              )}
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/register"
+              className={cn(
+                buttonVariants.primary,
+                "text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl",
+                "inline-block hover:shadow-lg hover:shadow-primary/25"
+              )}
+            >
+              Join {branding.name}
+            </Link>
+          )}
         </div>
       </section>
 

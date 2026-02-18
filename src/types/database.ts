@@ -273,3 +273,26 @@ export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type GroupPlayer = Database["public"]["Tables"]["group_players"]["Row"];
+
+// ── Attendance & Feedback (migration 20260219) ──
+export interface Attendance {
+  id: string;
+  player_id: string;
+  group_id: string | null;
+  session_date: string;
+  session_time: string | null;
+  status: "present" | "absent" | "excused";
+  marked_by: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface Feedback {
+  id: string;
+  player_id: string;
+  coach_id: string;
+  session_date: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}

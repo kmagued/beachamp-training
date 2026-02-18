@@ -8,23 +8,11 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS health_conditions TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferred_package_id UUID REFERENCES packages(id);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE;
 
--- ── Update the trigger function ──
--- Note: area and date_of_birth are set via profile update after signUp, not in the trigger
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, first_name, last_name, email, phone, role)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'phone', NEW.phone),
-    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'player')
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- ── Disable the auto-profile trigger ──
+-- Profile creation is handled by the register server action using
+-- the service role client (bypasses RLS). This avoids trigger issues
+-- with type casting and metadata access.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 -- ── Update packages to match current pricing ──
 DELETE FROM packages WHERE name IN ('Starter', 'Premium', 'Elite');

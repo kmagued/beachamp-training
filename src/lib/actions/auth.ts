@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 
 export async function login(formData: FormData) {
@@ -22,12 +22,6 @@ export async function login(formData: FormData) {
 
   if (!user) return { error: "Authentication failed" };
 
-  // Check email verification
-  if (!user.email_confirmed_at) {
-    await supabase.auth.signOut();
-    return { error: "Please verify your email before signing in. Check your inbox for the verification link." };
-  }
-
   // Check if profile is completed
   const { data: profile } = await supabase
     .from("profiles")
@@ -42,17 +36,14 @@ export async function login(formData: FormData) {
 
   const role = profile?.role || "player";
   const redirectTo =
-    role === "admin"
-      ? "/admin/dashboard"
-      : role === "coach"
-        ? "/coach/dashboard"
-        : "/player/dashboard";
+    role === "admin" ? "/admin/dashboard" : role === "coach" ? "/coach/dashboard" : "/player/dashboard";
 
   redirect(redirectTo);
 }
 
 export async function register(formData: FormData) {
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -62,10 +53,7 @@ export async function register(formData: FormData) {
   const area = formData.get("area") as string;
   const dateOfBirth = formData.get("date_of_birth") as string;
 
-  console.log("[register] Starting signup for:", email);
-  console.log("[register] Metadata:", { firstName, lastName, phone, area, dateOfBirth });
-
-  // First, try signUp without metadata to isolate the issue
+  // signUp with minimal metadata — profile is created via admin client below
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -74,37 +62,35 @@ export async function register(formData: FormData) {
     },
   });
 
-  console.log("[register] signUp response - error:", error);
-  console.log("[register] signUp response - user:", data?.user?.id ?? "no user");
-
   if (error) {
-    console.error("[register] signUp error:", error.message, error.status);
     return { error: error.message };
   }
 
-  // Update profile with all fields (trigger creates minimal row, we fill in the rest)
+  // Create profile + auto-confirm email using admin client (service role)
   if (data.user) {
-    console.log("[register] Updating profile for user:", data.user.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateError } = await (supabase as any)
-      .from("profiles")
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        area,
-        date_of_birth: dateOfBirth || null,
-      })
-      .eq("id", data.user.id);
+    // Auto-confirm email so login works without SMTP setup
+    await admin.auth.admin.updateUserById(data.user.id, {
+      email_confirm: true,
+    });
 
-    if (updateError) {
-      console.error("[register] Profile update error:", updateError);
-    } else {
-      console.log("[register] Profile updated successfully");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: profileError } = await (admin as any).from("profiles").insert({
+      id: data.user.id,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
+      area,
+      date_of_birth: dateOfBirth || null,
+      role: "player",
+    });
+
+    if (profileError) {
+      console.error("[register] Profile creation error:", profileError);
     }
   }
 
-  redirect("/verify-email");
+  redirect("/complete-profile");
 }
 
 export async function completeProfile(formData: FormData) {

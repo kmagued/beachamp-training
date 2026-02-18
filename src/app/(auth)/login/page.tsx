@@ -1,31 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useCallback } from "react";
 import { login } from "@/lib/actions/auth";
-import { Button, Input, Label, Alert, Logo } from "@/components/ui";
+import { Button, Input, Label, Alert, Toast } from "@/components/ui";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
 
-  async function handleSubmit(formData: FormData) {
+  function updateField(name: string, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  const clearToast = useCallback(() => setToast(null), []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
+    setToast(null);
+
+    const formData = new FormData();
+    formData.set("email", form.email);
+    formData.set("password", form.password);
+
     const result = await login(formData);
     if (result?.error) {
-      setError(result.error);
+      if (result.error.toLowerCase().includes("verify")) {
+        setToast(result.error);
+      } else {
+        setError(result.error);
+      }
       setLoading(false);
     }
   }
 
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center px-4">
+      <Toast message={toast} variant="warning" onClose={clearToast} />
+
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex justify-center mb-6">
-            <Logo />
-          </Link>
           <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
           <p className="text-slate-500 text-sm mt-1">
             Sign in to your account
@@ -34,15 +52,27 @@ export default function LoginPage() {
 
         {error && <Alert className="mb-6">{error}</Alert>}
 
-        <form action={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label>Email</Label>
-            <Input type="email" name="email" required placeholder="you@example.com" />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => updateField("email", e.target.value)}
+              required
+              placeholder="you@example.com"
+            />
           </div>
 
           <div>
             <Label>Password</Label>
-            <Input type="password" name="password" required placeholder="••••••••" />
+            <Input
+              type="password"
+              value={form.password}
+              onChange={(e) => updateField("password", e.target.value)}
+              required
+              placeholder="••••••••"
+            />
           </div>
 
           <Button type="submit" disabled={loading} fullWidth>
