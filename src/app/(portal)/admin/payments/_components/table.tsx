@@ -28,7 +28,7 @@ interface PaymentsTableProps {
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
 const thSortable = `${thBase} cursor-pointer select-none hover:text-slate-600 transition-colors`;
-const tdBase = "px-4 py-3 border-b border-slate-100";
+const tdBase = "px-4 py-3 border-b border-slate-100 whitespace-nowrap";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
   if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
@@ -48,6 +48,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
   } = props;
 
   const selectionMode = selectedIds.size > 0;
+  const total = payments.reduce((sum, p) => sum + p.amount, 0);
 
   function handleRowClick(e: React.MouseEvent, payment: PaymentRow) {
     const target = e.target as HTMLElement;
@@ -134,7 +135,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                       {payment.profiles?.first_name} {payment.profiles?.last_name}
                     </td>
                     {/* Scrollable middle */}
-                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {payment.subscriptions?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
@@ -149,7 +150,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                     <td className={tdBase}>
                       <StatusBadge status={payment.status} />
                     </td>
-                    <td className={cn(tdBase, "text-sm whitespace-nowrap")}>
+                    <td className={cn(tdBase, "text-sm")}>
                       {payment.status === "rejected" && payment.rejection_reason ? (
                         <span className="text-red-400 text-xs" title={payment.rejection_reason}>
                           {payment.rejection_reason}
@@ -209,6 +210,22 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 </tr>
               )}
             </tbody>
+            {payments.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-50">
+                  <td className="sticky left-0 z-10 bg-slate-50 px-4 py-3 whitespace-nowrap" />
+                  <td className="sticky left-12 z-10 bg-slate-50 px-4 py-3 border-r border-r-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    Total
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap" />
+                  <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">
+                    {total.toLocaleString()} EGP
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap" colSpan={4} />
+                  <td className="sticky right-0 z-10 bg-slate-50 px-4 py-3 border-l border-l-slate-200 whitespace-nowrap" />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </Card>
@@ -300,6 +317,12 @@ export function PaymentsTableView(props: PaymentsTableProps) {
           </Card>
           );
         })}
+        {payments.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</span>
+            <span className="text-sm font-bold text-slate-900">{total.toLocaleString()} EGP</span>
+          </div>
+        )}
         {payments.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-8">{emptyMessage}</p>
         )}

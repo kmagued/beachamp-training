@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DollarSign, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-export function RevenueCard({ label, value }: { label: string; value: string }) {
+export function RevenueCard({ label, value, subtitle }: { label: string; value: string; subtitle?: string }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -28,6 +28,14 @@ export function RevenueCard({ label, value }: { label: string; value: string }) 
               {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          {subtitle && (
+            <p className={cn(
+              "text-xs text-slate-400 mt-1 transition-all duration-200 select-none",
+              !visible && "blur-md"
+            )}>
+              {subtitle}
+            </p>
+          )}
         </div>
         <div className="text-slate-300">
           <DollarSign className="w-5 h-5" />

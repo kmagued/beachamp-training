@@ -11,6 +11,9 @@ interface PaymentsFiltersProps {
   packageFilter: string;
   onPackageFilterChange: (value: string) => void;
   packageOptions: readonly string[];
+  monthFilter: string;
+  onMonthFilterChange: (value: string) => void;
+  monthOptions: readonly string[];
   onReset: () => void;
   hasActiveFilters: boolean;
 }
@@ -23,6 +26,9 @@ export function PaymentsFilters({
   packageFilter,
   onPackageFilterChange,
   packageOptions,
+  monthFilter,
+  onMonthFilterChange,
+  monthOptions,
   onReset,
   hasActiveFilters,
 }: PaymentsFiltersProps) {
@@ -37,6 +43,16 @@ export function PaymentsFilters({
           className="pl-9"
         />
       </div>
+      <select
+        value={monthFilter}
+        onChange={(e) => onMonthFilterChange(e.target.value)}
+        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-44"
+      >
+        <option value="">All Months</option>
+        {monthOptions.map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
       <MultiSelect
         options={STATUS_OPTIONS}
         value={statusFilter}

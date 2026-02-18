@@ -41,6 +41,7 @@ function AdminPaymentsContent() {
       : ""
   );
   const [packageFilter, setPackageFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,6 +79,16 @@ function AdminPaymentsContent() {
     return [...names].sort();
   }, [payments]);
 
+  // Derive unique months from payments (sorted newest first)
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    payments.forEach((p) => {
+      const d = new Date(p.created_at);
+      months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
+    });
+    return [...months];
+  }, [payments]);
+
   // Filtered + sorted payments
   const filteredPayments = useMemo(() => {
     let result = payments;
@@ -87,6 +98,13 @@ function AdminPaymentsContent() {
       result = result.filter((p) => {
         const name = `${p.profiles?.first_name ?? ""} ${p.profiles?.last_name ?? ""}`.toLowerCase();
         return name.includes(q);
+      });
+    }
+
+    if (monthFilter) {
+      result = result.filter((p) => {
+        const d = new Date(p.created_at);
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === monthFilter;
       });
     }
 
@@ -113,7 +131,7 @@ function AdminPaymentsContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [payments, search, statusFilter, packageFilter, sortField, sortDir]);
+  }, [payments, search, monthFilter, statusFilter, packageFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE);
@@ -124,7 +142,7 @@ function AdminPaymentsContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, packageFilter]);
+  }, [search, monthFilter, statusFilter, packageFilter]);
 
   // Selection helpers
   const pageIds = paginatedPayments.map((p) => p.id);
@@ -204,7 +222,7 @@ function AdminPaymentsContent() {
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
         <p className="text-slate-500 text-sm">
           {payments.length} total payments
-          {(!!search || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
+          {(!!search || !!monthFilter || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
         </p>
       </div>
 
@@ -223,8 +241,11 @@ function AdminPaymentsContent() {
         packageFilter={packageFilter}
         onPackageFilterChange={setPackageFilter}
         packageOptions={packageOptions}
-        onReset={() => { setSearch(""); setStatusFilter(""); setPackageFilter(""); }}
-        hasActiveFilters={!!search || !!statusFilter || !!packageFilter}
+        monthFilter={monthFilter}
+        onMonthFilterChange={setMonthFilter}
+        monthOptions={monthOptions}
+        onReset={() => { setSearch(""); setMonthFilter(""); setStatusFilter(""); setPackageFilter(""); }}
+        hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter}
       />
 
       <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />

@@ -85,6 +85,7 @@ export default async function AdminDashboard() {
     { data: recentPlayers },
     { data: activeSubscriptions },
     { data: confirmedPayments },
+    { data: totalRevenueData },
     { data: playerLevels },
   ] = await Promise.all([
     supabase
@@ -123,6 +124,10 @@ export default async function AdminDashboard() {
       .select("method")
       .eq("status", "confirmed"),
     supabase
+      .from("payments")
+      .select("amount")
+      .eq("status", "confirmed"),
+    supabase
       .from("profiles")
       .select("playing_level")
       .eq("role", "player")
@@ -130,6 +135,11 @@ export default async function AdminDashboard() {
   ]);
 
   const monthlyRevenue = (revenueData || []).reduce(
+    (sum: number, p: { amount: number }) => sum + p.amount,
+    0
+  );
+
+  const totalRevenue = (totalRevenueData || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
   );
@@ -172,6 +182,7 @@ export default async function AdminDashboard() {
         <RevenueCard
           label={`Revenue (${currentMonth})`}
           value={`${monthlyRevenue.toLocaleString()} EGP`}
+          subtitle={`All Time: ${totalRevenue.toLocaleString()} EGP`}
         />
         <StatCard
           label="Pending Payments"
