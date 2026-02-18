@@ -158,11 +158,7 @@ export async function completeProfile(formData: FormData) {
 }
 
 export async function registerAdmin(formData: FormData) {
-  // Only allow in development
-  if (process.env.NODE_ENV !== "development") {
-    return { error: "Admin registration is only available in development mode" };
-  }
-
+  const supabase = await createClient();
   const admin = createAdminClient();
 
   const email = formData.get("email") as string;
@@ -178,11 +174,10 @@ export async function registerAdmin(formData: FormData) {
     return { error: "Password must be at least 6 characters" };
   }
 
-  // Create user via admin client
-  const { data, error } = await admin.auth.admin.createUser({
+  // signUp — Supabase sends an OTP code to the email
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    email_confirm: true,
   });
 
   if (error) {
@@ -206,7 +201,7 @@ export async function registerAdmin(formData: FormData) {
     }
   }
 
-  return { success: true };
+  redirect(`/verify-email?email=${encodeURIComponent(email)}`);
 }
 
 export async function resendVerificationEmail(email: string) {
