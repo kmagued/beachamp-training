@@ -4,21 +4,21 @@ Player portals, coach tools, and admin dashboards — all in one place.
 
 ## Tech Stack
 
-| Layer | Technology | Service |
-|-------|-----------|---------|
-| Frontend + Backend | Next.js 15 (App Router) | Vercel |
-| Database | PostgreSQL | Supabase |
-| Auth | Supabase Auth | Supabase |
-| File Storage | Supabase Storage | Supabase |
-| Job Queue | BullMQ + Redis | Railway |
+| Layer              | Technology              | Service  |
+| ------------------ | ----------------------- | -------- |
+| Frontend + Backend | Next.js 15 (App Router) | Vercel   |
+| Database           | PostgreSQL              | Supabase |
+| Auth               | Supabase Auth           | Supabase |
+| File Storage       | Supabase Storage        | Supabase |
+| Job Queue          | BullMQ + Redis          | Railway  |
 
 ## Getting Started
 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/sports-academy.git
-cd sports-academy
+git clone https://github.com/YOUR_USERNAME/beachamp-training.git
+cd beachamp-training
 npm install
 ```
 
@@ -33,9 +33,11 @@ npm install
 ### 3. Run Migration
 
 Option A — via Supabase Dashboard:
+
 - Go to SQL Editor → paste contents of `supabase/migrations/20260218000000_phase1_foundation.sql` → Run
 
 Option B — via Supabase CLI:
+
 ```bash
 npx supabase link --project-ref YOUR_PROJECT_ID
 npx supabase db push
@@ -81,11 +83,11 @@ src/
 
 ## Roles & Access
 
-| Route | Player | Coach | Admin |
-|-------|--------|-------|-------|
-| `/player/*` | ✅ | ❌ | ✅ |
-| `/coach/*` | ❌ | ✅ | ✅ |
-| `/admin/*` | ❌ | ❌ | ✅ |
+| Route       | Player | Coach | Admin |
+| ----------- | ------ | ----- | ----- |
+| `/player/*` | ✅     | ❌    | ✅    |
+| `/coach/*`  | ❌     | ✅    | ✅    |
+| `/admin/*`  | ❌     | ❌    | ✅    |
 
 ## Phase Roadmap
 

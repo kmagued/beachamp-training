@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { logout } from "@/app/_auth/actions";
+import { logout } from "@/lib/actions/auth";
+import { Button, Card } from "@/components/ui";
+import type { Profile } from "@/types/database";
 
 export default async function PlayerDashboard() {
-  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = await createClient() as any;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -14,7 +17,7 @@ export default async function PlayerDashboard() {
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .single() as { data: Profile | null };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -27,16 +30,13 @@ export default async function PlayerDashboard() {
             <p className="text-slate-500 text-sm">Player Dashboard</p>
           </div>
           <form action={logout}>
-            <button
-              type="submit"
-              className="text-sm text-slate-500 hover:text-slate-700 border border-slate-300 px-4 py-2 rounded-lg"
-            >
+            <Button type="submit" variant="secondary" size="sm">
               Sign Out
-            </button>
+            </Button>
           </form>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <Card>
           <h2 className="font-semibold text-slate-900 mb-4">Your Profile</h2>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -74,7 +74,7 @@ export default async function PlayerDashboard() {
               </dd>
             </div>
           </dl>
-        </div>
+        </Card>
 
         <p className="text-slate-400 text-xs mt-8 text-center">
           Full dashboard UI coming in Phase 1 development.

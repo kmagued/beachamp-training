@@ -1,10 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { branding } from "@/lib/config/branding";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sports Academy — Management Platform",
-  description:
-    "Player portals, coach tools, and admin dashboards — all in one place.",
+  title: branding.meta.title,
+  description: branding.meta.description,
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

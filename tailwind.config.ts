@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { branding } from "./src/lib/config/branding";
 
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
@@ -9,17 +10,22 @@ const config: Config = {
         mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
-        sidebar: "#0F172A",
-        brand: {
-          player: "#3B82F6",
-          coach: "#8B5CF6",
-          admin: "#EF4444",
+        primary: {
+          DEFAULT: branding.colors.primary,
+          light: branding.colors.primaryLight,
         },
-        surface: {
-          bg: "#F8FAFC",
-          card: "#FFFFFF",
-          border: "#E2E8F0",
+        secondary: branding.colors.secondary,
+        accent: branding.colors.accent,
+        success: branding.colors.success,
+        warning: branding.colors.warning,
+        danger: branding.colors.danger,
+        sand: {
+          DEFAULT: branding.colors.sand,
+          dark: branding.colors.sandDark,
         },
+        sidebar: branding.colors.sidebar,
+        brand: branding.colors.brand,
+        surface: branding.colors.surface,
       },
     },
   },
