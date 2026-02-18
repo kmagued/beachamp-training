@@ -106,7 +106,7 @@ export default async function AdminDashboard() {
               Pending Payments
             </h2>
             <Link
-              href="/admin/payments"
+              href="/admin/payments?status=pending"
               className="text-xs font-medium text-primary hover:underline"
             >
               View all
@@ -118,9 +118,10 @@ export default async function AdminDashboard() {
                 const profile = payment.profiles as { first_name: string; last_name: string } | null;
                 const sub = payment.subscriptions as { packages: { name: string } } | null;
                 return (
-                  <div
+                  <Link
                     key={payment.id as string}
-                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                    href={`/admin/payments?highlight=${payment.id as string}`}
+                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0 -mx-2 px-2 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <div>
                       <p className="text-sm font-medium text-slate-900">
@@ -131,7 +132,7 @@ export default async function AdminDashboard() {
                       </p>
                     </div>
                     <Badge variant="warning">Pending</Badge>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -163,9 +164,10 @@ export default async function AdminDashboard() {
                 const hasActive = subs?.some((s) => s.status === "active");
                 const hasPending = subs?.some((s) => s.status === "pending");
                 return (
-                  <div
+                  <Link
                     key={player.id as string}
-                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                    href={`/admin/players?highlight=${player.id as string}`}
+                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0 -mx-2 px-2 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <div>
                       <p className="text-sm font-medium text-slate-900">
@@ -181,7 +183,7 @@ export default async function AdminDashboard() {
                     >
                       {hasActive ? "Active" : hasPending ? "Pending" : "New"}
                     </Badge>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

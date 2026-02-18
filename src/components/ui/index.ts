@@ -17,3 +17,5 @@ export { StatCard } from "./stat-card";
 export { DataTable, type Column } from "./data-table";
 export { EmptyState } from "./empty-state";
 export { Skeleton, StatCardSkeleton, TableRowSkeleton } from "./loading-skeleton";
+export { Pagination } from "./pagination";
+export { SelectionBar } from "./selection-bar";

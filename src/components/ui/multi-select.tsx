@@ -13,6 +13,8 @@ interface MultiSelectProps {
   value?: string;
   /** Called with comma-separated string */
   onChange?: (value: string) => void;
+  /** Hide chips below the dropdown (default: true) */
+  showChips?: boolean;
 }
 
 export function MultiSelect({
@@ -23,6 +25,7 @@ export function MultiSelect({
   className,
   value,
   onChange,
+  showChips = true,
 }: MultiSelectProps) {
   const [internalSelected, setInternalSelected] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -77,7 +80,7 @@ export function MultiSelect({
           <span className="text-slate-400">{placeholder}</span>
         ) : (
           <span className="text-slate-900">
-            {selected.length} selected
+            {!showChips && selected.length === 1 ? selected[0] : `${selected.length} selected`}
           </span>
         )}
         <svg
@@ -143,7 +146,7 @@ export function MultiSelect({
       )}
 
       {/* Selected chips */}
-      {selected.length > 0 && (
+      {showChips && selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {selected.map((item) => (
             <span

@@ -15,14 +15,22 @@ export default function AdminPlayersLoading() {
 
       {/* Desktop skeleton */}
       <div className="hidden sm:block bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="flex gap-4 px-4 py-3 border-b border-slate-200">
-          {["w-28", "w-24", "w-20", "w-20", "w-20", "w-16"].map((w, i) => (
-            <Skeleton key={i} className={`h-3 ${w}`} />
-          ))}
-        </div>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <TableRowSkeleton key={i} columns={6} />
-        ))}
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-200">
+              {["w-28", "w-24", "w-20", "w-20", "w-20", "w-20", "w-16"].map((w, i) => (
+                <th key={i} className="px-4 py-3 text-left">
+                  <Skeleton className={`h-3 ${w}`} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <TableRowSkeleton key={i} columns={7} />
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Mobile skeleton */}

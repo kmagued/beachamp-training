@@ -1,24 +1,26 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { Suspense, useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Input, Skeleton, TableRowSkeleton } from "@/components/ui";
-import { Check, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Badge, Pagination, SelectionBar } from "@/components/ui";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
+import { useSearchParams } from "next/navigation";
 import { confirmPayment, rejectPayment, getScreenshotUrl } from "./actions";
-
-interface PaymentRow {
-  id: string;
-  amount: number;
-  method: string;
-  status: string;
-  screenshot_url: string | null;
-  created_at: string;
-  confirmed_at: string | null;
-  profiles: { first_name: string; last_name: string } | null;
-  subscriptions: { packages: { name: string } } | null;
-}
+import type { PaymentRow, SortField, SortDir } from "./_components/types";
+import { PaymentsPageSkeleton, PaymentsInlineSkeleton } from "./_components/skeleton";
+import { PaymentsFilters } from "./_components/filters";
+import { PaymentsTableView } from "./_components/table";
+import { RejectModal, ScreenshotLightbox } from "./_components/modals";
 
 export default function AdminPaymentsPage() {
+  return (
+    <Suspense fallback={<PaymentsPageSkeleton />}>
+      <AdminPaymentsContent />
+    </Suspense>
+  );
+}
+
+function AdminPaymentsContent() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -26,6 +28,24 @@ export default function AdminPaymentsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const initialStatusParam = searchParams.get("status");
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(
+    initialStatusParam
+      ? initialStatusParam.charAt(0).toUpperCase() + initialStatusParam.slice(1)
+      : ""
+  );
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const { getRowId, isHighlighted } = useHighlightRow();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,6 +65,86 @@ export default function AdminPaymentsPage() {
     fetchPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Filtered + sorted payments
+  const filteredPayments = useMemo(() => {
+    let result = payments;
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((p) => {
+        const name = `${p.profiles?.first_name ?? ""} ${p.profiles?.last_name ?? ""}`.toLowerCase();
+        return name.includes(q);
+      });
+    }
+
+    if (statusFilter) {
+      const selected = statusFilter.split(",").map((s) => s.toLowerCase());
+      result = result.filter((p) => selected.includes(p.status));
+    }
+
+    const statusOrder: Record<string, number> = { pending: 0, confirmed: 1, rejected: 2 };
+
+    return [...result].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "date") {
+        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortField === "amount") {
+        cmp = a.amount - b.amount;
+      } else {
+        cmp = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [payments, search, statusFilter, sortField, sortDir]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE);
+  const paginatedPayments = filteredPayments.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  // Selection helpers
+  const pageIds = paginatedPayments.map((p) => p.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [allPageSelected, pageIds]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  }
 
   function handleConfirm(id: string) {
     if (isPending) return;
@@ -82,13 +182,12 @@ export default function AdminPaymentsPage() {
   ).length;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
         <p className="text-slate-500 text-sm">Review and manage player payments</p>
       </div>
 
-      {/* Summary badges */}
       <div className="flex gap-3 mb-6">
         <Badge variant={pendingCount > 0 ? "warning" : "neutral"}>
           {pendingCount} Pending
@@ -96,321 +195,65 @@ export default function AdminPaymentsPage() {
         <Badge variant="success">{confirmedToday} Confirmed Today</Badge>
       </div>
 
-      {loading ? (
-        <>
-          {/* Desktop Skeleton */}
-          <Card className="hidden sm:block overflow-hidden p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    {["Player", "Package", "Amount", "Method", "Date", "Screenshot", "Actions"].map((h) => (
-                      <th key={h} className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <TableRowSkeleton key={i} columns={7} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-          {/* Mobile Skeleton */}
-          <div className="sm:hidden space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  {Array.from({ length: 3 }).map((_, j) => (
-                    <div key={j} className="space-y-1">
-                      <Skeleton className="h-3 w-12" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        </>
-      ) : (
-      <>
-      {/* Desktop Table */}
-      <Card className="hidden sm:block overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Player
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Package
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Amount
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Method
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Date
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Screenshot
-                </th>
-                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((payment, i) => (
-                <tr
-                  key={payment.id}
-                  className={`border-b border-slate-100 ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}
-                >
-                  <td className="px-4 py-3 text-sm font-medium text-slate-900">
-                    {payment.profiles?.first_name} {payment.profiles?.last_name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {payment.subscriptions?.packages?.name || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {payment.amount.toLocaleString()} EGP
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700 capitalize">
-                    {payment.method.replace("_", " ")}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-500">
-                    {new Date(payment.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    {payment.screenshot_url ? (
-                      <button
-                        onClick={() => handleViewScreenshot(payment.screenshot_url!)}
-                        className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
-                        title="View Screenshot"
-                      >
-                        <ImageIcon className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {payment.status === "pending" ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleConfirm(payment.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                          title="Confirm"
-                        >
-                          {isPending && actionId === payment.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Check className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setRejectingId(payment.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
-                          title="Reject"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <Badge
-                        variant={
-                          payment.status === "confirmed"
-                            ? "success"
-                            : payment.status === "rejected"
-                              ? "danger"
-                              : "neutral"
-                        }
-                      >
-                        {payment.status}
-                      </Badge>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {payments.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
-                    No payments found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <PaymentsFilters
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        onReset={() => { setSearch(""); setStatusFilter(""); }}
+        hasActiveFilters={!!search || !!statusFilter}
+      />
 
-      {/* Mobile Cards */}
-      <div className="sm:hidden space-y-3">
-        {payments.map((payment) => (
-          <Card key={payment.id} className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  {payment.profiles?.first_name} {payment.profiles?.last_name}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {payment.subscriptions?.packages?.name || "—"}
-                </p>
-              </div>
-              {payment.status === "pending" ? (
-                <Badge variant="warning">Pending</Badge>
-              ) : (
-                <Badge
-                  variant={
-                    payment.status === "confirmed"
-                      ? "success"
-                      : payment.status === "rejected"
-                        ? "danger"
-                        : "neutral"
-                  }
-                >
-                  {payment.status}
-                </Badge>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-              <div>
-                <span className="text-slate-400">Amount</span>
-                <p className="text-slate-700 font-medium">{payment.amount.toLocaleString()} EGP</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Method</span>
-                <p className="text-slate-700 font-medium capitalize">{payment.method.replace("_", " ")}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Date</span>
-                <p className="text-slate-700 font-medium">{new Date(payment.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-            {payment.screenshot_url && (
-              <button
-                onClick={() => handleViewScreenshot(payment.screenshot_url!)}
-                className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-100 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
-              >
-                <ImageIcon className="w-3.5 h-3.5" /> View Screenshot
-              </button>
-            )}
-            {payment.status === "pending" && (
-              <div className={`flex items-center gap-2 mt-3 ${!payment.screenshot_url ? "pt-3 border-t border-slate-100" : ""}`}>
-                <button
-                  onClick={() => handleConfirm(payment.id)}
-                  disabled={isPending}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-medium disabled:opacity-50"
-                >
-                  {isPending && actionId === payment.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5" />
-                  )}{" "}
-                  {isPending && actionId === payment.id ? "Confirming..." : "Confirm"}
-                </button>
-                <button
-                  onClick={() => setRejectingId(payment.id)}
-                  disabled={isPending}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors text-xs font-medium disabled:opacity-50"
-                >
-                  <X className="w-3.5 h-3.5" /> Reject
-                </button>
-              </div>
-            )}
-          </Card>
-        ))}
-        {payments.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-8">No payments found</p>
+      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />
+
+      <div className="flex-1">
+        {loading ? (
+          <PaymentsInlineSkeleton />
+        ) : (
+          <PaymentsTableView
+            payments={paginatedPayments}
+            selectedIds={selectedIds}
+            toggleSelect={toggleSelect}
+            toggleSelectAll={toggleSelectAll}
+            allPageSelected={allPageSelected}
+            selectAllRef={selectAllRef}
+            getRowId={getRowId}
+            isHighlighted={isHighlighted}
+            sortField={sortField}
+            sortDir={sortDir}
+            toggleSort={toggleSort}
+            onConfirm={handleConfirm}
+            onReject={(id) => setRejectingId(id)}
+            isPending={isPending}
+            actionId={actionId}
+            onViewScreenshot={handleViewScreenshot}
+            search={search}
+            statusFilter={statusFilter}
+          />
         )}
       </div>
-      </>
-      )}
 
-      {/* Reject modal */}
-      {rejectingId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <h3 className="font-semibold text-slate-900 mb-3">Reject Payment</h3>
-            <p className="text-sm text-slate-500 mb-4">
-              Please provide a reason for rejecting this payment.
-            </p>
-            <Input
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Rejection reason..."
-              className="mb-4"
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleReject(rejectingId)}
-                disabled={!rejectReason.trim() || isPending}
-                fullWidth
-                className="!bg-red-600 hover:!bg-red-700"
-              >
-                {isPending && actionId === rejectingId ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Rejecting...
-                  </span>
-                ) : (
-                  "Reject"
-                )}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setRejectingId(null);
-                  setRejectReason("");
-                }}
-                fullWidth
-              >
-                Cancel
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredPayments.length}
+        onPageChange={setCurrentPage}
+      />
 
-      {/* Screenshot lightbox */}
-      {screenshotUrl && (
-        <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={() => setScreenshotUrl(null)}
-        >
-          <div className="max-w-2xl max-h-[80vh] relative">
-            <button
-              onClick={() => setScreenshotUrl(null)}
-              className="absolute -top-10 right-0 text-white hover:text-slate-300"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={screenshotUrl}
-              alt="Payment screenshot"
-              className="max-w-full max-h-[80vh] rounded-lg object-contain"
-            />
-          </div>
-        </div>
-      )}
+      <RejectModal
+        rejectingId={rejectingId}
+        rejectReason={rejectReason}
+        onReasonChange={setRejectReason}
+        onReject={() => rejectingId && handleReject(rejectingId)}
+        onCancel={() => { setRejectingId(null); setRejectReason(""); }}
+        isPending={isPending}
+        actionId={actionId}
+      />
+
+      <ScreenshotLightbox
+        url={screenshotUrl}
+        onClose={() => setScreenshotUrl(null)}
+      />
     </div>
   );
 }
