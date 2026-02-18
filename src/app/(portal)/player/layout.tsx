@@ -6,6 +6,7 @@ export default async function PlayerLayout({ children }: { children: React.React
   const currentUser = await getCurrentUser();
 
   if (!currentUser) redirect("/login");
+  if (currentUser.profile.role !== "player") redirect("/login");
 
   return (
     <SidebarLayout portal="player" user={currentUser.profile}>

@@ -38,6 +38,8 @@ export default function RegisterPage() {
     if (!form.date_of_birth) return "Date of birth is required";
     if (!form.email.trim()) return "Email is required";
     if (!form.phone.trim()) return "Phone number is required";
+    const phone = form.phone.replace(/\s+/g, "");
+    if (!/^(\+20|0)(1[0125])\d{8}$/.test(phone)) return "Enter a valid Egyptian phone number (e.g., 01XXXXXXXXX)";
     if (!form.area) return "Area of residence is required";
     if (!form.password) return "Password is required";
     if (form.password.length < 6) return "Password must be at least 6 characters";
@@ -73,27 +75,27 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col lg:flex-row">
       {/* Mobile Hero (visible on small screens) */}
-      <div className="lg:hidden bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-6">
-        <div className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-1">
+      <div className="lg:hidden bg-gradient-to-r from-sidebar to-secondary px-6 py-6">
+        <div className="text-xs font-semibold tracking-widest uppercase text-primary-300 mb-1">
           Join Beachamp
         </div>
         <h2 className="text-xl font-bold text-white">
           Start Your Training Journey
         </h2>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-primary-200 text-sm mt-1">
           Register to track sessions, get feedback, and connect with coaches.
         </p>
       </div>
 
       {/* Desktop Left Panel */}
-      <div className="hidden lg:flex w-[420px] bg-gradient-to-b from-slate-900 to-slate-800 p-10 flex-col justify-center text-white flex-shrink-0">
-        <div className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-3">
+      <div className="hidden lg:flex w-[420px] bg-gradient-to-b from-sidebar to-secondary p-10 flex-col justify-center text-white flex-shrink-0">
+        <div className="text-xs font-semibold tracking-widest uppercase text-primary-300 mb-3">
           Join Beachamp
         </div>
         <h2 className="text-3xl font-extrabold leading-tight mb-4">
           Start Your Training Journey
         </h2>
-        <p className="text-slate-400 text-sm leading-relaxed mb-8">
+        <p className="text-primary-200 text-sm leading-relaxed mb-8">
           Register to access your personal dashboard, track sessions, and
           connect with coaches.
         </p>
@@ -106,7 +108,7 @@ export default function RegisterPage() {
           ].map((item) => (
             <li key={item.text} className="flex items-center gap-3 text-slate-300">
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4 text-primary-400" viewBox="0 0 24 24" fill="currentColor">
                   <path d={item.icon} />
                 </svg>
               </div>

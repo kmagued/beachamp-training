@@ -22,19 +22,21 @@ import type { Profile } from "@/types/database";
 
 type Portal = "player" | "coach" | "admin";
 
-const portalConfig: Record<Portal, { label: string; accent: string; accentBg: string; accentText: string }> = {
-  player: { label: "Player Portal", accent: "bg-primary", accentBg: "bg-primary/10", accentText: "text-primary" },
+const portalConfig: Record<Portal, { label: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
+  player: { label: "Player Portal", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
   coach: {
     label: "Coach Portal",
-    accent: "bg-brand-coach",
+    avatar: "bg-brand-coach",
+    labelColor: "text-brand-coach",
     accentBg: "bg-brand-coach/10",
     accentText: "text-brand-coach",
   },
   admin: {
     label: "Admin Portal",
-    accent: "bg-primary",
-    accentBg: "bg-primary/10",
-    accentText: "text-primary",
+    avatar: "bg-primary",
+    labelColor: "text-primary",
+    accentBg: "bg-primary-50",
+    accentText: "text-primary-700",
   },
 };
 
@@ -86,7 +88,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       <aside className="hidden md:flex flex-col w-[220px] bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-30">
         {/* Brand */}
         <div className="px-5 pt-5 pb-4">
-          <p className={cn("text-xs font-semibold uppercase tracking-wider mb-1", config.accentText)}>{config.label}</p>
+          <p className={cn("text-xs font-semibold uppercase tracking-wider mb-1", config.labelColor)}>{config.label}</p>
         </div>
 
         {/* Nav */}
@@ -118,7 +120,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
-                config.accent,
+                config.avatar,
               )}
             >
               {initials}
@@ -163,7 +165,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         )}
       >
         <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-          <p className={cn("text-xs font-semibold uppercase tracking-wider", config.accentText)}>{config.label}</p>
+          <p className={cn("text-xs font-semibold uppercase tracking-wider", config.labelColor)}>{config.label}</p>
           <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
@@ -195,7 +197,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
-                config.accent,
+                config.avatar,
               )}
             >
               {initials}

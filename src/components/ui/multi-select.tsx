@@ -108,7 +108,7 @@ export function MultiSelect({
                 onClick={() => toggle(option)}
                 className={cn(
                   "w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 hover:bg-slate-50 transition-colors",
-                  isSelected && "bg-cyan-50"
+                  isSelected && "bg-primary-50"
                 )}
               >
                 <div
@@ -148,13 +148,13 @@ export function MultiSelect({
           {selected.map((item) => (
             <span
               key={item}
-              className="inline-flex items-center gap-1 bg-cyan-50 text-primary text-xs font-medium px-2.5 py-1 rounded-md"
+              className="inline-flex items-center gap-1 bg-primary-50 text-primary text-xs font-medium px-2.5 py-1 rounded-md"
             >
               {item}
               <button
                 type="button"
                 onClick={() => toggle(item)}
-                className="hover:text-cyan-800 transition-colors"
+                className="hover:text-primary-700 transition-colors"
               >
                 <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
                   <path

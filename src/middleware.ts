@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Routes that don't require authentication
-const publicRoutes = ["/", "/login", "/register", "/verify-email", "/auth/callback"];
+const publicRoutes = ["/", "/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/auth/callback", "/admin-setup"];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -36,17 +36,10 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // If user is not authenticated and trying to access a protected route
-  if (!user && !publicRoutes.includes(pathname) && pathname !== "/complete-profile") {
+  if (!user && !publicRoutes.includes(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // Unauthenticated users trying to access complete-profile
-  if (!user && pathname === "/complete-profile") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
@@ -59,20 +52,15 @@ export async function middleware(request: NextRequest) {
 
   // If user is authenticated and verified
   if (user && user.email_confirmed_at) {
-    // Redirect away from login/register if already authenticated
-    if (pathname === "/login" || pathname === "/register") {
+    // Redirect away from login/register/verify-email if already verified
+    if (pathname === "/login" || pathname === "/register" || pathname === "/verify-email") {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, profile_completed")
+        .select("role")
         .eq("id", user.id)
         .single();
 
       const url = request.nextUrl.clone();
-
-      if (profile && !profile.profile_completed) {
-        url.pathname = "/complete-profile";
-        return NextResponse.redirect(url);
-      }
 
       switch (profile?.role) {
         case "admin":
@@ -87,20 +75,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // For dashboard routes, check profile completion and role access
+    // For portal routes, check role access
     if (pathname.startsWith("/admin") || pathname.startsWith("/coach") || pathname.startsWith("/player")) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, profile_completed")
+        .select("role")
         .eq("id", user.id)
         .single();
-
-      // Redirect to complete-profile if not done yet
-      if (profile && !profile.profile_completed) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/complete-profile";
-        return NextResponse.redirect(url);
-      }
 
       const role = profile?.role || "player";
       const url = request.nextUrl.clone();
@@ -108,14 +89,13 @@ export async function middleware(request: NextRequest) {
       // Admin can access everything
       if (role === "admin") return supabaseResponse;
 
-      // Coach can only access /coach routes
-      if (pathname.startsWith("/admin") && role !== "admin") {
-        url.pathname = role === "coach" ? "/coach/dashboard" : "/player/dashboard";
+      // Non-admin users can only access their own portal
+      if (role === "coach" && !pathname.startsWith("/coach")) {
+        url.pathname = "/coach/dashboard";
         return NextResponse.redirect(url);
       }
 
-      // Player can only access /player routes
-      if (pathname.startsWith("/coach") && role === "player") {
+      if (role === "player" && !pathname.startsWith("/player")) {
         url.pathname = "/player/dashboard";
         return NextResponse.redirect(url);
       }

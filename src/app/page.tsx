@@ -76,7 +76,7 @@ const levels = [
     name: "Intermediate",
     accent: "bg-primary",
     accentText: "text-primary",
-    border: "border-cyan-200",
+    border: "border-primary-200",
     description: "Comfortable with basics, ready to level up",
     includes: [
       "Advanced shot selection",
@@ -100,13 +100,6 @@ const levels = [
   },
 ];
 
-// Fallback packages if DB is empty or unavailable
-const fallbackPackages = branding.packages.map((p) => ({
-  session_count: p.sessions,
-  validity_days: p.validityDays ?? 1,
-  price: p.price,
-}));
-
 export default async function LandingPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = await createClient() as any;
@@ -121,13 +114,11 @@ export default async function LandingPage() {
     .eq("is_active", true)
     .order("sort_order", { ascending: true }) as { data: Package[] | null };
 
-  const packages = dbPackages && dbPackages.length > 0
-    ? dbPackages.map((p: Package) => ({
-        session_count: p.session_count,
-        validity_days: p.validity_days,
-        price: p.price,
-      }))
-    : fallbackPackages;
+  const packages = (dbPackages || []).map((p: Package) => ({
+    session_count: p.session_count,
+    validity_days: p.validity_days,
+    price: p.price,
+  }));
 
   return (
     <div className="min-h-screen bg-white">
@@ -142,16 +133,16 @@ export default async function LandingPage() {
       {/* ── Hero ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-24 pb-16 sm:pb-28">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-cyan-50 border border-cyan-200 rounded-full px-3 sm:px-4 py-1.5 mb-6 sm:mb-8">
+          <div className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-full px-3 sm:px-4 py-1.5 mb-6 sm:mb-8">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-primary text-xs font-semibold tracking-wide uppercase">
+            <span className="text-primary-700 text-xs font-semibold tracking-wide uppercase">
               Now accepting registrations
             </span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-4 sm:mb-6">
             Elevate Your{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-700 to-primary">
               {branding.sport} Game
             </span>
           </h1>
@@ -190,7 +181,7 @@ export default async function LandingPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 mt-16 sm:mt-20 max-w-3xl mx-auto">
           {stats.map((stat) => (
             <div key={stat.label} className="text-center">
-              <div className="text-2xl sm:text-4xl font-extrabold text-slate-900">
+              <div className="text-2xl sm:text-4xl font-extrabold text-primary">
                 {stat.value}
               </div>
               <div className="text-slate-500 text-xs sm:text-sm mt-1">{stat.label}</div>
@@ -220,7 +211,7 @@ export default async function LandingPage() {
               key={program.title}
               className="bg-slate-50 border border-slate-100 rounded-2xl p-5 sm:p-6 hover:border-primary/30 hover:shadow-sm transition-all group"
             >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+              <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center mb-4">
                 <svg
                   className="w-5 h-5 text-primary"
                   viewBox="0 0 24 24"
@@ -317,7 +308,7 @@ export default async function LandingPage() {
               className={cn(
                 "border rounded-2xl p-4 sm:p-6 text-center transition-all hover:shadow-md",
                 pkg.session_count === 12
-                  ? "border-primary bg-cyan-50/50 ring-1 ring-primary/20"
+                  ? "border-primary bg-primary-50/50 ring-1 ring-primary/20"
                   : "border-slate-200 bg-white"
               )}
             >
@@ -333,7 +324,7 @@ export default async function LandingPage() {
                 {pkg.session_count === 1 ? "session" : "sessions"}
               </div>
               <div className="text-lg sm:text-2xl font-bold text-slate-900 mb-1">
-                {pkg.price} EGP
+                {pkg.price.toLocaleString("en-US")} EGP
               </div>
               {pkg.validity_days > 1 && (
                 <div className="text-slate-400 text-xs">
@@ -346,34 +337,26 @@ export default async function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="bg-slate-900">
+      <section className="bg-sidebar">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center">
           <h2 className="text-xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">
             Ready to hit the court?
           </h2>
-          <p className="text-slate-400 text-sm sm:text-base mb-6 sm:mb-8 max-w-md mx-auto">
+          <p className="text-primary-200 text-sm sm:text-base mb-6 sm:mb-8 max-w-md mx-auto">
             Register today, pick a training package, and start improving your
             game.
           </p>
           {currentUser ? (
             <Link
               href="/player/dashboard"
-              className={cn(
-                buttonVariants.primary,
-                "text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl",
-                "inline-block hover:shadow-lg hover:shadow-primary/25"
-              )}
+              className="inline-block bg-primary hover:bg-primary-700 text-white font-semibold text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl transition-colors hover:shadow-lg hover:shadow-primary/25"
             >
               Go to Dashboard
             </Link>
           ) : (
             <Link
               href="/register"
-              className={cn(
-                buttonVariants.primary,
-                "text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl",
-                "inline-block hover:shadow-lg hover:shadow-primary/25"
-              )}
+              className="inline-block bg-primary hover:bg-primary-700 text-white font-semibold text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl transition-colors hover:shadow-lg hover:shadow-primary/25"
             >
               Join {branding.name}
             </Link>

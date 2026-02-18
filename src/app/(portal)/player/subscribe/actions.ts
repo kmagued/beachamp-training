@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export async function submitRenewal(formData: FormData) {
+export async function submitSubscription(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
@@ -17,6 +17,23 @@ export async function submitRenewal(formData: FormData) {
   const method = formData.get("method") as string;
 
   if (!packageId || !method) return { error: "Please select a package and payment method" };
+
+  // Save training info if provided (first-time subscribers)
+  const playingLevel = formData.get("playing_level") as string | null;
+  const trainingGoals = formData.get("training_goals") as string | null;
+  const healthConditions = formData.get("health_conditions") as string | null;
+
+  if (playingLevel || trainingGoals || healthConditions) {
+    const updates: Record<string, unknown> = { profile_completed: true };
+    if (playingLevel) updates.playing_level = playingLevel;
+    if (trainingGoals) updates.training_goals = trainingGoals;
+    if (healthConditions) updates.health_conditions = healthConditions;
+
+    await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id);
+  }
 
   // Fetch the package to get details
   const { data: pkg } = await supabase
@@ -46,7 +63,6 @@ export async function submitRenewal(formData: FormData) {
   let screenshotUrl: string | null = null;
   const screenshot = formData.get("screenshot") as File | null;
   if (screenshot && screenshot.size > 0) {
-    const ext = screenshot.name.split(".").pop();
     const path = `${user.id}/${Date.now()}_${screenshot.name}`;
     const { error: uploadError } = await supabase.storage
       .from("payment-screenshots")
@@ -70,6 +86,6 @@ export async function submitRenewal(formData: FormData) {
   if (payError) return { error: payError.message };
 
   revalidatePath("/player/dashboard");
-  revalidatePath("/player/renew");
+  revalidatePath("/player/subscribe");
   return { success: true };
 }

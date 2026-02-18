@@ -27,7 +27,7 @@ export default async function CompleteProfilePage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-cyan-50 border border-cyan-200 rounded-full px-3 py-1 mb-4">
+          <div className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-full px-3 py-1 mb-4">
             <span className="w-2 h-2 rounded-full bg-primary" />
             <span className="text-primary text-xs font-semibold">Step 2 of 2</span>
           </div>

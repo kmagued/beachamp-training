@@ -10,12 +10,9 @@ const config: Config = {
         mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
-        primary: {
-          DEFAULT: branding.colors.primary,
-          light: branding.colors.primaryLight,
-        },
-        secondary: branding.colors.secondary,
+        primary: branding.colors.primary,
         accent: branding.colors.accent,
+        secondary: branding.colors.secondary,
         success: branding.colors.success,
         warning: branding.colors.warning,
         danger: branding.colors.danger,

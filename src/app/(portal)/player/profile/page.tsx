@@ -42,6 +42,15 @@ export default function PlayerProfilePage() {
   }, []);
 
   function handleSubmit(formData: FormData) {
+    if (isPending) return;
+
+    // Validate phone if provided
+    const phone = (formData.get("phone") as string)?.replace(/\s+/g, "") || "";
+    if (phone && !/^(\+20|0)(1[0125])\d{8}$/.test(phone)) {
+      setResult({ error: "Enter a valid Egyptian phone number (e.g., 01XXXXXXXXX)" });
+      return;
+    }
+
     formData.set("training_goals", trainingGoals);
     formData.set("date_of_birth", dateOfBirth);
     setResult(null);

@@ -55,6 +55,8 @@ export async function confirmPayment(paymentId: string) {
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
+  revalidatePath("/player/subscriptions");
+  revalidatePath("/player/dashboard");
   return { success: true };
 }
 
@@ -64,11 +66,12 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("subscription_id")
+    .select("subscription_id, status")
     .eq("id", paymentId)
     .single();
 
   if (!payment) return { error: "Payment not found" };
+  if (payment.status !== "pending") return { error: "Payment is not pending" };
 
   // Update payment
   const { error: payError } = await supabase
@@ -91,6 +94,7 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
+  revalidatePath("/player/subscriptions");
   return { success: true };
 }
 

@@ -176,7 +176,7 @@ export default async function PlayerDashboard() {
               description="Subscribe to a training package to start attending sessions."
               action={
                 <Link
-                  href="/player/renew"
+                  href="/player/packages"
                   className="text-sm font-medium text-primary hover:underline"
                 >
                   Browse Packages
@@ -255,7 +255,7 @@ export default async function PlayerDashboard() {
             </p>
           </div>
           <Link
-            href="/player/renew"
+            href="/player/subscribe"
             className="text-sm font-semibold text-amber-700 hover:text-amber-900 whitespace-nowrap"
           >
             Renew Now

@@ -22,10 +22,12 @@ export function StatCardSkeleton() {
 
 export function TableRowSkeleton({ columns = 4 }: { columns?: number }) {
   return (
-    <div className="flex gap-4 px-4 py-3 border-b border-slate-100">
+    <tr className="border-b border-slate-100">
       {Array.from({ length: columns }).map((_, i) => (
-        <Skeleton key={i} className="h-4 flex-1" />
+        <td key={i} className="px-4 py-3">
+          <Skeleton className="h-4 w-full" />
+        </td>
       ))}
-    </div>
+    </tr>
   );
 }

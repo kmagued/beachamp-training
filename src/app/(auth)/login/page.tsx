@@ -80,7 +80,13 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center mt-6 text-sm text-slate-500">
+        <div className="text-center mt-4">
+          <Link href="/forgot-password" className="text-sm text-slate-400 hover:text-primary">
+            Forgot your password?
+          </Link>
+        </div>
+
+        <p className="text-center mt-4 text-sm text-slate-500">
           New player?{" "}
           <Link href="/register" className="text-primary font-semibold hover:underline">
             Register here

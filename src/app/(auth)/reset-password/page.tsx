@@ -3,35 +3,33 @@
 import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button, Alert } from "@/components/ui";
-import { verifyEmailOtp, resendVerificationEmail } from "@/lib/actions/auth";
+import { Button, Input, Label, Alert } from "@/components/ui";
+import { resetPasswordWithOtp } from "@/lib/actions/auth";
 
-export default function VerifyEmailPage() {
+export default function ResetPasswordPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-pulse text-slate-400">Loading...</div></div>}>
-      <VerifyEmailContent />
+      <ResetPasswordContent />
     </Suspense>
   );
 }
 
-function VerifyEmailContent() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const emailFromParams = searchParams.get("email") || "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [verifying, setVerifying] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resent, setResent] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Focus first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
 
   function handleChange(index: number, value: string) {
-    // Only allow digits
     if (value && !/^\d$/.test(value)) return;
 
     const newOtp = [...otp];
@@ -39,7 +37,6 @@ function VerifyEmailContent() {
     setOtp(newOtp);
     setError(null);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -62,68 +59,56 @@ function VerifyEmailContent() {
     }
     setOtp(newOtp);
 
-    // Focus last filled input or the next empty one
     const focusIndex = Math.min(pasted.length, 5);
     inputRefs.current[focusIndex]?.focus();
   }
 
-  async function handleVerify() {
+  async function handleSubmit() {
     const code = otp.join("");
     if (code.length !== 6) {
       setError("Please enter the 6-digit code");
       return;
     }
     if (!emailFromParams) {
-      setError("Email address is missing. Please go back and register again.");
+      setError("Email address is missing. Please go back and try again.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
-    setVerifying(true);
+    setLoading(true);
     setError(null);
 
-    const result = await verifyEmailOtp(emailFromParams, code);
+    const result = await resetPasswordWithOtp(emailFromParams, code, newPassword);
     if (result?.error) {
       setError(result.error);
-      setVerifying(false);
+      setLoading(false);
     }
-    // If successful, the server action will redirect
+    // If successful, the server action will redirect to /login
   }
 
-  async function handleResend() {
-    if (!emailFromParams) {
-      setError("Email address is missing");
-      return;
-    }
-    setResending(true);
-    setError(null);
-    setResent(false);
-    const result = await resendVerificationEmail(emailFromParams);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setResent(true);
-      setOtp(["", "", "", "", "", ""]);
-      inputRefs.current[0]?.focus();
-    }
-    setResending(false);
-  }
-
-  const isComplete = otp.every((d) => d !== "");
+  const isComplete = otp.every((d) => d !== "") && newPassword && confirmPassword;
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-6">
           <svg className="w-8 h-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
         </div>
 
         <h1 className="text-2xl font-bold text-slate-900 mb-2">
-          Verify your email
+          Reset your password
         </h1>
         <p className="text-slate-500 text-sm leading-relaxed mb-2">
-          We&apos;ve sent a 6-digit verification code to
+          Enter the 6-digit code sent to
         </p>
         {emailFromParams && (
           <p className="text-sm font-semibold text-slate-900 mb-8">
@@ -148,35 +133,38 @@ function VerifyEmailContent() {
           ))}
         </div>
 
+        {/* New password fields */}
+        <div className="text-left space-y-4 mb-6">
+          <div>
+            <Label>New Password</Label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="At least 6 characters"
+            />
+          </div>
+          <div>
+            <Label>Confirm Password</Label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+            />
+          </div>
+        </div>
+
         {error && <Alert className="mb-4 text-left">{error}</Alert>}
 
         <Button
-          onClick={handleVerify}
-          disabled={!isComplete || verifying}
+          onClick={handleSubmit}
+          disabled={!isComplete || loading}
           fullWidth
           className="mb-6"
         >
-          {verifying ? "Verifying..." : "Verify Email"}
+          {loading ? "Resetting..." : "Reset Password"}
         </Button>
-
-        {/* Resend */}
-        <div className="border-t border-slate-100 pt-6">
-          <p className="text-slate-500 text-sm mb-3">
-            Didn&apos;t receive the code? Check your spam folder or
-          </p>
-          <button
-            onClick={handleResend}
-            disabled={resending || resent}
-            className="text-primary font-semibold text-sm hover:underline disabled:opacity-50 disabled:no-underline"
-          >
-            {resending ? "Sending..." : resent ? "Code sent!" : "Resend code"}
-          </button>
-          {resent && (
-            <p className="text-emerald-600 text-xs mt-2">
-              A new code has been sent to your email.
-            </p>
-          )}
-        </div>
 
         <div className="mt-6">
           <Link

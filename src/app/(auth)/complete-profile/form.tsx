@@ -68,7 +68,7 @@ export function CompleteProfileForm({ packages }: CompleteProfileFormProps) {
       {/* Playing Level */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" />
             </svg>
@@ -92,7 +92,7 @@ export function CompleteProfileForm({ packages }: CompleteProfileFormProps) {
       {/* Training Goals */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
               <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
             </svg>
@@ -113,7 +113,7 @@ export function CompleteProfileForm({ packages }: CompleteProfileFormProps) {
       {/* Health Conditions */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-1.99.9-1.99 2L3 19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z" />
             </svg>
@@ -134,7 +134,7 @@ export function CompleteProfileForm({ packages }: CompleteProfileFormProps) {
       {packages.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
               <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
               </svg>
@@ -153,7 +153,7 @@ export function CompleteProfileForm({ packages }: CompleteProfileFormProps) {
                 className={cn(
                   "border rounded-xl p-4 text-left transition-all",
                   form.preferred_package_id === pkg.id
-                    ? "border-primary bg-cyan-50 ring-1 ring-primary/20"
+                    ? "border-primary bg-primary-50 ring-1 ring-primary/20"
                     : "border-slate-200 hover:border-slate-300"
                 )}
               >

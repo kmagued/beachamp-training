@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Input, Skeleton, TableRowSkeleton } from "@/components/ui";
-import { Check, X, Image as ImageIcon } from "lucide-react";
+import { Check, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { confirmPayment, rejectPayment, getScreenshotUrl } from "./actions";
 
 interface PaymentRow {
@@ -22,6 +22,7 @@ export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [actionId, setActionId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
@@ -46,16 +47,21 @@ export default function AdminPaymentsPage() {
   }, []);
 
   function handleConfirm(id: string) {
+    if (isPending) return;
+    setActionId(id);
     startTransition(async () => {
       await confirmPayment(id);
+      setActionId(null);
       fetchPayments();
     });
   }
 
   function handleReject(id: string) {
-    if (!rejectReason.trim()) return;
+    if (!rejectReason.trim() || isPending) return;
+    setActionId(id);
     startTransition(async () => {
       await rejectPayment(id, rejectReason);
+      setActionId(null);
       setRejectingId(null);
       setRejectReason("");
       fetchPayments();
@@ -98,7 +104,7 @@ export default function AdminPaymentsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    {["Player", "Package", "Amount", "Method", "Date", "Actions"].map((h) => (
+                    {["Player", "Package", "Amount", "Method", "Date", "Screenshot", "Actions"].map((h) => (
                       <th key={h} className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
                         {h}
                       </th>
@@ -107,7 +113,7 @@ export default function AdminPaymentsPage() {
                 </thead>
                 <tbody>
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <TableRowSkeleton key={i} columns={6} />
+                    <TableRowSkeleton key={i} columns={7} />
                   ))}
                 </tbody>
               </table>
@@ -160,6 +166,9 @@ export default function AdminPaymentsPage() {
                   Date
                 </th>
                 <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
+                  Screenshot
+                </th>
+                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
                   Actions
                 </th>
               </tr>
@@ -186,29 +195,37 @@ export default function AdminPaymentsPage() {
                     {new Date(payment.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
+                    {payment.screenshot_url ? (
+                      <button
+                        onClick={() => handleViewScreenshot(payment.screenshot_url!)}
+                        className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
+                        title="View Screenshot"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     {payment.status === "pending" ? (
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleConfirm(payment.id)}
                           disabled={isPending}
-                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                           title="Confirm"
                         >
-                          <Check className="w-4 h-4" />
+                          {isPending && actionId === payment.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4" />
+                          )}
                         </button>
-                        {payment.screenshot_url && (
-                          <button
-                            onClick={() => handleViewScreenshot(payment.screenshot_url!)}
-                            className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
-                            title="View Screenshot"
-                          >
-                            <ImageIcon className="w-4 h-4" />
-                          </button>
-                        )}
                         <button
                           onClick={() => setRejectingId(payment.id)}
                           disabled={isPending}
-                          className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                          className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
                           title="Reject"
                         >
                           <X className="w-4 h-4" />
@@ -232,7 +249,7 @@ export default function AdminPaymentsPage() {
               ))}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
                     No payments found
                   </td>
                 </tr>
@@ -285,27 +302,32 @@ export default function AdminPaymentsPage() {
                 <p className="text-slate-700 font-medium">{new Date(payment.created_at).toLocaleDateString()}</p>
               </div>
             </div>
+            {payment.screenshot_url && (
+              <button
+                onClick={() => handleViewScreenshot(payment.screenshot_url!)}
+                className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-100 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> View Screenshot
+              </button>
+            )}
             {payment.status === "pending" && (
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+              <div className={`flex items-center gap-2 mt-3 ${!payment.screenshot_url ? "pt-3 border-t border-slate-100" : ""}`}>
                 <button
                   onClick={() => handleConfirm(payment.id)}
                   disabled={isPending}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-medium"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-medium disabled:opacity-50"
                 >
-                  <Check className="w-3.5 h-3.5" /> Confirm
+                  {isPending && actionId === payment.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}{" "}
+                  {isPending && actionId === payment.id ? "Confirming..." : "Confirm"}
                 </button>
-                {payment.screenshot_url && (
-                  <button
-                    onClick={() => handleViewScreenshot(payment.screenshot_url!)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors text-xs font-medium"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" />
-                  </button>
-                )}
                 <button
                   onClick={() => setRejectingId(payment.id)}
                   disabled={isPending}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors text-xs font-medium"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors text-xs font-medium disabled:opacity-50"
                 >
                   <X className="w-3.5 h-3.5" /> Reject
                 </button>
@@ -343,7 +365,13 @@ export default function AdminPaymentsPage() {
                 fullWidth
                 className="!bg-red-600 hover:!bg-red-700"
               >
-                Reject
+                {isPending && actionId === rejectingId ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Rejecting...
+                  </span>
+                ) : (
+                  "Reject"
+                )}
               </Button>
               <Button
                 variant="secondary"
