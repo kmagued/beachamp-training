@@ -20,8 +20,9 @@ interface PlayersTableProps {
   hasActiveFilters: boolean;
 }
 
-const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3";
+const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
 const thSortable = `${thBase} cursor-pointer select-none hover:text-slate-600 transition-colors`;
+const tdBase = "px-4 py-3 border-b border-slate-100";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
   if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
@@ -62,10 +63,11 @@ export function PlayersTableView(props: PlayersTableProps) {
       {/* Desktop Table */}
       <Card className="hidden sm:block overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-separate border-spacing-0">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 w-10">
+              <tr>
+                {/* Sticky left */}
+                <th className="sticky left-0 z-20 bg-white px-4 py-3 w-12 border-b border-slate-200">
                   <input
                     ref={selectAllRef}
                     type="checkbox"
@@ -74,7 +76,10 @@ export function PlayersTableView(props: PlayersTableProps) {
                     className="table-checkbox"
                   />
                 </th>
-                <th className={thBase}>Player</th>
+                <th className={cn(thBase, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")}>
+                  Player
+                </th>
+                {/* Scrollable middle */}
                 <th className={thSortable} onClick={() => toggleSort("package")}>
                   <span className="inline-flex items-center gap-1">Package <SortIcon field="package" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
@@ -86,24 +91,29 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <th className={thSortable} onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1">Registered <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                <th className={thBase}>Status</th>
+                {/* Sticky right */}
+                <th className={cn(thBase, "sticky right-0 z-20 bg-white border-l border-l-slate-200")}>
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
               {players.map((player, i) => {
                 const activeSub = player.subscriptions?.find((s) => s.status === "active");
                 const status = getPlayerStatus(player);
+                const highlighted = isHighlighted(player.id);
+                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
                 return (
                   <tr
                     key={player.id}
                     id={getRowId(player.id)}
                     className={cn(
-                      "border-b border-slate-100",
                       i % 2 === 1 && "bg-[#FAFBFC]",
-                      isHighlighted(player.id) && "row-highlight"
+                      highlighted && "row-highlight"
                     )}
                   >
-                    <td className="px-4 py-3 w-10">
+                    {/* Sticky left: checkbox */}
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
                       <input
                         type="checkbox"
                         checked={selectedIds.has(player.id)}
@@ -111,38 +121,43 @@ export function PlayersTableView(props: PlayersTableProps) {
                         className="table-checkbox"
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    {/* Sticky left: player */}
+                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
                         {player.first_name} {player.last_name}
                       </p>
                       <p className="text-xs text-slate-400">{player.email}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    {/* Scrollable middle */}
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {activeSub?.packages?.name || "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {activeSub
                         ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}`
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-500">
+                    <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {activeSub?.end_date
                         ? new Date(activeSub.end_date).toLocaleDateString()
                         : "—"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className={tdBase}>
                       <LevelBadge level={player.playing_level} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-500">
+                    <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {new Date(player.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3"><StatusBadge status={status} /></td>
+                    {/* Sticky right: status */}
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
+                      <StatusBadge status={status} />
+                    </td>
                   </tr>
                 );
               })}
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>

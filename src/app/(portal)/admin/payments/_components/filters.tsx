@@ -8,6 +8,9 @@ interface PaymentsFiltersProps {
   onSearchChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  packageFilter: string;
+  onPackageFilterChange: (value: string) => void;
+  packageOptions: readonly string[];
   onReset: () => void;
   hasActiveFilters: boolean;
 }
@@ -17,6 +20,9 @@ export function PaymentsFilters({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  packageFilter,
+  onPackageFilterChange,
+  packageOptions,
   onReset,
   hasActiveFilters,
 }: PaymentsFiltersProps) {
@@ -39,6 +45,16 @@ export function PaymentsFilters({
         showChips={false}
         className="sm:w-44"
       />
+      {packageOptions.length > 0 && (
+        <MultiSelect
+          options={packageOptions}
+          value={packageFilter}
+          onChange={onPackageFilterChange}
+          placeholder="All Packages"
+          showChips={false}
+          className="sm:w-48"
+        />
+      )}
       {hasActiveFilters && (
         <button
           onClick={onReset}

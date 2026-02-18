@@ -38,6 +38,7 @@ function AdminPaymentsContent() {
       ? initialStatusParam.charAt(0).toUpperCase() + initialStatusParam.slice(1)
       : ""
   );
+  const [packageFilter, setPackageFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +67,15 @@ function AdminPaymentsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Derive unique package names for filter
+  const packageOptions = useMemo(() => {
+    const names = new Set<string>();
+    payments.forEach((p) => {
+      if (p.subscriptions?.packages?.name) names.add(p.subscriptions.packages.name);
+    });
+    return [...names].sort();
+  }, [payments]);
+
   // Filtered + sorted payments
   const filteredPayments = useMemo(() => {
     let result = payments;
@@ -83,6 +93,11 @@ function AdminPaymentsContent() {
       result = result.filter((p) => selected.includes(p.status));
     }
 
+    if (packageFilter) {
+      const selected = packageFilter.split(",");
+      result = result.filter((p) => selected.includes(p.subscriptions?.packages?.name ?? ""));
+    }
+
     const statusOrder: Record<string, number> = { pending: 0, confirmed: 1, rejected: 2 };
 
     return [...result].sort((a, b) => {
@@ -96,7 +111,7 @@ function AdminPaymentsContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [payments, search, statusFilter, sortField, sortDir]);
+  }, [payments, search, statusFilter, packageFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE);
@@ -107,7 +122,7 @@ function AdminPaymentsContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, packageFilter]);
 
   // Selection helpers
   const pageIds = paginatedPayments.map((p) => p.id);
@@ -200,8 +215,11 @@ function AdminPaymentsContent() {
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onReset={() => { setSearch(""); setStatusFilter(""); }}
-        hasActiveFilters={!!search || !!statusFilter}
+        packageFilter={packageFilter}
+        onPackageFilterChange={setPackageFilter}
+        packageOptions={packageOptions}
+        onReset={() => { setSearch(""); setStatusFilter(""); setPackageFilter(""); }}
+        hasActiveFilters={!!search || !!statusFilter || !!packageFilter}
       />
 
       <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />

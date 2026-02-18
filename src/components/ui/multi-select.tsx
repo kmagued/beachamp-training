@@ -101,7 +101,7 @@ export function MultiSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
+        <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
           {options.map((option) => {
             const isSelected = selected.includes(option);
             return (

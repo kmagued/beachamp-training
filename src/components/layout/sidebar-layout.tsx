@@ -219,7 +219,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </div>
       </div>
 
-      <main className="flex-1 md:ml-[220px] pt-14 md:pt-0">{children}</main>
+      <main className="flex-1 min-w-0 overflow-x-hidden md:ml-[220px] pt-14 md:pt-0">{children}</main>
     </div>
   );
 }

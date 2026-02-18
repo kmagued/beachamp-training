@@ -25,8 +25,9 @@ interface PaymentsTableProps {
   statusFilter: string;
 }
 
-const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3";
+const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
 const thSortable = `${thBase} cursor-pointer select-none hover:text-slate-600 transition-colors`;
+const tdBase = "px-4 py-3 border-b border-slate-100";
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
   if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
@@ -35,7 +36,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 
 function StatusBadge({ status }: { status: string }) {
   const variant = status === "pending" ? "warning" : status === "confirmed" ? "success" : status === "rejected" ? "danger" : "neutral";
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant} className="capitalize">{status}</Badge>;
 }
 
 export function PaymentsTableView(props: PaymentsTableProps) {
@@ -54,10 +55,11 @@ export function PaymentsTableView(props: PaymentsTableProps) {
       {/* Desktop Table */}
       <Card className="hidden sm:block overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-separate border-spacing-0">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 w-10">
+              <tr>
+                {/* Sticky left */}
+                <th className="sticky left-0 z-20 bg-white px-4 py-3 w-12 border-b border-slate-200">
                   <input
                     ref={selectAllRef}
                     type="checkbox"
@@ -66,7 +68,10 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                     className="table-checkbox"
                   />
                 </th>
-                <th className={thBase}>Player</th>
+                <th className={cn(thBase, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")}>
+                  Player
+                </th>
+                {/* Scrollable middle */}
                 <th className={thBase}>Package</th>
                 <th className={thSortable} onClick={() => toggleSort("amount")}>
                   <span className="inline-flex items-center gap-1">Amount <SortIcon field="amount" sortField={sortField} sortDir={sortDir} /></span>
@@ -78,93 +83,110 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 <th className={thSortable} onClick={() => toggleSort("status")}>
                   <span className="inline-flex items-center gap-1">Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                <th className={thBase}>Screenshot</th>
-                <th className={thBase}>Actions</th>
+                <th className={thBase}>Reason</th>
+                {/* Sticky right */}
+                <th className={cn(thBase, "sticky right-0 z-20 bg-white border-l border-l-slate-200 text-center")}>
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
-              {payments.map((payment, i) => (
-                <tr
-                  key={payment.id}
-                  id={getRowId(payment.id)}
-                  className={cn(
-                    "border-b border-slate-100",
-                    i % 2 === 1 && "bg-[#FAFBFC]",
-                    isHighlighted(payment.id) && "row-highlight"
-                  )}
-                >
-                  <td className="px-4 py-3 w-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(payment.id)}
-                      onChange={() => toggleSelect(payment.id)}
-                      className="table-checkbox"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-slate-900">
-                    {payment.profiles?.first_name} {payment.profiles?.last_name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {payment.subscriptions?.packages?.name || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {payment.amount.toLocaleString()} EGP
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-700 capitalize">
-                    {payment.method.replace("_", " ")}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-500">
-                    {new Date(payment.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={payment.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {payment.screenshot_url ? (
-                      <button
-                        onClick={() => onViewScreenshot(payment.screenshot_url!)}
-                        className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
-                        title="View Screenshot"
-                      >
-                        <ImageIcon className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-300">—</span>
+              {payments.map((payment, i) => {
+                const highlighted = isHighlighted(payment.id);
+                const rowBg = highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                return (
+                  <tr
+                    key={payment.id}
+                    id={getRowId(payment.id)}
+                    className={cn(
+                      i % 2 === 1 && "bg-[#FAFBFC]",
+                      highlighted && "row-highlight"
                     )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {payment.status === "pending" ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => onConfirm(payment.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                          title="Confirm"
-                        >
-                          {isPending && actionId === payment.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Check className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => onReject(payment.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
-                          title="Reject"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                  >
+                    {/* Sticky left: checkbox */}
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12", rowBg)}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(payment.id)}
+                        onChange={() => toggleSelect(payment.id)}
+                        className="table-checkbox"
+                      />
+                    </td>
+                    {/* Sticky left: player */}
+                    <td className={cn(tdBase, "sticky left-12 z-10 text-sm font-medium text-slate-900 min-w-[150px] border-r border-r-slate-100", rowBg)}>
+                      {payment.profiles?.first_name} {payment.profiles?.last_name}
+                    </td>
+                    {/* Scrollable middle */}
+                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                      {payment.subscriptions?.packages?.name || "—"}
+                    </td>
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
+                      {payment.amount.toLocaleString()} EGP
+                    </td>
+                    <td className={cn(tdBase, "text-sm text-slate-700 capitalize")}>
+                      {payment.method.replace("_", " ")}
+                    </td>
+                    <td className={cn(tdBase, "text-sm text-slate-500")}>
+                      {new Date(payment.created_at).toLocaleDateString()}
+                    </td>
+                    <td className={tdBase}>
+                      <StatusBadge status={payment.status} />
+                    </td>
+                    <td className={cn(tdBase, "text-sm whitespace-nowrap")}>
+                      {payment.status === "rejected" && payment.rejection_reason ? (
+                        <span className="text-red-400 text-xs" title={payment.rejection_reason}>
+                          {payment.rejection_reason}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300">—</span>
+                      )}
+                    </td>
+                    {/* Sticky right: screenshot + actions */}
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100", rowBg)}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        {payment.screenshot_url && (
+                          <button
+                            onClick={() => onViewScreenshot(payment.screenshot_url!)}
+                            className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
+                            title="View Screenshot"
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {payment.status === "pending" ? (
+                          <>
+                            <button
+                              onClick={() => onConfirm(payment.id)}
+                              disabled={isPending}
+                              className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                              title="Confirm"
+                            >
+                              {isPending && actionId === payment.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => onReject(payment.id)}
+                              disabled={isPending}
+                              className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                              title="Reject"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : !payment.screenshot_url ? (
+                          <span className="text-xs text-slate-300">—</span>
+                        ) : null}
                       </div>
-                    ) : (
-                      <span className="text-xs text-slate-300">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -215,6 +237,11 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 <p className="text-slate-700 font-medium">{new Date(payment.created_at).toLocaleDateString()}</p>
               </div>
             </div>
+            {payment.status === "rejected" && payment.rejection_reason && (
+              <div className="mt-3 px-2.5 py-1.5 bg-red-50 rounded-lg text-[11px] text-red-500">
+                <span className="font-medium">Reason:</span> {payment.rejection_reason}
+              </div>
+            )}
             {payment.screenshot_url && (
               <button
                 onClick={() => onViewScreenshot(payment.screenshot_url!)}

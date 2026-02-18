@@ -6,6 +6,7 @@ export interface PaymentRow {
   screenshot_url: string | null;
   created_at: string;
   confirmed_at: string | null;
+  rejection_reason: string | null;
   profiles: { first_name: string; last_name: string } | null;
   subscriptions: { packages: { name: string } } | null;
 }
