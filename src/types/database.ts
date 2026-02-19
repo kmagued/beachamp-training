@@ -7,7 +7,7 @@ export type UserRole = "player" | "coach" | "admin";
 export type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
 export type GroupLevel = "beginner" | "intermediate" | "advanced" | "mixed";
 export type SubscriptionStatus = "pending" | "active" | "expired" | "cancelled";
-export type PaymentMethod = "instapay" | "bank_transfer" | "vodafone_cash" | "cash";
+export type PaymentMethod = "instapay" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";
 

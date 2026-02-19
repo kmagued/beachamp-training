@@ -4,8 +4,12 @@ export interface PlayerRow {
   last_name: string;
   email: string | null;
   phone: string | null;
-  health_conditions: string | null;
+  date_of_birth: string | null;
+  area: string | null;
   playing_level: string | null;
+  training_goals: string | null;
+  health_conditions: string | null;
+  is_active: boolean;
   created_at: string;
   subscriptions: {
     status: string;

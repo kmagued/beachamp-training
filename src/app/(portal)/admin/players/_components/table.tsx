@@ -1,6 +1,5 @@
 import { RefObject, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +19,7 @@ interface PlayersTableProps {
   sortDir: SortDir;
   toggleSort: (field: SortField) => void;
   hasActiveFilters: boolean;
+  onPlayerClick: (player: PlayerRow) => void;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -134,21 +134,20 @@ export function PlayersTableView(props: PlayersTableProps) {
   const {
     players, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    hasActiveFilters,
+    hasActiveFilters, onPlayerClick,
   } = props;
 
-  const router = useRouter();
   const emptyMessage = hasActiveFilters ? "No players match your filters" : "No players found";
 
   const selectionMode = selectedIds.size > 0;
 
-  function handleRowClick(e: React.MouseEvent, playerId: string) {
+  function handleRowClick(e: React.MouseEvent, player: PlayerRow) {
     const target = e.target as HTMLElement;
     if (target.closest("input, button, a")) return;
     if (selectionMode) {
-      toggleSelect(playerId);
+      toggleSelect(player.id);
     } else {
-      router.push(`/admin/players/${playerId}`);
+      onPlayerClick(player);
     }
   }
 
@@ -206,7 +205,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                   <tr
                     key={player.id}
                     id={getRowId(player.id)}
-                    onClick={(e) => handleRowClick(e, player.id)}
+                    onClick={(e) => handleRowClick(e, player)}
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
@@ -291,7 +290,7 @@ export function PlayersTableView(props: PlayersTableProps) {
             <Card
               key={player.id}
               id={getRowId(player.id)}
-              onClick={(e: React.MouseEvent) => handleRowClick(e, player.id)}
+              onClick={(e: React.MouseEvent) => handleRowClick(e, player)}
               className={cn(
                 "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
                 selected && "bg-primary-100 border-primary-200",

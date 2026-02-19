@@ -8,7 +8,7 @@ CREATE TYPE user_role AS ENUM ('player', 'coach', 'admin');
 CREATE TYPE playing_level AS ENUM ('beginner', 'intermediate', 'advanced', 'professional');
 CREATE TYPE group_level AS ENUM ('beginner', 'intermediate', 'advanced', 'mixed');
 CREATE TYPE subscription_status AS ENUM ('pending', 'active', 'expired', 'cancelled');
-CREATE TYPE payment_method AS ENUM ('instapay', 'bank_transfer', 'vodafone_cash', 'cash');
+CREATE TYPE payment_method AS ENUM ('instapay', 'cash');
 CREATE TYPE payment_status AS ENUM ('pending', 'confirmed', 'rejected');
 
 

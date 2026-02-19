@@ -2,13 +2,16 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Pagination, SelectionBar } from "@/components/ui";
+import Link from "next/link";
+import { Pagination, SelectionBar, Button } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
+import { Plus } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
 import { getPlayerStatus } from "./_components/types";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
 import { PlayersFilters } from "./_components/filters";
 import { PlayersTableView } from "./_components/table";
+import { PlayerDrawer } from "./_components/player-drawer";
 
 export default function AdminPlayersPage() {
   return (
@@ -28,6 +31,7 @@ function AdminPlayersContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [drawerPlayer, setDrawerPlayer] = useState<PlayerRow | null>(null);
   const PAGE_SIZE = 10;
 
   const { getRowId, isHighlighted } = useHighlightRow();
@@ -37,19 +41,20 @@ function AdminPlayersContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, phone, health_conditions, playing_level, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
-        .eq("role", "player")
-        .order("created_at", { ascending: false });
-      if (data) setPlayers(data as unknown as PlayerRow[]);
-      setLoading(false);
-    }
-    load();
+  const fetchPlayers = useCallback(async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
+      .eq("role", "player")
+      .order("created_at", { ascending: false });
+    if (data) setPlayers(data as unknown as PlayerRow[]);
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    fetchPlayers();
+  }, [fetchPlayers]);
 
   // Unique package names for filter dropdown
   const packageNames = useMemo(() => {
@@ -160,12 +165,21 @@ function AdminPlayersContent() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Players</h1>
-        <p className="text-slate-500 text-sm">
-          {players.length} total players
-          {hasActiveFilters && ` · ${filteredPlayers.length} matching`}
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Players</h1>
+          <p className="text-slate-500 text-sm">
+            {players.length} total players
+            {hasActiveFilters && ` · ${filteredPlayers.length} matching`}
+          </p>
+        </div>
+        <Link href="/admin/players/add">
+          <Button>
+            <span className="flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Add Players
+            </span>
+          </Button>
+        </Link>
       </div>
 
       <PlayersFilters
@@ -201,6 +215,7 @@ function AdminPlayersContent() {
             sortDir={sortDir}
             toggleSort={toggleSort}
             hasActiveFilters={hasActiveFilters}
+            onPlayerClick={setDrawerPlayer}
           />
         )}
       </div>
@@ -209,6 +224,12 @@ function AdminPlayersContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+      />
+
+      <PlayerDrawer
+        player={drawerPlayer}
+        onClose={() => setDrawerPlayer(null)}
+        onDataChange={fetchPlayers}
       />
     </div>
   );

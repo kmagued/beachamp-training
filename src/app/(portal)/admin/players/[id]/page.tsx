@@ -8,6 +8,7 @@ import { ProfileCard } from "./_components/profile-cards";
 import { PlayerStats } from "./_components/player-stats";
 import { SubscriptionHistory } from "./_components/subscription-history";
 import { PlaceholderSections } from "./_components/placeholder-sections";
+import { PlayerActionsMenu } from "./_components/player-actions";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,7 +59,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
         Back to Players
       </Link>
 
-      <PlayerHeader player={player} />
+      <PlayerHeader player={player} actions={<PlayerActionsMenu player={player} />} />
       <ProfileCard player={player} />
       <PlayerStats subsCount={subs.length} activeSub={activeSub} totalPaid={totalPaid} />
       <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} />
