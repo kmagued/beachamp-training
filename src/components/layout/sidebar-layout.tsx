@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { Logo } from "@/components/ui";
+import { branding } from "@/lib/config/branding";
 import { logout } from "@/lib/actions/auth";
 import {
   LayoutDashboard,
@@ -150,7 +150,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
       {/* Mobile header */}
       <header className="md:hidden fixed top-0 inset-x-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 h-14">
-        <Logo showName className="text-slate-900" size="sm" />
+        <Link href={navItems[0].href} className="text-sm font-bold text-slate-900">
+          {branding.name}
+        </Link>
         <button onClick={() => setMobileOpen(!mobileOpen)} className="text-slate-600 p-1">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>

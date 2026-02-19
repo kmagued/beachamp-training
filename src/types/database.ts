@@ -9,6 +9,7 @@ export type GroupLevel = "beginner" | "intermediate" | "advanced" | "mixed";
 export type SubscriptionStatus = "pending" | "active" | "expired" | "cancelled";
 export type PaymentMethod = "instapay" | "bank_transfer" | "vodafone_cash" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
+export type AttendanceStatus = "present" | "absent" | "excused";
 
 export interface Database {
   public: {
@@ -250,6 +251,72 @@ export interface Database {
         };
         Relationships: [];
       };
+      attendance: {
+        Row: {
+          id: string;
+          player_id: string;
+          group_id: string | null;
+          session_date: string;
+          session_time: string | null;
+          status: AttendanceStatus;
+          marked_by: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          group_id?: string | null;
+          session_date: string;
+          session_time?: string | null;
+          status?: AttendanceStatus;
+          marked_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          group_id?: string | null;
+          session_date?: string;
+          session_time?: string | null;
+          status?: AttendanceStatus;
+          marked_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      feedback: {
+        Row: {
+          id: string;
+          player_id: string;
+          coach_id: string;
+          session_date: string;
+          rating: number;
+          comment: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          coach_id: string;
+          session_date: string;
+          rating: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          coach_id?: string;
+          session_date?: string;
+          rating?: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -273,26 +340,5 @@ export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type GroupPlayer = Database["public"]["Tables"]["group_players"]["Row"];
-
-// ── Attendance & Feedback (migration 20260219) ──
-export interface Attendance {
-  id: string;
-  player_id: string;
-  group_id: string | null;
-  session_date: string;
-  session_time: string | null;
-  status: "present" | "absent" | "excused";
-  marked_by: string | null;
-  notes: string | null;
-  created_at: string;
-}
-
-export interface Feedback {
-  id: string;
-  player_id: string;
-  coach_id: string;
-  session_date: string;
-  rating: number;
-  comment: string | null;
-  created_at: string;
-}
+export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
+export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
