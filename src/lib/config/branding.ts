@@ -60,7 +60,7 @@ export const branding = {
       dark: "from-[#0C2340] to-[#155E75]",
     },
   },
-  areas: ["Maadi", "Zamalek", "New Cairo", "6th October", "Heliopolis", "Nasr City", "Mohandessin"],
+  areas: ["Maadi", "Zamalek", "New Cairo", "6th October", "Heliopolis", "Nasr City", "Mohandessin", "El Shorouk"],
   levels: [
     { value: "beginner", label: "Beginner" },
     { value: "intermediate", label: "Intermediate" },

@@ -30,10 +30,10 @@ const portalConfig: Record<Portal, { label: string; avatar: string; labelColor: 
   player: { label: "Player Portal", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
   coach: {
     label: "Coach Portal",
-    avatar: "bg-brand-coach",
-    labelColor: "text-brand-coach",
-    accentBg: "bg-brand-coach/10",
-    accentText: "text-brand-coach",
+    avatar: "bg-primary",
+    labelColor: "text-primary",
+    accentBg: "bg-primary-50",
+    accentText: "text-primary-700",
   },
   admin: {
     label: "Admin Portal",

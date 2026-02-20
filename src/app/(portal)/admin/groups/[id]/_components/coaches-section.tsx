@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Card, Badge, Button, Drawer } from "@/components/ui";
-import { UserCheck, Plus, X, Star } from "lucide-react";
+import { UserCheck, Plus, X } from "lucide-react";
 import { assignCoachToGroup, removeCoachFromGroup, setPrimaryCoach } from "@/app/_actions/training";
 import type { CoachRow, AvailableCoach } from "./types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -99,10 +99,9 @@ export function CoachesSection({ groupId, coaches, onRefresh, supabase }: Coache
                   <button
                     onClick={() => handleSetPrimary(c.id)}
                     disabled={isPending}
-                    className="text-xs px-2 py-1 text-slate-500 hover:text-primary hover:bg-primary-50 rounded"
-                    title="Set as primary"
+                    className="text-xs px-2.5 py-1 font-medium text-primary hover:bg-primary-50 rounded-lg transition-colors"
                   >
-                    <Star className="w-3.5 h-3.5" />
+                    Set Primary
                   </button>
                 )}
                 <button

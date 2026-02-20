@@ -163,7 +163,7 @@ export function CoachesTableView(props: CoachesTableProps) {
               {coaches.map((coach, i) => {
                 const highlighted = isHighlighted(coach.id);
                 const selected = selectedIds.has(coach.id);
-                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
                 return (
                   <tr
                     key={coach.id}
@@ -172,8 +172,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
-                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
-                      highlighted && "row-highlight"
+                                            highlighted && "row-highlight"
                     )}
                   >
                     <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>

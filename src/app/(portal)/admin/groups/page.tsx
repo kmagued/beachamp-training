@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, StatCard, Skeleton, Drawer } from "@/components/ui";
 import { toggleGroupActive, deleteGroup } from "@/app/_actions/training";
-import { UsersRound, Plus, Pencil, Calendar, Users, Clock, ChevronRight, Trash2 } from "lucide-react";
+import { UsersRound, Plus, Pencil, Calendar, Users, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { GroupModal } from "./_components/group-modal";
 import { DAY_NAMES, formatTime, getLevelVariant } from "./_components/types";
@@ -23,14 +23,11 @@ export default function AdminGroupsPage() {
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
   async function fetchGroups() {
-    const { data: groupData } = await supabase
-      .from("groups")
-      .select("*")
-      .order("name");
+    const { data: groupData } = await supabase.from("groups").select("*").order("name");
 
     if (!groupData) {
       setLoading(false);
@@ -71,7 +68,7 @@ export default function AdminGroupsPage() {
           })),
           schedule: schedData || [],
         };
-      })
+      }),
     );
 
     setGroups(enriched);
@@ -125,10 +122,7 @@ export default function AdminGroupsPage() {
         .eq("role", "player")
         .eq("is_active", true);
 
-      const { data: assignedPlayers } = await supabase
-        .from("group_players")
-        .select("player_id")
-        .eq("is_active", true);
+      const { data: assignedPlayers } = await supabase.from("group_players").select("player_id").eq("is_active", true);
 
       const assignedSet = new Set((assignedPlayers || []).map((gp: { player_id: string }) => gp.player_id));
       setUnassignedCount((totalPlayerCount || 0) - assignedSet.size);
@@ -140,21 +134,22 @@ export default function AdminGroupsPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Training Groups</h1>
           <p className="text-slate-500 text-sm">Manage groups, players, and schedules</p>
         </div>
-        <Button onClick={openCreate} size="sm">
+        <Button onClick={openCreate} size="sm" className="shrink-0">
           <span className="flex items-center gap-1.5">
             <Plus className="w-4 h-4" />
-            Create Group
+            <span className="hidden sm:inline">Create Group</span>
+            <span className="sm:hidden">New</span>
           </span>
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <StatCard
           label="Active Groups"
           value={activeGroups.length}
@@ -176,15 +171,16 @@ export default function AdminGroupsPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
       )}
 
       {/* Create/Edit Modal */}
       <GroupModal
         open={showModal}
-        onClose={() => { setShowModal(false); setEditingGroup(null); }}
+        onClose={() => {
+          setShowModal(false);
+          setEditingGroup(null);
+        }}
         onSuccess={fetchGroups}
         editingGroup={editingGroup}
       />
@@ -207,106 +203,102 @@ export default function AdminGroupsPage() {
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <div className="text-center py-12 text-sm text-slate-400">
-          No groups yet. Create your first training group.
-        </div>
+        <div className="text-center py-12 text-sm text-slate-400">No groups yet. Create your first training group.</div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {groups.map((group) => {
-            const scheduleText = group.schedule.length > 0
-              ? group.schedule.map((s) => DAY_NAMES[s.day_of_week]).join(", ")
-              : "No schedule";
+            const scheduleText =
+              group.schedule.length > 0
+                ? group.schedule.map((s) => DAY_NAMES[s.day_of_week]).join(", ")
+                : "No schedule";
             const firstTime = group.schedule[0];
 
             return (
-              <Card key={group.id} className={!group.is_active ? "opacity-60" : ""}>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{group.name}</h3>
-                    <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+              <Link key={group.id} href={`/admin/groups/${group.id}`}>
+                <Card className={`h-full hover:shadow-md transition-shadow cursor-pointer ${!group.is_active ? "opacity-60" : ""}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{group.name}</h3>
+                      <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+                    </div>
+                    <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+                      <button onClick={() => openEdit(group)} className="text-slate-400 hover:text-slate-600 p-1">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingGroup(group)}
+                        className="text-slate-400 hover:text-red-500 p-1 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(group)} className="text-slate-400 hover:text-slate-600 p-1">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => setDeletingGroup(group)} className="text-slate-400 hover:text-red-500 p-1 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-slate-500">Players</span>
+                    <span className="font-medium text-slate-900">
+                      {group.player_count} / {group.max_players}
+                    </span>
                   </div>
-                </div>
+                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-3">
+                    <div
+                      className={`h-full rounded-full transition-all ${group.player_count >= group.max_players ? "bg-red-500" : "bg-primary"}`}
+                      style={{ width: `${Math.min((group.player_count / group.max_players) * 100, 100)}%` }}
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-slate-500">Players</span>
-                  <span className="font-medium text-slate-900">{group.player_count} / {group.max_players}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-3">
-                  <div
-                    className={`h-full rounded-full transition-all ${group.player_count >= group.max_players ? "bg-red-500" : "bg-primary"}`}
-                    style={{ width: `${Math.min((group.player_count / group.max_players) * 100, 100)}%` }}
-                  />
-                </div>
-
-                <div className="text-sm mb-2">
-                  <span className="text-slate-500">Coaches: </span>
-                  {group.coaches.length > 0 ? (
-                    group.coaches.map((c, i) => (
-                      <span key={c.id}>
-                        <span className={`font-medium ${c.is_primary ? "text-primary" : "text-slate-700"}`}>
-                          {c.first_name} {c.last_name}
+                  <div className="text-sm mb-2">
+                    <span className="text-slate-500">Coaches: </span>
+                    {group.coaches.length > 0 ? (
+                      group.coaches.map((c, i) => (
+                        <span key={c.id}>
+                          <span className={`font-medium ${c.is_primary ? "text-primary" : "text-slate-700"}`}>
+                            {c.first_name} {c.last_name}
+                          </span>
+                          {c.is_primary && <span className="text-[10px] text-primary ml-0.5">(P)</span>}
+                          {i < group.coaches.length - 1 && ", "}
                         </span>
-                        {c.is_primary && <span className="text-[10px] text-primary ml-0.5">(P)</span>}
-                        {i < group.coaches.length - 1 && ", "}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-slate-400">None</span>
-                  )}
-                </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-400">None</span>
+                    )}
+                  </div>
 
-                <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>{scheduleText}</span>
-                  {firstTime && (
-                    <>
-                      <span>&middot;</span>
-                      <Clock className="w-3 h-3" />
-                      <span>{formatTime(firstTime.start_time)}</span>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Link href={`/admin/groups/${group.id}`} className="flex-1">
-                    <Button variant="secondary" size="sm" fullWidth>
-                      <span className="flex items-center gap-1">
-                        Manage <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </Button>
-                  </Link>
-                  <button
-                    onClick={() => handleToggleActive(group.id)}
-                    disabled={isPending}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                      group.is_active
-                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    }`}
-                  >
-                    {group.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                </div>
-              </Card>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{scheduleText}</span>
+                      {firstTime && (
+                        <>
+                          <span>&middot;</span>
+                          <Clock className="w-3 h-3" />
+                          <span>{formatTime(firstTime.start_time)}</span>
+                        </>
+                      )}
+                    </div>
+                    <div onClick={(e) => e.preventDefault()}>
+                      <button
+                        onClick={() => handleToggleActive(group.id)}
+                        disabled={isPending}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                          group.is_active
+                            ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        }`}
+                      >
+                        {group.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
             );
           })}
         </div>
       )}
 
       {/* Delete Confirmation Drawer */}
-      <Drawer
-        open={!!deletingGroup}
-        onClose={() => setDeletingGroup(null)}
-        title="Delete Group"
-      >
+      <Drawer open={!!deletingGroup} onClose={() => setDeletingGroup(null)} title="Delete Group">
         {deletingGroup && (
           <div>
             <div className="text-center mb-6">
@@ -314,7 +306,8 @@ export default function AdminGroupsPage() {
                 <Trash2 className="w-6 h-6 text-red-500" />
               </div>
               <p className="text-sm text-slate-500">
-                Are you sure you want to delete <span className="font-medium text-slate-700">{deletingGroup.name}</span>? This action cannot be undone.
+                Are you sure you want to delete <span className="font-medium text-slate-700">{deletingGroup.name}</span>
+                ? This action cannot be undone.
               </p>
             </div>
             <div className="flex gap-3">

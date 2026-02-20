@@ -22,7 +22,7 @@ interface PlayersTableProps {
   onPlayerClick: (player: PlayerRow) => void;
 }
 
-const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
+const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200 whitespace-nowrap";
 const thSortable = `${thBase} cursor-pointer select-none hover:text-slate-600 transition-colors`;
 const tdBase = "px-4 py-3 border-b border-slate-100";
 
@@ -200,7 +200,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                 const status = getPlayerStatus(player);
                 const highlighted = isHighlighted(player.id);
                 const selected = selectedIds.has(player.id);
-                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
                 return (
                   <tr
                     key={player.id}
@@ -209,12 +209,11 @@ export function PlayersTableView(props: PlayersTableProps) {
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
-                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
-                      highlighted && "row-highlight"
+                                            highlighted && "row-highlight"
                     )}
                   >
                     {/* Sticky left: checkbox */}
-                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
                       <input
                         type="checkbox"
                         checked={selected}
@@ -223,7 +222,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       />
                     </td>
                     {/* Sticky left: player */}
-                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
+                    <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
                       <p className="text-sm font-medium text-slate-900">
                         {player.first_name} {player.last_name}
                       </p>
@@ -259,7 +258,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       {new Date(player.created_at).toLocaleDateString()}
                     </td>
                     {/* Sticky right: status + contact */}
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
+                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
                       <div className="flex items-center gap-3 justify-between">
                         <StatusBadge status={status} />
                         <ContactMenu phone={player.phone} email={player.email} />

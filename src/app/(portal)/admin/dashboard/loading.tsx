@@ -15,6 +15,22 @@ export default function AdminDashboardLoading() {
         <StatCardSkeleton />
       </div>
 
+      {/* Chart skeletons */}
+      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        <div className="sm:col-span-2 bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+          <Skeleton className="h-5 w-48 mb-4" />
+          <Skeleton className="h-[240px] w-full rounded-lg" />
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+          <Skeleton className="h-5 w-40 mb-4" />
+          <Skeleton className="h-[200px] w-full rounded-lg" />
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+          <Skeleton className="h-5 w-40 mb-4" />
+          <Skeleton className="h-[200px] w-full rounded-lg" />
+        </div>
+      </div>
+
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <Skeleton className="h-5 w-36 mb-4" />

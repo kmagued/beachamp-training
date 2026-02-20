@@ -101,7 +101,20 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         .eq("is_active", true);
 
       if (!showAll) {
-        query = query.eq("coach_id", coachId);
+        // Get groups assigned to this coach
+        const { data: coachGroups } = await supabase
+          .from("coach_groups")
+          .select("group_id")
+          .eq("coach_id", coachId)
+          .eq("is_active", true);
+
+        const groupIds = (coachGroups || []).map((cg: { group_id: string }) => cg.group_id);
+        if (groupIds.length === 0) {
+          setSessions([]);
+          setLoading(false);
+          return;
+        }
+        query = query.in("group_id", groupIds);
       }
 
       const { data } = await query.order("start_time");

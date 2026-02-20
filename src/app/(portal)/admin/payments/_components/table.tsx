@@ -108,7 +108,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
               {payments.map((payment, i) => {
                 const highlighted = isHighlighted(payment.id);
                 const selected = selectedIds.has(payment.id);
-                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
                 return (
                   <tr
                     key={payment.id}
@@ -117,8 +117,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
-                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
-                      highlighted && "row-highlight"
+                                            highlighted && "row-highlight"
                     )}
                   >
                     {/* Sticky left: checkbox */}

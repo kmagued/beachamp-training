@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils/cn";
 type CardVariant = "default" | "dark";
 
 const variantClasses: Record<CardVariant, string> = {
-  default: "bg-white rounded-xl border border-slate-200 p-6",
-  dark: "bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6",
+  default: "bg-white rounded-xl border border-slate-200 p-4 sm:p-6",
+  dark: "bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 sm:p-6",
 };
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {

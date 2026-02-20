@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -51,7 +52,7 @@ export function Drawer({ open, onClose, title, children, className, width = "max
 
   if (!mounted) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div
@@ -71,7 +72,7 @@ export function Drawer({ open, onClose, title, children, className, width = "max
           // Mobile: bottom sheet positioning
           "inset-x-0 bottom-0 rounded-t-2xl max-h-[90vh]",
           // Desktop: right side panel positioning (overrides mobile)
-          "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:bottom-auto sm:rounded-none sm:max-h-none sm:w-full",
+          "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:rounded-none sm:max-h-none sm:w-full",
           width,
           // Animation: mobile uses translateY, desktop uses translateX
           visible
@@ -100,6 +101,7 @@ export function Drawer({ open, onClose, title, children, className, width = "max
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
