@@ -48,6 +48,7 @@ export async function resetPlayerPassword(playerId: string) {
 
   const { error } = await admin.auth.admin.updateUserById(playerId, {
     password,
+    email_confirm: true,
   });
 
   if (error) return { error: error.message };

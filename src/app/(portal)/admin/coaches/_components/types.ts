@@ -7,6 +7,8 @@ export interface CoachRow {
   area: string | null;
   is_active: boolean;
   created_at: string;
+  group_count: number;
+  group_names: string[];
 }
 
 export type SortField = "name" | "date";

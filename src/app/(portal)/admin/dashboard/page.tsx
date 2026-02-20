@@ -77,6 +77,8 @@ export default async function AdminDashboard() {
   const supabase = (await createClient()) as any;
 
   // Stats queries in parallel
+  const todayDow = new Date().getDay();
+
   const [
     { count: playerCount },
     { count: pendingPayments },
@@ -87,6 +89,7 @@ export default async function AdminDashboard() {
     { data: confirmedPayments },
     { data: totalRevenueData },
     { data: playerLevels },
+    { count: todaySessionCount },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -131,6 +134,11 @@ export default async function AdminDashboard() {
       .from("profiles")
       .select("playing_level")
       .eq("role", "player")
+      .eq("is_active", true),
+    supabase
+      .from("schedule_sessions")
+      .select("*", { count: "exact", head: true })
+      .eq("day_of_week", todayDow)
       .eq("is_active", true),
   ]);
 
@@ -192,9 +200,8 @@ export default async function AdminDashboard() {
         />
         <StatCard
           label="Sessions Today"
-          value="—"
-          subtitle="Coming in Phase 2"
-          accentColor="bg-slate-300"
+          value={todaySessionCount ?? 0}
+          accentColor="bg-brand-coach"
           icon={<CalendarDays className="w-5 h-5" />}
         />
       </div>

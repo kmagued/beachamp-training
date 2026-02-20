@@ -14,11 +14,13 @@ import {
   Users,
   CreditCard,
   Package,
-  UserCheck,
   ShieldCheck,
   LogOut,
   Menu,
   X,
+  Calendar,
+  GraduationCap,
+  UsersRound,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 
@@ -51,8 +53,11 @@ const iconMap = {
   players: Users,
   payments: CreditCard,
   packages: Package,
-  coaches: UserCheck,
+  coaches: GraduationCap,
   users: ShieldCheck,
+  groups: UsersRound,
+  "my-groups": Users,
+  schedule: Calendar,
 } as const;
 
 const playerNav = [
@@ -63,14 +68,26 @@ const playerNav = [
   { key: "profile", label: "Profile", href: "/player/profile" },
 ] as const;
 
-const adminNav = [
+const coachNav = [
+  { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
+  { key: "schedule", label: "Schedule", href: "/coach/schedule" },
+  { key: "my-groups", label: "My Groups", href: "/coach/groups" },
+] as const;
+
+type NavItem = { key: string; label: string; href: string; section?: string };
+
+const adminNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { key: "players", label: "Players", href: "/admin/players" },
   { key: "coaches", label: "Coaches", href: "/admin/coaches" },
+  { key: "groups", label: "Groups", href: "/admin/groups" },
   { key: "payments", label: "Payments", href: "/admin/payments" },
   { key: "packages", label: "Packages", href: "/admin/packages" },
   { key: "users", label: "User Mgmt", href: "/admin/users" },
-] as const;
+  // Training Operations
+  { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
+  { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
+];
 
 interface SidebarLayoutProps {
   portal: Portal;
@@ -82,11 +99,13 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const config = portalConfig[portal];
-  const navItems = portal === "admin" ? adminNav : playerNav;
+  const navItems = portal === "admin" ? adminNav : portal === "coach" ? coachNav : playerNav;
 
   const initials = `${(user.first_name || "")[0] || ""}${(user.last_name || "")[0] || ""}`.toUpperCase() || "U";
 
-  const activeKey = navItems.find((item) => pathname.startsWith(item.href))?.key || "dashboard";
+  // Match the most specific route first (longer href = more specific)
+  const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
+  const activeKey = sortedNav.find((item) => pathname.startsWith(item.href))?.key || "dashboard";
 
   return (
     <div className="min-h-screen flex bg-surface-bg">
@@ -98,24 +117,36 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 mt-2">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-3 mt-2 overflow-y-auto">
+          {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
+            const navItem = item as NavItem;
+            const prevItem = index > 0 ? (navItems[index - 1] as NavItem) : null;
+            const showSection = navItem.section && navItem.section !== prevItem?.section;
             return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
-                  isActive
-                    ? cn(config.accentBg, config.accentText)
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+              <div key={item.key}>
+                {showSection && (
+                  <div className="mt-4 mb-2 px-3">
+                    <div className="border-t border-slate-200" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
+                      {navItem.section}
+                    </p>
+                  </div>
                 )}
-              >
-                <Icon className="w-[18px] h-[18px]" />
-                {item.label}
-              </Link>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
+                    isActive
+                      ? cn(config.accentBg, config.accentText)
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+                  )}
+                >
+                  {Icon && <Icon className="w-[18px] h-[18px]" />}
+                  {item.label}
+                </Link>
+              </div>
             );
           })}
         </nav>
@@ -178,25 +209,37 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <nav className="flex-1 px-3">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-3 overflow-y-auto">
+          {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
+            const navItem = item as NavItem;
+            const prevItem = index > 0 ? (navItems[index - 1] as NavItem) : null;
+            const showSection = navItem.section && navItem.section !== prevItem?.section;
             return (
-              <Link
-                key={item.key}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
-                  isActive
-                    ? cn(config.accentBg, config.accentText)
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+              <div key={item.key}>
+                {showSection && (
+                  <div className="mt-4 mb-2 px-3">
+                    <div className="border-t border-slate-200" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
+                      {navItem.section}
+                    </p>
+                  </div>
                 )}
-              >
-                <Icon className="w-[18px] h-[18px]" />
-                {item.label}
-              </Link>
+                <Link
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
+                    isActive
+                      ? cn(config.accentBg, config.accentText)
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+                  )}
+                >
+                  {Icon && <Icon className="w-[18px] h-[18px]" />}
+                  {item.label}
+                </Link>
+              </div>
             );
           })}
         </nav>

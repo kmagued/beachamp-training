@@ -261,6 +261,7 @@ export interface Database {
           status: AttendanceStatus;
           marked_by: string | null;
           notes: string | null;
+          schedule_session_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -272,6 +273,7 @@ export interface Database {
           status?: AttendanceStatus;
           marked_by?: string | null;
           notes?: string | null;
+          schedule_session_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -283,6 +285,7 @@ export interface Database {
           status?: AttendanceStatus;
           marked_by?: string | null;
           notes?: string | null;
+          schedule_session_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -317,12 +320,90 @@ export interface Database {
         };
         Relationships: [];
       };
+      coach_groups: {
+        Row: {
+          id: string;
+          coach_id: string;
+          group_id: string;
+          is_primary: boolean;
+          assigned_at: string;
+          is_active: boolean;
+        };
+        Insert: {
+          id?: string;
+          coach_id: string;
+          group_id: string;
+          is_primary?: boolean;
+          assigned_at?: string;
+          is_active?: boolean;
+        };
+        Update: {
+          id?: string;
+          coach_id?: string;
+          group_id?: string;
+          is_primary?: boolean;
+          assigned_at?: string;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      schedule_sessions: {
+        Row: {
+          id: string;
+          group_id: string;
+          coach_id: string | null;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          location: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          coach_id?: string | null;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          location?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          coach_id?: string | null;
+          day_of_week?: number;
+          start_time?: string;
+          end_time?: string;
+          location?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      log_attendance_with_deduction: {
+        Args: {
+          p_player_id: string;
+          p_group_id: string;
+          p_session_date: string;
+          p_session_time: string;
+          p_status: string;
+          p_marked_by: string;
+          p_schedule_session_id: string;
+          p_notes?: string | null;
+        };
+        Returns: unknown;
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -342,3 +423,26 @@ export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type GroupPlayer = Database["public"]["Tables"]["group_players"]["Row"];
 export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
+export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
+export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
+
+// ── Joined types for UI queries ──
+export interface ScheduleSessionWithDetails extends ScheduleSession {
+  group: Pick<Group, "id" | "name" | "level">;
+  coach: Pick<Profile, "id" | "first_name" | "last_name"> | null;
+}
+
+export interface CoachGroupWithDetails extends CoachGroup {
+  group: Pick<Group, "id" | "name" | "level" | "max_players">;
+  player_count: number;
+}
+
+export interface AttendanceWithPlayer extends Attendance {
+  player: Pick<Profile, "id" | "first_name" | "last_name" | "avatar_url">;
+}
+
+export interface GroupWithDetails extends Group {
+  player_count: number;
+  coaches: Pick<Profile, "id" | "first_name" | "last_name">[];
+  schedule: ScheduleSession[];
+}
