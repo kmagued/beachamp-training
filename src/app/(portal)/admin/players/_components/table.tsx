@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils/cn";
 import type { PlayerRow, SortField, SortDir } from "./types";
 import { getPlayerStatus } from "./types";
 
+function getDaysLeft(endDate: string | null): number | null {
+  if (!endDate) return null;
+  return Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
 interface PlayersTableProps {
   players: PlayerRow[];
   selectedIds: Set<string>;
@@ -34,7 +39,10 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "active": return <Badge variant="success">Active</Badge>;
-    case "expiring": return <Badge variant="warning">Expiring</Badge>;
+    case "completed": return <Badge variant="neutral">Completed</Badge>;
+    case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
+    case "expiring": return <Badge variant="danger">Expiring</Badge>;
+    case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending</Badge>;
     default: return <Badge variant="neutral">Inactive</Badge>;
   }
@@ -201,6 +209,8 @@ export function PlayersTableView(props: PlayersTableProps) {
                 const highlighted = isHighlighted(player.id);
                 const selected = selectedIds.has(player.id);
                 const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
+                const daysLeft = activeSub ? getDaysLeft(activeSub.end_date) : null;
+                const showExpiryWarning = status !== "completed" && daysLeft !== null;
                 return (
                   <tr
                     key={player.id}
@@ -233,14 +243,28 @@ export function PlayersTableView(props: PlayersTableProps) {
                       {activeSub?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {activeSub
-                        ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}`
-                        : "—"}
+                      {activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {activeSub?.end_date
-                        ? new Date(activeSub.end_date).toLocaleDateString()
-                        : "—"}
+                    <td className={cn(tdBase, "text-sm")}>
+                      {activeSub?.end_date ? (
+                        <div>
+                          <span className={cn(
+                            showExpiryWarning && daysLeft! <= 3 ? "text-red-600 font-medium" :
+                            showExpiryWarning && daysLeft! <= 7 ? "text-amber-600 font-medium" :
+                            "text-slate-500"
+                          )}>
+                            {new Date(activeSub.end_date).toLocaleDateString()}
+                          </span>
+                          {showExpiryWarning && daysLeft! <= 7 && (
+                            <p className={cn(
+                              "text-xs mt-0.5",
+                              daysLeft! <= 3 ? "text-red-500" : "text-amber-500"
+                            )}>
+                              {daysLeft! <= 0 ? "Expired" : `${daysLeft}d left`}
+                            </p>
+                          )}
+                        </div>
+                      ) : "—"}
                     </td>
                     <td className={tdBase}>
                       <LevelBadge level={player.playing_level} />
@@ -285,6 +309,8 @@ export function PlayersTableView(props: PlayersTableProps) {
           const activeSub = player.subscriptions?.find((s) => s.status === "active");
           const status = getPlayerStatus(player);
           const selected = selectedIds.has(player.id);
+          const daysLeft = activeSub ? getDaysLeft(activeSub.end_date) : null;
+          const showExpiryWarning = status !== "completed" && daysLeft !== null;
           return (
             <Card
               key={player.id}
@@ -323,14 +349,22 @@ export function PlayersTableView(props: PlayersTableProps) {
                 </div>
                 <div>
                   <span className="text-slate-400">Sessions</span>
-                  <p className="text-slate-700 font-medium">
+                  <p className="font-medium text-slate-700">
                     {activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
                   </p>
                 </div>
                 <div>
                   <span className="text-slate-400">Expires</span>
-                  <p className="text-slate-700 font-medium">
+                  <p className={cn(
+                    "font-medium",
+                    showExpiryWarning && daysLeft! <= 3 ? "text-red-600" :
+                    showExpiryWarning && daysLeft! <= 7 ? "text-amber-600" :
+                    "text-slate-700"
+                  )}>
                     {activeSub?.end_date ? new Date(activeSub.end_date).toLocaleDateString() : "—"}
+                    {showExpiryWarning && daysLeft! <= 7 && (
+                      <span className="ml-1">({daysLeft! <= 0 ? "Expired" : `${daysLeft}d`})</span>
+                    )}
                   </p>
                 </div>
                 <div>

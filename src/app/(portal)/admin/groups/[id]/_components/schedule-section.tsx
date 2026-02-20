@@ -76,7 +76,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
           <span className="bg-slate-100 text-slate-600 text-xs px-1.5 py-0.5 rounded-full">{schedule.length}</span>
         </h2>
         <Button size="sm" onClick={openAdd}>
-          <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> Add Session</span>
+          <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span><span className="sm:hidden">Add</span></span>
         </Button>
       </div>
 
@@ -91,7 +91,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto -mx-6 px-6">
+          <div className="hidden sm:block overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200">

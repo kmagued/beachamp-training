@@ -46,12 +46,16 @@ export async function resetPlayerPassword(playerId: string) {
 
   const password = generatePassword();
 
-  const { error } = await admin.auth.admin.updateUserById(playerId, {
+  const { data, error } = await admin.auth.admin.updateUserById(playerId, {
     password,
     email_confirm: true,
   });
 
   if (error) return { error: error.message };
+  if (!data?.user) return { error: "User not found in auth system" };
+
+  // Sign out all existing sessions so the new password takes effect immediately
+  await admin.auth.admin.signOut(playerId, "global");
 
   return { success: true, password };
 }

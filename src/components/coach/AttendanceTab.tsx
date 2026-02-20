@@ -63,7 +63,8 @@ export function AttendanceTab({
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ success?: boolean; error?: string; warnings?: string[] } | null>(null);
+  const [result, setResult] = useState<{ success?: boolean; warnings?: string[] } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [existingAttendance, setExistingAttendance] = useState<Map<string, string>>(new Map());
 
   const supabase = createBrowserClient(
@@ -196,6 +197,7 @@ export function AttendanceTab({
 
   function handleSubmit() {
     if (!allMarked) return;
+    setSubmitError(null);
 
     startTransition(async () => {
       const attendanceRecords = Array.from(records.values())
@@ -214,7 +216,7 @@ export function AttendanceTab({
       });
 
       if ("error" in res) {
-        setResult({ error: (res as { error: string }).error });
+        setSubmitError((res as { error: string }).error);
       } else {
         const warnings: string[] = [];
         if ("results" in res) {
@@ -229,6 +231,7 @@ export function AttendanceTab({
         }
         setResult({ success: true, warnings });
         setShowConfirm(false);
+        setSubmitError(null);
       }
     });
   }
@@ -465,46 +468,53 @@ export function AttendanceTab({
       {/* Confirmation Drawer */}
       <Drawer
         open={showConfirm}
-        onClose={() => setShowConfirm(false)}
+        onClose={() => { setShowConfirm(false); setSubmitError(null); }}
         title="Confirm Attendance"
       >
-        <div>
-          <p className="text-sm text-slate-500 mb-4">
-            You&apos;re marking attendance for <span className="font-medium text-slate-900">{groupName}</span> — {formatTime(startTime)} session on {sessionDate}
-          </p>
-          <div className="flex items-center gap-4 text-sm mb-4 bg-slate-50 rounded-lg p-3">
-            <span className="text-emerald-600">{presentCount} present</span>
-            <span className="text-red-500">{absentCount} absent</span>
-            <span className="text-amber-500">{excusedCount} excused</span>
-          </div>
-          {hasExistingAttendance && (
-            <p className="text-xs text-amber-600 mb-4">
-              This will update existing attendance records.
+        <div className="flex flex-col h-full -mb-5 sm:-mb-6">
+          <div className="flex-1">
+            <p className="text-sm text-slate-500 mb-4">
+              You&apos;re marking attendance for <span className="font-medium text-slate-900">{groupName}</span> — {formatTime(startTime)} session on {sessionDate}
             </p>
-          )}
-          <div className="flex gap-2">
-            <Button onClick={handleSubmit} disabled={isPending} fullWidth>
-              {isPending ? "Submitting..." : "Confirm"}
-            </Button>
-            <Button variant="secondary" onClick={() => setShowConfirm(false)} disabled={isPending} fullWidth>
-              Cancel
-            </Button>
+            <div className="flex items-center gap-4 text-sm mb-4 bg-slate-50 rounded-lg p-3">
+              <span className="text-emerald-600">{presentCount} present</span>
+              <span className="text-red-500">{absentCount} absent</span>
+              <span className="text-amber-500">{excusedCount} excused</span>
+            </div>
+            {hasExistingAttendance && (
+              <p className="text-xs text-amber-600 mb-4">
+                This will update existing attendance records.
+              </p>
+            )}
+          </div>
+
+          <div className="sticky bottom-0 pt-3 pb-5 sm:pb-6 border-t border-slate-200 bg-white -mx-5 px-5 sm:-mx-6 sm:px-6">
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
+                <X className="w-4 h-4 mt-0.5 shrink-0" />
+                {submitError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button onClick={handleSubmit} disabled={isPending} fullWidth>
+                {isPending ? "Submitting..." : "Confirm"}
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowConfirm(false); setSubmitError(null); }} disabled={isPending} fullWidth>
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       </Drawer>
 
-      {/* Result Toast */}
-      {result && (
-        <div className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 sm:max-w-sm ${result.error ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"} border rounded-lg p-4 shadow-lg`}>
+      {/* Success Toast */}
+      {result?.success && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 sm:max-w-sm bg-emerald-50 border-emerald-200 border rounded-lg p-4 shadow-lg">
           <div className="flex items-start gap-2">
-            {result.error ? (
-              <X className="w-4 h-4 text-red-500 mt-0.5" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5" />
-            )}
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5" />
             <div>
-              <p className={`text-sm font-medium ${result.error ? "text-red-700" : "text-emerald-700"}`}>
-                {result.error || "Attendance submitted successfully!"}
+              <p className="text-sm font-medium text-emerald-700">
+                Attendance submitted successfully!
               </p>
               {result.warnings && result.warnings.length > 0 && (
                 <div className="mt-2 space-y-1">

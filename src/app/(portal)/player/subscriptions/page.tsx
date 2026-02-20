@@ -114,7 +114,7 @@ export default async function PlayerSubscriptionsPage() {
                     return (
                       <tr
                         key={sub.id}
-                        className={`border-b border-slate-100 ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}
+                        className="border-b border-slate-100"
                       >
                         <td className="px-4 py-3 text-sm font-medium text-slate-900">
                           {sub.packages?.name || "—"}

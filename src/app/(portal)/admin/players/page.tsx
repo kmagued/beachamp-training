@@ -44,7 +44,7 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
       .eq("role", "player")
       .order("created_at", { ascending: false });
     if (data) setPlayers(data as unknown as PlayerRow[]);
@@ -54,6 +54,19 @@ function AdminPlayersContent() {
 
   useEffect(() => {
     fetchPlayers();
+  }, [fetchPlayers]);
+
+  // Re-fetch when window regains focus (picks up attendance changes etc.)
+  useEffect(() => {
+    let lastFetch = Date.now();
+    function handleFocus() {
+      if (Date.now() - lastFetch > 30_000) {
+        lastFetch = Date.now();
+        fetchPlayers();
+      }
+    }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [fetchPlayers]);
 
   // Unique package names for filter dropdown

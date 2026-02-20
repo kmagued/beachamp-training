@@ -76,7 +76,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
           size="sm"
           onClick={() => { setShowAddPlayer(true); loadAvailablePlayers(); }}
         >
-          <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> Add Players</span>
+          <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Players</span><span className="sm:hidden">Add</span></span>
         </Button>
       </div>
 
@@ -91,7 +91,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto -mx-6 px-6">
+          <div className="hidden sm:block overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200">

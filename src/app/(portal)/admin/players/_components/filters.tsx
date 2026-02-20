@@ -1,7 +1,7 @@
 import { Input, MultiSelect } from "@/components/ui";
 import { Search, RotateCcw } from "lucide-react";
 
-const STATUS_OPTIONS = ["Active", "Expiring", "Pending", "Inactive"] as const;
+const STATUS_OPTIONS = ["Active", "Completed", "Expiring Soon", "Expiring", "Expired", "Pending", "Inactive"] as const;
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
 
 interface PlayersFiltersProps {
