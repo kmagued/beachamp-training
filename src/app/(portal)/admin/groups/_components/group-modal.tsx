@@ -37,6 +37,11 @@ export function GroupModal({ open, onClose, onSuccess, editingGroup }: GroupModa
       open={open}
       onClose={onClose}
       title={editingGroup ? "Edit Group" : "New Group"}
+      footer={
+        <Button type="submit" form="group-form" fullWidth disabled={isPending}>
+          {isPending ? "Saving..." : editingGroup ? "Save Changes" : "Create Group"}
+        </Button>
+      }
     >
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-4">
@@ -44,7 +49,7 @@ export function GroupModal({ open, onClose, onSuccess, editingGroup }: GroupModa
         </div>
       )}
 
-      <form action={handleSubmit} className="space-y-4">
+      <form id="group-form" action={handleSubmit} className="space-y-4">
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">Name</label>
           <Input name="name" required defaultValue={editingGroup?.name || ""} placeholder="e.g. Group A" />
@@ -68,9 +73,6 @@ export function GroupModal({ open, onClose, onSuccess, editingGroup }: GroupModa
           <label className="text-xs font-medium text-slate-500 mb-1 block">Description</label>
           <Input name="description" placeholder="Optional description" defaultValue={editingGroup?.description || ""} />
         </div>
-        <Button type="submit" fullWidth disabled={isPending}>
-          {isPending ? "Saving..." : editingGroup ? "Save Changes" : "Create Group"}
-        </Button>
       </form>
     </Drawer>
   );

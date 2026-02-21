@@ -2,10 +2,10 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Pagination, SelectionBar, Card, Button, Input } from "@/components/ui";
+import { Pagination, SelectionBar, Button, Input, Drawer } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { createCoach } from "@/app/_actions/training";
-import { Plus, X, Eye, EyeOff, Copy, CheckCircle2 } from "lucide-react";
+import { Plus, Eye, EyeOff, Copy, CheckCircle2 } from "lucide-react";
 import type { CoachRow, SortField, SortDir } from "./_components/types";
 import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
 import { CoachesFilters } from "./_components/filters";
@@ -204,76 +204,71 @@ function AdminCoachesContent() {
         </Button>
       </div>
 
-      {/* Add Coach Modal */}
-      {showAddCoach && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-900">
-                {createdPassword ? "Coach Created!" : "Add New Coach"}
-              </h3>
-              <button onClick={() => { setShowAddCoach(false); setCreatedPassword(null); }} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
+      {/* Add Coach Drawer */}
+      <Drawer
+        open={showAddCoach}
+        onClose={() => { setShowAddCoach(false); setCreatedPassword(null); }}
+        title={createdPassword ? "Coach Created!" : "Add New Coach"}
+        footer={
+          createdPassword ? (
+            <Button fullWidth onClick={() => { setShowAddCoach(false); setCreatedPassword(null); }}>Done</Button>
+          ) : (
+            <Button type="submit" form="add-coach-form" fullWidth disabled={isPending}>
+              {isPending ? "Creating..." : "Create Coach Account"}
+            </Button>
+          )
+        }
+      >
+        {createdPassword ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <p className="text-sm font-medium text-emerald-700">Coach account created successfully</p>
+            </div>
+            <p className="text-xs text-emerald-600 mb-3">Share this temporary password with the coach.</p>
+            <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 px-3 py-2">
+              <code className="flex-1 text-sm font-mono text-slate-900">
+                {showPassword ? createdPassword : "••••••••••••"}
+              </code>
+              <button onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+              <button onClick={copyPassword} className="text-slate-400 hover:text-slate-600">
+                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
-            {createdPassword ? (
-              <div>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <p className="text-sm font-medium text-emerald-700">Coach account created successfully</p>
-                  </div>
-                  <p className="text-xs text-emerald-600 mb-3">Share this temporary password with the coach.</p>
-                  <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 px-3 py-2">
-                    <code className="flex-1 text-sm font-mono text-slate-900">
-                      {showPassword ? createdPassword : "••••••••••••"}
-                    </code>
-                    <button onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600">
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                    <button onClick={copyPassword} className="text-slate-400 hover:text-slate-600">
-                      {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <Button fullWidth onClick={() => { setShowAddCoach(false); setCreatedPassword(null); }}>Done</Button>
-              </div>
-            ) : (
-              <form action={handleAddCoach} className="space-y-3">
-                {addError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{addError}</div>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 block">First Name</label>
-                    <Input name="first_name" required placeholder="John" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 block">Last Name</label>
-                    <Input name="last_name" required placeholder="Doe" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">Email</label>
-                  <Input name="email" type="email" required placeholder="coach@example.com" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">Phone</label>
-                  <Input name="phone" placeholder="+201234567890" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">Password</label>
-                  <Input name="password" type="text" required placeholder="Temporary password" defaultValue={Math.random().toString(36).slice(-10)} />
-                  <p className="text-[10px] text-slate-400 mt-1">Coach should change this after first login</p>
-                </div>
-                <Button type="submit" fullWidth disabled={isPending}>
-                  {isPending ? "Creating..." : "Create Coach Account"}
-                </Button>
-              </form>
+          </div>
+        ) : (
+          <form id="add-coach-form" action={handleAddCoach} className="space-y-3">
+            {addError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{addError}</div>
             )}
-          </Card>
-        </div>
-      )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">First Name</label>
+                <Input name="first_name" required placeholder="John" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Last Name</label>
+                <Input name="last_name" required placeholder="Doe" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Email</label>
+              <Input name="email" type="email" required placeholder="coach@example.com" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Phone</label>
+              <Input name="phone" placeholder="+201234567890" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Password</label>
+              <Input name="password" type="text" required placeholder="Temporary password" defaultValue={Math.random().toString(36).slice(-10)} />
+              <p className="text-[10px] text-slate-400 mt-1">Coach should change this after first login</p>
+            </div>
+          </form>
+        )}
+      </Drawer>
 
       <CoachesFilters
         search={search}

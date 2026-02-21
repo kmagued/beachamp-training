@@ -10,12 +10,13 @@ interface DrawerProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  footer?: ReactNode;
   className?: string;
   /** Width of the side panel on desktop (default: "max-w-md") */
   width?: string;
 }
 
-export function Drawer({ open, onClose, title, children, className, width = "max-w-md" }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, className, width = "max-w-md" }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -100,6 +101,13 @@ export function Drawer({ open, onClose, title, children, className, width = "max
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
           {children}
         </div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="px-5 py-4 sm:px-6 border-t border-slate-200 shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

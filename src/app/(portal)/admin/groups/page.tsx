@@ -139,36 +139,40 @@ export default function AdminGroupsPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Training Groups</h1>
           <p className="text-slate-500 text-sm">Manage groups, players, and schedules</p>
         </div>
-        <Button onClick={openCreate} size="sm" className="shrink-0">
-          <span className="flex items-center gap-1.5">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create Group</span>
-            <span className="sm:hidden">New</span>
-          </span>
-        </Button>
+        {groups.length > 0 && (
+          <Button onClick={openCreate} size="sm" className="shrink-0">
+            <span className="flex items-center gap-1.5">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Create Group</span>
+              <span className="sm:hidden">New</span>
+            </span>
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        <StatCard
-          label="Active Groups"
-          value={activeGroups.length}
-          accentColor="bg-primary"
-          icon={<UsersRound className="w-5 h-5" />}
-        />
-        <StatCard
-          label="Players Assigned"
-          value={totalPlayers}
-          accentColor="bg-emerald-500"
-          icon={<Users className="w-5 h-5" />}
-        />
-        <StatCard
-          label="Unassigned Players"
-          value={unassignedCount}
-          accentColor={unassignedCount > 0 ? "bg-amber-500" : "bg-slate-300"}
-          icon={<Users className="w-5 h-5" />}
-        />
-      </div>
+      {groups.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <StatCard
+            label="Active Groups"
+            value={activeGroups.length}
+            accentColor="bg-primary"
+            icon={<UsersRound className="w-5 h-5" />}
+          />
+          <StatCard
+            label="Players Assigned"
+            value={totalPlayers}
+            accentColor="bg-emerald-500"
+            icon={<Users className="w-5 h-5" />}
+          />
+          <StatCard
+            label="Unassigned Players"
+            value={unassignedCount}
+            accentColor={unassignedCount > 0 ? "bg-amber-500" : "bg-slate-300"}
+            icon={<Users className="w-5 h-5" />}
+          />
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
@@ -203,7 +207,19 @@ export default function AdminGroupsPage() {
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <div className="text-center py-12 text-sm text-slate-400">No groups yet. Create your first training group.</div>
+        <div className="text-center py-16">
+          <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UsersRound className="w-7 h-7 text-slate-400" />
+          </div>
+          <h3 className="font-semibold text-slate-700 mb-1">No training groups yet</h3>
+          <p className="text-sm text-slate-400 mb-5">Create your first group to start organizing players and schedules.</p>
+          <Button onClick={openCreate} size="sm">
+            <span className="flex items-center gap-1.5">
+              <Plus className="w-4 h-4" />
+              Create Group
+            </span>
+          </Button>
+        </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {groups.map((group) => {
@@ -298,30 +314,34 @@ export default function AdminGroupsPage() {
       )}
 
       {/* Delete Confirmation Drawer */}
-      <Drawer open={!!deletingGroup} onClose={() => setDeletingGroup(null)} title="Delete Group">
+      <Drawer
+        open={!!deletingGroup}
+        onClose={() => setDeletingGroup(null)}
+        title="Delete Group"
+        footer={deletingGroup ? (
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth onClick={() => setDeletingGroup(null)} disabled={isPending}>
+              Cancel
+            </Button>
+            <button
+              onClick={() => handleDelete(deletingGroup)}
+              disabled={isPending}
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
+            >
+              {isPending ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        ) : undefined}
+      >
         {deletingGroup && (
-          <div>
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Trash2 className="w-6 h-6 text-red-500" />
-              </div>
-              <p className="text-sm text-slate-500">
-                Are you sure you want to delete <span className="font-medium text-slate-700">{deletingGroup.name}</span>
-                ? This action cannot be undone.
-              </p>
+          <div className="text-center">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Trash2 className="w-6 h-6 text-red-500" />
             </div>
-            <div className="flex gap-3">
-              <Button variant="secondary" fullWidth onClick={() => setDeletingGroup(null)} disabled={isPending}>
-                Cancel
-              </Button>
-              <button
-                onClick={() => handleDelete(deletingGroup)}
-                disabled={isPending}
-                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
-              >
-                {isPending ? "Deleting..." : "Delete"}
-              </button>
-            </div>
+            <p className="text-sm text-slate-500">
+              Are you sure you want to delete <span className="font-medium text-slate-700">{deletingGroup.name}</span>
+              ? This action cannot be undone.
+            </p>
           </div>
         )}
       </Drawer>

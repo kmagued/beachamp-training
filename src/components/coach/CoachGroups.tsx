@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Skeleton } from "@/components/ui";
-import { Users, Calendar, Clock } from "lucide-react";
+import { Users, UsersRound, Calendar, Clock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -185,10 +185,25 @@ export function CoachGroups({ coachId, isAdmin }: CoachGroupsProps) {
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-slate-400">
-        {isAdmin
-          ? "No active groups found. Create one from the Groups page."
-          : "You haven't been assigned to any groups yet. Contact your administrator."}
+      <div className="text-center py-16">
+        <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <UsersRound className="w-7 h-7 text-slate-400" />
+        </div>
+        <h3 className="font-semibold text-slate-700 mb-1">No groups yet</h3>
+        <p className="text-sm text-slate-400">
+          {isAdmin
+            ? "No active groups found. Create one from the Groups page."
+            : "You haven't been assigned to any groups yet. Contact your administrator."}
+        </p>
+        {isAdmin && (
+          <Link
+            href="/admin/groups"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 mt-4"
+          >
+            Go to Groups
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        )}
       </div>
     );
   }
