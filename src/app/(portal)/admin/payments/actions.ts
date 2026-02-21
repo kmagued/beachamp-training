@@ -120,6 +120,131 @@ export async function rejectPayment(paymentId: string, reason: string) {
   return { success: true };
 }
 
+export async function updatePayment(
+  paymentId: string,
+  updates: { amount?: number; method?: string; status?: string }
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: payment } = await supabase
+    .from("payments")
+    .select("id, status, subscription_id, player_id, subscriptions(*, packages(*))")
+    .eq("id", paymentId)
+    .single();
+
+  if (!payment) return { error: "Payment not found" };
+
+  const paymentUpdate: Record<string, unknown> = {};
+  if (updates.amount !== undefined) paymentUpdate.amount = updates.amount;
+  if (updates.method !== undefined) paymentUpdate.method = updates.method;
+
+  // Handle status change
+  if (updates.status && updates.status !== payment.status) {
+    paymentUpdate.status = updates.status;
+
+    if (updates.status === "confirmed") {
+      paymentUpdate.confirmed_by = user.id;
+      paymentUpdate.confirmed_at = new Date().toISOString();
+      paymentUpdate.rejection_reason = null;
+
+      // Activate subscription with proper dates
+      const pkg = payment.subscriptions?.packages;
+      if (pkg) {
+        const { data: existingActiveSub } = await supabase
+          .from("subscriptions")
+          .select("end_date")
+          .eq("player_id", payment.player_id)
+          .eq("status", "active")
+          .neq("id", payment.subscription_id)
+          .order("end_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const today = new Date();
+        let startDate = today;
+        if (existingActiveSub?.end_date) {
+          const activeEndDate = new Date(existingActiveSub.end_date);
+          if (activeEndDate > today) {
+            startDate = new Date(activeEndDate);
+            startDate.setDate(startDate.getDate() + 1);
+          }
+        }
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+        await supabase
+          .from("subscriptions")
+          .update({
+            status: "active",
+            start_date: startDate.toISOString().split("T")[0],
+            end_date: endDate.toISOString().split("T")[0],
+          })
+          .eq("id", payment.subscription_id);
+      }
+    } else if (updates.status === "pending") {
+      paymentUpdate.confirmed_by = null;
+      paymentUpdate.confirmed_at = null;
+      paymentUpdate.rejection_reason = null;
+
+      await supabase
+        .from("subscriptions")
+        .update({ status: "pending", start_date: null, end_date: null })
+        .eq("id", payment.subscription_id);
+    } else if (updates.status === "rejected") {
+      paymentUpdate.confirmed_by = null;
+      paymentUpdate.confirmed_at = null;
+
+      await supabase
+        .from("subscriptions")
+        .update({ status: "cancelled" })
+        .eq("id", payment.subscription_id);
+    }
+  }
+
+  if (Object.keys(paymentUpdate).length === 0) return { error: "No changes provided" };
+
+  const { error } = await supabase
+    .from("payments")
+    .update(paymentUpdate)
+    .eq("id", paymentId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/player/subscriptions");
+  revalidatePath("/player/dashboard");
+  return { success: true };
+}
+
+export async function bulkUpdatePaymentStatus(paymentIds: string[], status: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const results = { success: 0, failed: 0 };
+
+  for (const id of paymentIds) {
+    const res = await updatePayment(id, { status });
+    if ("error" in res) results.failed++;
+    else results.success++;
+  }
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/dashboard");
+  return { success: true, results };
+}
+
 export async function getScreenshotUrl(path: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
