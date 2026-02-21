@@ -18,6 +18,11 @@ export async function submitSubscription(formData: FormData) {
 
   if (!packageId || !method) return { error: "Please select a package and payment method" };
 
+  const screenshot = formData.get("screenshot") as File | null;
+  if (method === "instapay" && (!screenshot || screenshot.size === 0)) {
+    return { error: "Payment screenshot is required for Instapay" };
+  }
+
   // Save training info if provided (first-time subscribers)
   const playingLevel = formData.get("playing_level") as string | null;
   const trainingGoals = formData.get("training_goals") as string | null;
@@ -61,7 +66,6 @@ export async function submitSubscription(formData: FormData) {
 
   // Handle screenshot upload
   let screenshotUrl: string | null = null;
-  const screenshot = formData.get("screenshot") as File | null;
   if (screenshot && screenshot.size > 0) {
     const path = `${user.id}/${Date.now()}_${screenshot.name}`;
     const { error: uploadError } = await supabase.storage
