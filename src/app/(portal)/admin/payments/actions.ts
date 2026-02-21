@@ -25,8 +25,30 @@ export async function confirmPayment(paymentId: string) {
   const pkg = payment.subscriptions?.packages;
   if (!pkg) return { error: "Package not found for this subscription" };
 
+  // Check if the player has an existing active subscription that hasn't expired
+  const { data: existingActiveSub } = await supabase
+    .from("subscriptions")
+    .select("end_date")
+    .eq("player_id", payment.player_id)
+    .eq("status", "active")
+    .neq("id", payment.subscription_id)
+    .order("end_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const today = new Date();
-  const endDate = new Date(today);
+  let startDate = today;
+
+  if (existingActiveSub?.end_date) {
+    const activeEndDate = new Date(existingActiveSub.end_date);
+    if (activeEndDate > today) {
+      // Start new subscription the day after current one ends
+      startDate = new Date(activeEndDate);
+      startDate.setDate(startDate.getDate() + 1);
+    }
+  }
+
+  const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + pkg.validity_days);
 
   // Update payment
@@ -46,7 +68,7 @@ export async function confirmPayment(paymentId: string) {
     .from("subscriptions")
     .update({
       status: "active",
-      start_date: today.toISOString().split("T")[0],
+      start_date: startDate.toISOString().split("T")[0],
       end_date: endDate.toISOString().split("T")[0],
     })
     .eq("id", payment.subscription_id);

@@ -247,6 +247,12 @@ function PlayerSubscribeContent() {
                 {activeSubscription.end_date &&
                   ` · Expires ${new Date(activeSubscription.end_date).toLocaleDateString()}`}
               </p>
+              {activeSubscription.end_date && (
+                <p className="text-xs text-primary font-medium mt-0.5">
+                  Your new subscription will start after your current one ends on{" "}
+                  {new Date(activeSubscription.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              )}
             </div>
           </div>
         </Card>

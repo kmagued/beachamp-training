@@ -554,6 +554,7 @@ export async function submitFeedback(data: {
   session_date: string;
   rating: number;
   comment?: string;
+  group_id?: string;
 }) {
   const user = await getCurrentUserRole();
   const authErr = requireCoachOrAdmin(user);
@@ -566,20 +567,21 @@ export async function submitFeedback(data: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { error } = await supabase.from("feedback").insert({
+  const { data: inserted, error } = await supabase.from("feedback").insert({
     player_id: data.player_id,
     coach_id: user!.id,
     session_date: data.session_date,
     rating: data.rating,
     comment: data.comment?.trim() || null,
-  });
+    group_id: data.group_id || null,
+  }).select("id").single();
 
   if (error) return { error: error.message };
 
   revalidatePath("/admin/sessions");
   revalidatePath("/coach/sessions");
   revalidatePath("/player/feedback");
-  return { success: true };
+  return { success: true, id: inserted.id as string };
 }
 
 export async function updateFeedback(

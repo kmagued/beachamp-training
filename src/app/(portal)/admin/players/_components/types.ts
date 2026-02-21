@@ -25,7 +25,21 @@ export type SortField = "date" | "level" | "package";
 export type SortDir = "asc" | "desc";
 
 export function getPlayerStatus(player: PlayerRow): string {
-  const activeSub = player.subscriptions?.find((s) => s.status === "active");
+  const now = Date.now();
+  const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
+
+  // Prefer the subscription covering today; if none, pick the nearest upcoming one
+  const activeSub =
+    activeSubs.find((s) => {
+      const start = s.start_date ? new Date(s.start_date).getTime() : 0;
+      const end = s.end_date ? new Date(s.end_date).getTime() : Infinity;
+      return start <= now && now <= end;
+    }) ||
+    activeSubs
+      .filter((s) => s.start_date && new Date(s.start_date).getTime() > now)
+      .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime())[0] ||
+    activeSubs[0] || null;
+
   if (activeSub) {
     const { sessions_remaining, sessions_total, start_date, end_date } = activeSub;
 

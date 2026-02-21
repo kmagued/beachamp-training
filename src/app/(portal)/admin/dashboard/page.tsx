@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard, Card, Badge } from "@/components/ui";
-import { Users, CreditCard, CalendarDays } from "lucide-react";
+import { Users, CreditCard, CalendarDays, Receipt } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 
@@ -16,7 +16,9 @@ export default async function AdminDashboard() {
 
   // Stats queries in parallel
   const todayDow = new Date().getDay();
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+  const monthEndISO = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0];
 
   const [
     { count: playerCount },
@@ -25,10 +27,11 @@ export default async function AdminDashboard() {
     { data: pendingPaymentsList },
     { data: recentPlayers },
     { data: activeSubscriptions },
-    { data: totalRevenueData },
     { data: playerLevels },
     { count: todaySessionCount },
-    { data: dailyRevenue },
+    { data: revenuePayments },
+    { data: oneTimeExpenseData },
+    { data: recurringExpenseData },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -61,10 +64,6 @@ export default async function AdminDashboard() {
       .select("package_id, packages(name)")
       .eq("status", "active"),
     supabase
-      .from("payments")
-      .select("amount")
-      .eq("status", "confirmed"),
-    supabase
       .from("profiles")
       .select("playing_level")
       .eq("role", "player")
@@ -74,12 +73,25 @@ export default async function AdminDashboard() {
       .select("*", { count: "exact", head: true })
       .eq("day_of_week", todayDow)
       .eq("is_active", true),
-    // Chart data: daily revenue last 30 days
+    // All confirmed payments for revenue chart
     supabase
       .from("payments")
       .select("amount, confirmed_at")
-      .eq("status", "confirmed")
-      .gte("confirmed_at", thirtyDaysAgo),
+      .eq("status", "confirmed"),
+    // One-time expenses this month
+    supabase
+      .from("expenses")
+      .select("amount")
+      .eq("is_active", true)
+      .eq("is_recurring", false)
+      .gte("expense_date", monthStartISO)
+      .lte("expense_date", monthEndISO),
+    // Active recurring expenses
+    supabase
+      .from("expenses")
+      .select("amount, recurrence_type")
+      .eq("is_active", true)
+      .eq("is_recurring", true),
   ]);
 
   const monthlyRevenue = (revenueData || []).reduce(
@@ -87,24 +99,28 @@ export default async function AdminDashboard() {
     0
   );
 
-  const totalRevenue = (totalRevenueData || []).reduce(
+  const totalRevenue = (revenuePayments || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
   );
 
+  // Expenses calculation
+  const oneTimeExpenses = (oneTimeExpenseData || []).reduce(
+    (sum: number, e: { amount: number }) => sum + e.amount,
+    0
+  );
+  const recurringExpenses = (recurringExpenseData || [])
+    .filter((e: { recurrence_type: string }) => e.recurrence_type === "monthly")
+    .reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
+    + (recurringExpenseData || [])
+    .filter((e: { recurrence_type: string }) => e.recurrence_type === "weekly")
+    .reduce((sum: number, e: { amount: number }) => sum + e.amount * 4, 0);
+  const monthlyExpenses = oneTimeExpenses + recurringExpenses;
+  const monthlyProfit = monthlyRevenue - monthlyExpenses;
+
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
   // --- Chart data transformations ---
-
-  // Revenue by day (last 30 days)
-  const revenueByDayMap: Record<string, number> = {};
-  for (const p of dailyRevenue || []) {
-    const date = new Date(p.confirmed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    revenueByDayMap[date] = (revenueByDayMap[date] || 0) + p.amount;
-  }
-  const revenueByDay = Object.entries(revenueByDayMap)
-    .map(([date, amount]) => ({ date, amount }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // Subscriptions by package
   const subCounts: Record<string, number> = {};
@@ -137,7 +153,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         <StatCard
           label="Active Players"
           value={playerCount ?? 0}
@@ -148,6 +164,13 @@ export default async function AdminDashboard() {
           label={`Revenue (${currentMonth})`}
           value={`${monthlyRevenue.toLocaleString()} EGP`}
           subtitle={`All Time: ${totalRevenue.toLocaleString()} EGP`}
+        />
+        <StatCard
+          label={`Expenses (${currentMonth})`}
+          value={`${monthlyExpenses.toLocaleString()} EGP`}
+          accentColor="bg-red-500"
+          icon={<Receipt className="w-5 h-5" />}
+          subtitle={`Profit: ${monthlyProfit.toLocaleString()} EGP`}
         />
         <StatCard
           label="Pending Payments"
@@ -165,7 +188,7 @@ export default async function AdminDashboard() {
 
       {/* Charts */}
       <DashboardCharts
-        revenueByDay={revenueByDay}
+        revenuePayments={revenuePayments || []}
         subsByPackage={subsByPackage}
         playersByLevel={playersByLevelData}
       />

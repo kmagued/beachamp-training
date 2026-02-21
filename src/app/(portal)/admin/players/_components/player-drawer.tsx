@@ -151,7 +151,16 @@ function DrawerContent({
   }
 
   const status = getPlayerStatus(player);
-  const activeSub = player.subscriptions?.find((s) => s.status === "active");
+  const now = Date.now();
+  const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
+  // Current subscription: covers today's date
+  const activeSub = activeSubs.find((s) => {
+    const start = s.start_date ? new Date(s.start_date).getTime() : 0;
+    const end = s.end_date ? new Date(s.end_date).getTime() : Infinity;
+    return start <= now && now <= end;
+  }) || activeSubs.find((s) => !s.start_date || !s.end_date || new Date(s.end_date).getTime() < now) || null;
+  // Upcoming subscription: start_date in the future
+  const upcomingSub = activeSubs.find((s) => s.start_date && new Date(s.start_date).getTime() > now) || null;
   const initials = `${player.first_name?.[0] ?? ""}${player.last_name?.[0] ?? ""}`.toUpperCase();
 
   return (
@@ -252,6 +261,40 @@ function DrawerContent({
             </div>
           );
         })()}
+
+        {/* Upcoming subscription card */}
+        {upcomingSub && (
+          <div className="rounded-xl border border-primary-200 bg-primary-50/30">
+            <div className="px-4 py-3 border-b border-primary-100">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider">Upcoming Subscription</p>
+            </div>
+            <div className="divide-y divide-primary-100">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Dumbbell className="w-4 h-4 text-primary/60 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400">Package</p>
+                  <p className="text-sm text-slate-700 font-medium">{upcomingSub.packages?.name || "—"}</p>
+                </div>
+              </div>
+              <div className="flex items-start justify-between px-4 py-3">
+                <div>
+                  <p className="text-xs text-slate-400">Sessions</p>
+                  <p className="text-sm text-slate-700 font-medium">
+                    {upcomingSub.sessions_remaining}/{upcomingSub.sessions_total}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">Starts</p>
+                  <p className="text-sm text-primary font-medium">
+                    {upcomingSub.start_date
+                      ? new Date(upcomingSub.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Contact info card */}
         <div className="rounded-xl border border-slate-200 bg-white">

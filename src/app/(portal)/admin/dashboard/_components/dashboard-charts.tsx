@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui";
 import {
   AreaChart,
@@ -17,9 +18,19 @@ import {
   Legend,
 } from "recharts";
 import { TrendingUp, Package, Activity } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
+
+type RevenueView = "30d" | "monthly" | "quarterly" | "yearly";
+
+const REVENUE_VIEWS: { key: RevenueView; label: string }[] = [
+  { key: "30d", label: "30 Days" },
+  { key: "monthly", label: "Monthly" },
+  { key: "quarterly", label: "Quarterly" },
+  { key: "yearly", label: "Yearly" },
+];
 
 interface DashboardChartsProps {
-  revenueByDay: { date: string; amount: number }[];
+  revenuePayments: { amount: number; confirmed_at: string }[];
   subsByPackage: { name: string; count: number }[];
   playersByLevel: { level: string; count: number }[];
 }
@@ -69,20 +80,112 @@ function PieTooltip({ active, payload }: any) {
   );
 }
 
-export function DashboardCharts({ revenueByDay, subsByPackage, playersByLevel }: DashboardChartsProps) {
+export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel }: DashboardChartsProps) {
+  const [revenueView, setRevenueView] = useState<RevenueView>("30d");
   const totalPlayers = playersByLevel.reduce((sum, s) => sum + s.count, 0);
+
+  const revenueChartData = useMemo(() => {
+    const now = new Date();
+
+    switch (revenueView) {
+      case "30d": {
+        const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const filtered = revenuePayments.filter(p => new Date(p.confirmed_at) >= cutoff);
+        const map: Record<string, number> = {};
+        for (const p of filtered) {
+          const d = new Date(p.confirmed_at);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          map[key] = (map[key] || 0) + p.amount;
+        }
+        return Object.entries(map)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, amount]) => {
+            const d = new Date(key + "T00:00:00");
+            return { date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), amount };
+          });
+      }
+      case "monthly": {
+        const map: Record<string, number> = {};
+        for (const p of revenuePayments) {
+          const d = new Date(p.confirmed_at);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          map[key] = (map[key] || 0) + p.amount;
+        }
+        const months = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          months.push({
+            date: d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+            amount: map[key] || 0,
+          });
+        }
+        return months;
+      }
+      case "quarterly": {
+        const map: Record<string, number> = {};
+        for (const p of revenuePayments) {
+          const d = new Date(p.confirmed_at);
+          const q = Math.floor(d.getMonth() / 3) + 1;
+          const key = `${d.getFullYear()}-Q${q}`;
+          map[key] = (map[key] || 0) + p.amount;
+        }
+        const quarters: { date: string; amount: number }[] = [];
+        const seen = new Set<string>();
+        for (let i = 7; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i * 3, 1);
+          const q = Math.floor(d.getMonth() / 3) + 1;
+          const key = `${d.getFullYear()}-Q${q}`;
+          const label = `Q${q} ${d.getFullYear().toString().slice(-2)}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            quarters.push({ date: label, amount: map[key] || 0 });
+          }
+        }
+        return quarters;
+      }
+      case "yearly": {
+        const map: Record<string, number> = {};
+        for (const p of revenuePayments) {
+          const year = new Date(p.confirmed_at).getFullYear().toString();
+          map[year] = (map[year] || 0) + p.amount;
+        }
+        return Object.entries(map)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, amount]) => ({ date, amount }));
+      }
+    }
+  }, [revenuePayments, revenueView]);
 
   return (
     <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
       {/* Revenue Trend */}
       <Card className="sm:col-span-2">
-        <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
-          <TrendingUp className="w-4 h-4 text-slate-400" />
-          Revenue (Last 30 Days)
-        </h2>
-        {revenueByDay.length > 0 ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-slate-400" />
+            Revenue
+          </h2>
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+            {REVENUE_VIEWS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setRevenueView(key)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                  revenueView === key
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {revenueChartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={revenueByDay} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+            <AreaChart data={revenueChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.2} />
@@ -119,7 +222,7 @@ export function DashboardCharts({ revenueByDay, subsByPackage, playersByLevel }:
       </Card>
 
       {/* Subscriptions by Package */}
-      <Card>
+      <Card className="sm:col-span-2 lg:col-span-1">
         <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
           <Package className="w-4 h-4 text-slate-400" />
           Active Subscriptions

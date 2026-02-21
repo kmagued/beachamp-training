@@ -21,6 +21,7 @@ import {
   Calendar,
   GraduationCap,
   UsersRound,
+  Receipt,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 
@@ -58,6 +59,7 @@ const iconMap = {
   groups: UsersRound,
   "my-groups": Users,
   schedule: Calendar,
+  expenses: Receipt,
 } as const;
 
 const playerNav = [
@@ -82,6 +84,7 @@ const adminNav: NavItem[] = [
   { key: "coaches", label: "Coaches", href: "/admin/coaches" },
   { key: "groups", label: "Groups", href: "/admin/groups" },
   { key: "payments", label: "Payments", href: "/admin/payments" },
+  { key: "expenses", label: "Expenses", href: "/admin/expenses" },
   { key: "packages", label: "Packages", href: "/admin/packages" },
   { key: "users", label: "User Mgmt", href: "/admin/users" },
   // Training Operations

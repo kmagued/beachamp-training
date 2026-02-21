@@ -31,6 +31,10 @@ export default async function PlayerSubscriptionsPage() {
     if (sub.status === "cancelled" && rejectedPayment) {
       return { label: "Rejected", variant: "danger" as const, reason: rejectedPayment.rejection_reason };
     }
+    // Active subscription with future start_date → "Upcoming"
+    if (sub.status === "active" && sub.start_date && new Date(sub.start_date) > new Date()) {
+      return { label: "Upcoming", variant: "info" as const, reason: null };
+    }
     switch (sub.status) {
       case "active":
         return { label: "Active", variant: "success" as const, reason: null };

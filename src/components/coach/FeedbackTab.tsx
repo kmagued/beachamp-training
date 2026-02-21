@@ -242,17 +242,19 @@ export function FeedbackTab({
           session_date: sessionDate,
           rating,
           comment: comment.trim() || undefined,
+          group_id: groupId,
         });
         if ("error" in res) {
           setResult({ error: (res as { error: string }).error, playerId: player.id });
         } else {
+          const newId = (res as { success: true; id: string }).id;
           setPlayers((prev) =>
             prev.map((p) =>
               p.id === player.id
                 ? {
                     ...p,
                     existing_feedback: {
-                      id: Date.now().toString(),
+                      id: newId,
                       rating,
                       comment: comment.trim() || null,
                       created_at: new Date().toISOString(),

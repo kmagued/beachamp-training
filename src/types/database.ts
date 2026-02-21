@@ -10,6 +10,7 @@ export type SubscriptionStatus = "pending" | "active" | "expired" | "cancelled";
 export type PaymentMethod = "instapay" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";
+export type RecurrenceType = "monthly" | "weekly";
 
 export interface Database {
   public: {
@@ -295,6 +296,7 @@ export interface Database {
           id: string;
           player_id: string;
           coach_id: string;
+          group_id: string | null;
           session_date: string;
           rating: number;
           comment: string | null;
@@ -304,6 +306,7 @@ export interface Database {
           id?: string;
           player_id: string;
           coach_id: string;
+          group_id?: string | null;
           session_date: string;
           rating: number;
           comment?: string | null;
@@ -313,6 +316,7 @@ export interface Database {
           id?: string;
           player_id?: string;
           coach_id?: string;
+          group_id?: string | null;
           session_date?: string;
           rating?: number;
           comment?: string | null;
@@ -386,6 +390,78 @@ export interface Database {
         };
         Relationships: [];
       };
+      expense_categories: {
+        Row: {
+          id: string;
+          name: string;
+          icon: string | null;
+          is_default: boolean;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          icon?: string | null;
+          is_default?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          icon?: string | null;
+          is_default?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      expenses: {
+        Row: {
+          id: string;
+          category_id: string;
+          description: string;
+          amount: number;
+          expense_date: string;
+          is_recurring: boolean;
+          recurrence_type: RecurrenceType | null;
+          is_active: boolean;
+          created_by: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          description: string;
+          amount: number;
+          expense_date: string;
+          is_recurring?: boolean;
+          recurrence_type?: RecurrenceType | null;
+          is_active?: boolean;
+          created_by: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          description?: string;
+          amount?: number;
+          expense_date?: string;
+          is_recurring?: boolean;
+          recurrence_type?: RecurrenceType | null;
+          is_active?: boolean;
+          created_by?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -425,6 +501,8 @@ export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
 export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
 export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
+export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]["Row"];
+export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
@@ -445,4 +523,8 @@ export interface GroupWithDetails extends Group {
   player_count: number;
   coaches: Pick<Profile, "id" | "first_name" | "last_name">[];
   schedule: ScheduleSession[];
+}
+
+export interface ExpenseWithCategory extends Expense {
+  expense_categories: Pick<ExpenseCategory, "id" | "name" | "icon">;
 }
