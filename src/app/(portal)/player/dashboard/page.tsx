@@ -50,15 +50,33 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle();
 
-  // Calculate days remaining
+  // Calculate days remaining with dynamic thresholds
   let daysRemaining: number | null = null;
-  let expiringWithin30 = false;
+  let isExpired = false;
+  let isExpiringSoon = false;
+  let expiringBySessions = false;
   if (subscription?.end_date) {
     const end = new Date(subscription.end_date);
     const now = new Date();
     daysRemaining = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    expiringWithin30 = daysRemaining <= 30 && daysRemaining > 0;
+    isExpired = daysRemaining <= 0;
+    isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
+
+    // Dynamic "expiring soon" based on package length
+    if (!isExpired && !isExpiringSoon && subscription.start_date) {
+      const packageDays = Math.max(1, Math.ceil(
+        (end.getTime() - new Date(subscription.start_date).getTime()) / (1000 * 60 * 60 * 24)
+      ));
+      const timeRatio = daysRemaining / packageDays;
+      if (timeRatio <= 0.3) isExpiringSoon = true;
+    }
   }
+  // Session-based warnings (dynamic: 30% of total)
+  const sessionsRatio = subscription && subscription.sessions_total > 0
+    ? subscription.sessions_remaining / subscription.sessions_total : 1;
+  const sessionsLow = subscription && sessionsRatio <= 0.3;
+  const sessionsOut = subscription && subscription.sessions_remaining <= 0;
+  if (sessionsLow && !isExpired) expiringBySessions = true;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -79,12 +97,13 @@ export default async function PlayerDashboard() {
             label="Sessions Remaining"
             value={subscription.sessions_remaining}
             subtitle={`of ${subscription.sessions_total} total`}
-            accentColor="bg-primary"
+            accentColor={sessionsOut ? "bg-red-500" : sessionsLow ? "bg-amber-500" : "bg-primary"}
             icon={<CalendarDays className="w-5 h-5" />}
           />
           <StatCard
             label="Valid Until"
             value={
+              isExpired ? "Expired" :
               subscription.end_date
                 ? new Date(subscription.end_date).toLocaleDateString("en-US", {
                     month: "short",
@@ -92,8 +111,8 @@ export default async function PlayerDashboard() {
                   })
                 : "—"
             }
-            subtitle={daysRemaining !== null ? `${daysRemaining} days remaining` : undefined}
-            accentColor={expiringWithin30 ? "bg-amber-500" : "bg-emerald-500"}
+            subtitle={daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days remaining` : undefined}
+            accentColor={isExpired ? "bg-red-500" : isExpiringSoon ? "bg-amber-500" : "bg-emerald-500"}
             icon={<Clock className="w-5 h-5" />}
           />
           <StatCard
@@ -242,13 +261,74 @@ export default async function PlayerDashboard() {
         </Card>
       </div>
 
-      {/* Renewal Banner */}
-      {expiringWithin30 && (
+      {/* Renewal / Warning Banners */}
+      {isExpired && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">
+              Your subscription has expired
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Renew your subscription to continue attending training sessions.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className="text-sm font-semibold text-red-700 hover:text-red-900 whitespace-nowrap"
+          >
+            Renew Now
+          </Link>
+        </div>
+      )}
+      {!isExpired && sessionsOut && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">
+              You have no sessions remaining
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Renew your subscription to continue training.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className="text-sm font-semibold text-red-700 hover:text-red-900 whitespace-nowrap"
+          >
+            Renew Now
+          </Link>
+        </div>
+      )}
+      {!isExpired && !sessionsOut && (isExpiringSoon || sessionsLow) && (
+        <div className={`${isExpiringSoon ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"} border rounded-xl p-4 flex items-center gap-3`}>
+          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-red-500" : "text-amber-500"} flex-shrink-0`} />
+          <div className="flex-1">
+            <p className={`text-sm font-medium ${isExpiringSoon ? "text-red-800" : "text-amber-800"}`}>
+              {isExpiringSoon && sessionsLow
+                ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
+                : isExpiringSoon
+                ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
+                : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`}
+            </p>
+            <p className={`text-xs ${isExpiringSoon ? "text-red-600" : "text-amber-600"} mt-0.5`}>
+              Renew now to avoid interruption to your training.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className={`text-sm font-semibold ${isExpiringSoon ? "text-red-700 hover:text-red-900" : "text-amber-700 hover:text-amber-900"} whitespace-nowrap`}
+          >
+            Renew Now
+          </Link>
+        </div>
+      )}
+      {!isExpired && !sessionsOut && !isExpiringSoon && !sessionsLow && expiringBySessions && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-800">
-              Your subscription expires in {daysRemaining} days
+              Your sessions are running low ({subscription?.sessions_remaining} remaining)
             </p>
             <p className="text-xs text-amber-600 mt-0.5">
               Renew now to avoid interruption to your training.

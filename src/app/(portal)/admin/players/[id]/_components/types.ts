@@ -32,3 +32,23 @@ export interface PaymentRow {
   status: string;
   created_at: string;
 }
+
+export interface AttendanceRow {
+  id: string;
+  session_date: string;
+  session_time: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  group: { name: string } | null;
+  marked_by_profile: { first_name: string; last_name: string } | null;
+}
+
+export interface FeedbackRow {
+  id: string;
+  session_date: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  coach: { first_name: string; last_name: string } | null;
+}

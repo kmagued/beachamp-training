@@ -8,7 +8,7 @@ export const buttonVariants: Record<ButtonVariant, string> = {
   primary:
     "bg-primary hover:bg-primary-600 disabled:bg-primary-300 text-white font-semibold transition-colors",
   outline:
-    "border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-medium transition-all",
+    "border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 font-medium transition-all",
   ghost:
     "text-slate-400 hover:text-white font-medium transition-colors",
   secondary:
@@ -31,6 +31,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap",
         buttonVariants[variant],
         buttonSizes[size],
         fullWidth && "w-full",

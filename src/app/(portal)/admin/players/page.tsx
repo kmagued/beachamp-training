@@ -5,7 +5,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { Pagination, SelectionBar, Button } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import { Plus } from "lucide-react";
+import { Plus, Users, ChevronDown, Loader2, Check } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
 import { getPlayerStatus } from "./_components/types";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
@@ -44,7 +44,7 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, end_date, packages(name))")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
       .eq("role", "player")
       .order("created_at", { ascending: false });
     if (data) setPlayers(data as unknown as PlayerRow[]);
@@ -54,6 +54,19 @@ function AdminPlayersContent() {
 
   useEffect(() => {
     fetchPlayers();
+  }, [fetchPlayers]);
+
+  // Re-fetch when window regains focus (picks up attendance changes etc.)
+  useEffect(() => {
+    let lastFetch = Date.now();
+    function handleFocus() {
+      if (Date.now() - lastFetch > 30_000) {
+        lastFetch = Date.now();
+        fetchPlayers();
+      }
+    }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [fetchPlayers]);
 
   // Unique package names for filter dropdown
@@ -163,6 +176,47 @@ function AdminPlayersContent() {
 
   const hasActiveFilters = !!search || !!statusFilter || !!levelFilter || !!packageFilter;
 
+  // Add to Group
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
+  const [addingToGroup, setAddingToGroup] = useState(false);
+  const [addGroupSuccess, setAddGroupSuccess] = useState<string | null>(null);
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.from("groups").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+      if (data) setGroups(data);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!groupDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(e.target as Node)) {
+        setGroupDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [groupDropdownOpen]);
+
+  async function handleAddToGroup(groupId: string) {
+    setAddingToGroup(true);
+    const rows = Array.from(selectedIds).map((playerId) => ({
+      group_id: groupId,
+      player_id: playerId,
+      is_active: true,
+    }));
+    await supabase.from("group_players").upsert(rows, { onConflict: "group_id,player_id" });
+    const groupName = groups.find((g) => g.id === groupId)?.name || "group";
+    setAddGroupSuccess(`Added ${selectedIds.size} player${selectedIds.size > 1 ? "s" : ""} to ${groupName}`);
+    setAddingToGroup(false);
+    setGroupDropdownOpen(false);
+    setSelectedIds(new Set());
+    setTimeout(() => setAddGroupSuccess(null), 3000);
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="flex items-center justify-between mb-6">
@@ -196,7 +250,43 @@ function AdminPlayersContent() {
         hasActiveFilters={hasActiveFilters}
       />
 
-      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />
+      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+        <div className="relative" ref={groupDropdownRef}>
+          <button
+            onClick={() => setGroupDropdownOpen((o) => !o)}
+            disabled={addingToGroup}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Add to Group
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          {groupDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[200px]">
+              {groups.length > 0 ? (
+                groups.map((group) => (
+                  <button
+                    key={group.id}
+                    onClick={() => handleAddToGroup(group.id)}
+                    disabled={addingToGroup}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    {addingToGroup ? <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-2" /> : null}
+                    {group.name}
+                  </button>
+                ))
+              ) : (
+                <p className="px-3 py-2 text-sm text-slate-400">No active groups</p>
+              )}
+            </div>
+          )}
+        </div>
+      </SelectionBar>
+      {addGroupSuccess && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+          <Check className="w-4 h-4" /> {addGroupSuccess}
+        </div>
+      )}
 
       <div className="flex-1">
         {loading ? (

@@ -15,6 +15,7 @@ export interface PlayerRow {
     status: string;
     sessions_remaining: number;
     sessions_total: number;
+    start_date: string | null;
     end_date: string | null;
     packages: { name: string } | null;
   }[];
@@ -24,16 +25,56 @@ export type SortField = "date" | "level" | "package";
 export type SortDir = "asc" | "desc";
 
 export function getPlayerStatus(player: PlayerRow): string {
-  const activeSub = player.subscriptions?.find((s) => s.status === "active");
+  const now = Date.now();
+  const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
+
+  // Prefer the subscription covering today; if none, pick the nearest upcoming one
+  const activeSub =
+    activeSubs.find((s) => {
+      const start = s.start_date ? new Date(s.start_date).getTime() : 0;
+      const end = s.end_date ? new Date(s.end_date).getTime() : Infinity;
+      return start <= now && now <= end;
+    }) ||
+    activeSubs
+      .filter((s) => s.start_date && new Date(s.start_date).getTime() > now)
+      .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime())[0] ||
+    activeSubs[0] || null;
+
   if (activeSub) {
-    if (activeSub.end_date) {
-      const daysLeft = Math.ceil(
-        (new Date(activeSub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    const { sessions_remaining, sessions_total, start_date, end_date } = activeSub;
+
+    // Time-based calculations
+    let daysLeft: number | null = null;
+    let packageDays = 30; // fallback if no start_date
+    if (end_date) {
+      daysLeft = Math.ceil(
+        (new Date(end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
-      if (daysLeft <= 7) return "expiring";
+      if (start_date) {
+        packageDays = Math.max(1, Math.ceil(
+          (new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24)
+        ));
+      }
     }
+
+    if (daysLeft !== null && daysLeft <= 0) return "expired";
+
+    const timeRatio = daysLeft !== null ? daysLeft / packageDays : 1;
+    const sessionsRatio = sessions_total > 0 ? sessions_remaining / sessions_total : 1;
+
+    // Completed: all sessions used up
+    if (sessions_remaining <= 0) return "completed";
+
+    // Expiring: <= 7 days left
+    if (daysLeft !== null && daysLeft <= 7) return "expiring";
+
+    // Expiring soon: <= 30% of package time remaining OR <= 30% of sessions remaining
+    if (timeRatio <= 0.3 || sessionsRatio <= 0.3) return "expiring soon";
+
     return "active";
   }
+  const expiredSub = player.subscriptions?.find((s) => s.status === "expired");
+  if (expiredSub) return "expired";
   const pendingSub = player.subscriptions?.find((s) => s.status === "pending");
   if (pendingSub) return "pending";
   return "inactive";

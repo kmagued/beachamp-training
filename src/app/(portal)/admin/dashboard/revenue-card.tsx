@@ -15,7 +15,7 @@ export function RevenueCard({ label, value, subtitle }: { label: string; value: 
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
           <div className="flex items-center gap-2 mt-1">
             <p className={cn(
-              "text-base sm:text-lg lg:text-2xl font-bold text-slate-900 transition-all duration-200 select-none whitespace-nowrap",
+              "text-base sm:text-lg font-bold text-slate-900 transition-all duration-200 select-none whitespace-nowrap",
               !visible && "blur-md"
             )}>
               {value}

@@ -17,7 +17,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary", i
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
-          <p className="text-lg sm:text-2xl font-bold text-slate-900 mt-1 capitalize">{value}</p>
+          <p className="text-base sm:text-lg font-bold text-slate-900 mt-1 capitalize">{value}</p>
           {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
         </div>
         {icon && <div className="text-slate-300">{icon}</div>}

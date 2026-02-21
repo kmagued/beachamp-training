@@ -12,6 +12,7 @@ import type { Package, Subscription, Profile } from "@/types/database";
 
 const paymentMethods = [
   { value: "instapay", label: "Instapay" },
+  { value: "cash", label: "Cash" },
 ] as const;
 
 export default function PlayerSubscribePage() {
@@ -133,6 +134,7 @@ function PlayerSubscribeContent() {
 
   function handleSubmit() {
     if (!selectedPackage || !selectedMethod || isPending) return;
+    if (selectedMethod === "instapay" && !screenshot) return;
 
     const formData = new FormData();
     formData.set("package_id", selectedPackage);
@@ -213,6 +215,7 @@ function PlayerSubscribeContent() {
   const trainingStep = 2;
   const methodStep = needsTrainingInfo ? 3 : 2;
   const screenshotStep = needsTrainingInfo ? 4 : 3;
+  const showScreenshot = selectedMethod === "instapay";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -247,13 +250,19 @@ function PlayerSubscribeContent() {
                 {activeSubscription.end_date &&
                   ` · Expires ${new Date(activeSubscription.end_date).toLocaleDateString()}`}
               </p>
+              {activeSubscription.end_date && (
+                <p className="text-xs text-primary font-medium mt-0.5">
+                  Your new subscription will start after your current one ends on{" "}
+                  {new Date(activeSubscription.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              )}
             </div>
           </div>
         </Card>
       )}
 
       {/* Package selection */}
-      <h2 className="font-semibold text-slate-900 mb-3">1. Choose Package</h2>
+      <h2 className="font-semibold text-slate-900 mb-3">1. Choose Package <span className="text-red-400">*</span></h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {packages.map((pkg) => (
           <button
@@ -328,12 +337,20 @@ function PlayerSubscribeContent() {
       )}
 
       {/* Payment method */}
-      <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method</h2>
+      <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method <span className="text-red-400">*</span></h2>
       <div className="flex flex-wrap gap-2 mb-4">
         {paymentMethods.map((m) => (
           <button
             key={m.value}
-            onClick={() => setSelectedMethod(m.value)}
+            onClick={() => {
+              setSelectedMethod(m.value);
+              if (m.value !== "instapay") {
+                setScreenshot(null);
+                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                setPreviewUrl(null);
+                setFileError(null);
+              }
+            }}
             className={cn(
               "px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
               selectedMethod === m.value
@@ -367,44 +384,48 @@ function PlayerSubscribeContent() {
 
       {!selectedMethod && <div className="mb-8" />}
 
-      {/* Screenshot upload */}
-      <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot</h2>
-      <div className="mb-8">
-        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
-          {previewUrl ? (
-            <div className="flex flex-col items-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt="Payment screenshot preview"
-                className="max-h-32 rounded-lg object-contain mb-2"
+      {/* Screenshot upload — instapay only */}
+      {showScreenshot && (
+        <>
+          <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot <span className="text-red-400">*</span></h2>
+          <div className="mb-8">
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
+              {previewUrl ? (
+                <div className="flex flex-col items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt="Payment screenshot preview"
+                    className="max-h-32 rounded-lg object-contain mb-2"
+                  />
+                  <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
+                  <p className="text-xs text-slate-400 mt-1">Click to change</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
+                  <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                className="hidden"
+                onChange={handleFileChange}
               />
-              <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
-              <p className="text-xs text-slate-400 mt-1">Click to change</p>
-            </div>
-          ) : (
-            <>
-              <Upload className="w-8 h-8 text-slate-300 mb-2" />
-              <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
-              <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
-            </>
-          )}
-          <input
-            type="file"
-            accept="image/png,image/jpeg"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </label>
-        {fileError && (
-          <p className="text-xs text-red-500 mt-2">{fileError}</p>
-        )}
-      </div>
+            </label>
+            {fileError && (
+              <p className="text-xs text-red-500 mt-2">{fileError}</p>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Submit */}
       <Button
         onClick={handleSubmit}
-        disabled={!selectedPackage || !selectedMethod || isPending}
+        disabled={!selectedPackage || !selectedMethod || (selectedMethod === "instapay" && !screenshot) || isPending}
         fullWidth
         size="md"
       >

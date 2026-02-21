@@ -1,4 +1,4 @@
-import { Input, MultiSelect } from "@/components/ui";
+import { Input, MultiSelect, MobileFilterSheet } from "@/components/ui";
 import { Search, RotateCcw } from "lucide-react";
 
 const ROLE_OPTIONS = ["Player", "Coach", "Admin"] as const;
@@ -25,17 +25,10 @@ export function UsersFilters({
   onReset,
   hasActiveFilters,
 }: UsersFiltersProps) {
-  return (
-    <div className="flex flex-col sm:flex-row gap-3 mb-6">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by name or email..."
-          className="pl-9"
-        />
-      </div>
+  const activeFilterCount = [roleFilter, statusFilter].filter(Boolean).length;
+
+  const filterDropdowns = (
+    <>
       <MultiSelect
         options={ROLE_OPTIONS}
         value={roleFilter}
@@ -60,6 +53,29 @@ export function UsersFilters({
           <RotateCcw className="w-3.5 h-3.5" /> Reset
         </button>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search by name or email..."
+            className="pl-9"
+          />
+        </div>
+        <div className="hidden sm:contents">
+          {filterDropdowns}
+        </div>
+      </div>
+
+      <MobileFilterSheet activeCount={activeFilterCount}>
+        {filterDropdowns}
+      </MobileFilterSheet>
+    </>
   );
 }

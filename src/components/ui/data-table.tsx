@@ -43,7 +43,6 @@ export function DataTable<T extends Record<string, unknown>>({
               key={i}
               className={cn(
                 "border-b border-slate-100 transition-colors",
-                i % 2 === 1 && "bg-[#FAFBFC]",
                 onRowClick && "cursor-pointer hover:bg-slate-50"
               )}
               onClick={() => onRowClick?.(row)}

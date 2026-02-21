@@ -5,7 +5,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Pagination, SelectionBar } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { useSearchParams } from "next/navigation";
-import { confirmPayment, rejectPayment, getScreenshotUrl } from "./actions";
+import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus } from "./actions";
 import type { PaymentRow, SortField, SortDir } from "./_components/types";
 import { PaymentsPageSkeleton, PaymentsInlineSkeleton } from "./_components/skeleton";
 import { PaymentsFilters } from "./_components/filters";
@@ -203,6 +203,16 @@ function AdminPaymentsContent() {
     });
   }
 
+  function handleBulkStatus(status: string) {
+    if (isPending || selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    startTransition(async () => {
+      await bulkUpdatePaymentStatus(ids, status);
+      setSelectedIds(new Set());
+      fetchPayments();
+    });
+  }
+
   async function handleViewScreenshot(path: string) {
     const result = await getScreenshotUrl(path);
     if (result.url) setScreenshotUrl(result.url);
@@ -248,7 +258,22 @@ function AdminPaymentsContent() {
         hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter}
       />
 
-      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />
+      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+        <button
+          onClick={() => handleBulkStatus("confirmed")}
+          disabled={isPending}
+          className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+        >
+          {isPending ? "Updating..." : "Confirm All"}
+        </button>
+        <button
+          onClick={() => handleBulkStatus("rejected")}
+          disabled={isPending}
+          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+        >
+          Reject All
+        </button>
+      </SelectionBar>
 
       <div className="flex-1">
         {loading ? (
@@ -305,6 +330,7 @@ function AdminPaymentsContent() {
         onConfirm={(id) => { setDrawerPayment(null); handleConfirm(id); }}
         onReject={(id) => { setDrawerPayment(null); setRejectingId(id); }}
         onViewScreenshot={handleViewScreenshot}
+        onDataChange={() => { setDrawerPayment(null); fetchPayments(); }}
         isPending={isPending}
         actionId={actionId}
       />

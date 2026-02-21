@@ -146,6 +146,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                 </th>
                 <th className={thBase}>Email</th>
                 <th className={thBase}>Phone</th>
+                <th className={thBase}>Groups</th>
                 <th className={thBase}>Area</th>
                 <th className={thSortable} onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1">Registered <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
@@ -162,7 +163,7 @@ export function CoachesTableView(props: CoachesTableProps) {
               {coaches.map((coach, i) => {
                 const highlighted = isHighlighted(coach.id);
                 const selected = selectedIds.has(coach.id);
-                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : i % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+                const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
                 return (
                   <tr
                     key={coach.id}
@@ -171,8 +172,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
-                      !selected && i % 2 === 1 && "bg-[#FAFBFC]",
-                      highlighted && "row-highlight"
+                                            highlighted && "row-highlight"
                     )}
                   >
                     <td className={cn(tdBase, "sticky left-0 z-10 w-12 transition-colors group-hover:bg-primary-50", rowBg)}>
@@ -194,6 +194,15 @@ export function CoachesTableView(props: CoachesTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
                       {coach.phone || "—"}
                     </td>
+                    <td className={cn(tdBase, "text-sm text-slate-700")}>
+                      {coach.group_count > 0 ? (
+                        <span title={coach.group_names.join(", ")}>
+                          {coach.group_count} group{coach.group_count !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">None</span>
+                      )}
+                    </td>
                     <td className={cn(tdBase, "text-sm text-slate-700 capitalize whitespace-nowrap")}>
                       {coach.area || "—"}
                     </td>
@@ -213,7 +222,7 @@ export function CoachesTableView(props: CoachesTableProps) {
               })}
               {coaches.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>

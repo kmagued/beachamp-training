@@ -31,6 +31,10 @@ export default async function PlayerSubscriptionsPage() {
     if (sub.status === "cancelled" && rejectedPayment) {
       return { label: "Rejected", variant: "danger" as const, reason: rejectedPayment.rejection_reason };
     }
+    // Active subscription with future start_date → "Upcoming"
+    if (sub.status === "active" && sub.start_date && new Date(sub.start_date) > new Date()) {
+      return { label: "Upcoming", variant: "info" as const, reason: null };
+    }
     switch (sub.status) {
       case "active":
         return { label: "Active", variant: "success" as const, reason: null };
@@ -114,7 +118,7 @@ export default async function PlayerSubscriptionsPage() {
                     return (
                       <tr
                         key={sub.id}
-                        className={`border-b border-slate-100 ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}
+                        className="border-b border-slate-100"
                       >
                         <td className="px-4 py-3 text-sm font-medium text-slate-900">
                           {sub.packages?.name || "—"}
