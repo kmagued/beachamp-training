@@ -25,6 +25,12 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
   const [playingLevel, setPlayingLevel] = useState("");
   const [trainingGoals, setTrainingGoals] = useState<string[]>([]);
   const [healthConditions, setHealthConditions] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
+  const [preferredHand, setPreferredHand] = useState("");
+  const [preferredPosition, setPreferredPosition] = useState("");
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
   const [packageId, setPackageId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -49,6 +55,11 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
         start.setDate(start.getDate() + pkg.validity_days);
         setEndDate(start.toISOString().split("T")[0]);
       }
+    } else {
+      setSessionsTotal("");
+      setSessionsRemaining("");
+      setAmount("");
+      setEndDate("");
     }
   }
 
@@ -74,6 +85,12 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
+    formData.set("height", height);
+    formData.set("weight", weight);
+    formData.set("preferred_hand", preferredHand);
+    formData.set("preferred_position", preferredPosition);
+    formData.set("guardian_name", guardianName);
+    formData.set("guardian_phone", guardianPhone);
     formData.set("package_id", packageId);
     formData.set("start_date", startDate);
     formData.set("end_date", endDate);
@@ -98,6 +115,12 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
         setPlayingLevel("");
         setTrainingGoals([]);
         setHealthConditions("");
+        setHeight("");
+        setWeight("");
+        setPreferredHand("");
+        setPreferredPosition("");
+        setGuardianName("");
+        setGuardianPhone("");
         setPackageId("");
         setStartDate("");
         setEndDate("");
@@ -116,6 +139,8 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
       setTimeout(() => setCopied(false), 2000);
     }
   }
+
+  const hasSubscription = !!packageId;
 
   return (
     <>
@@ -198,15 +223,59 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
               rows={2}
             />
           </div>
+          <div>
+            <Label>Height (cm)</Label>
+            <Input type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} placeholder="170" />
+          </div>
+          <div>
+            <Label>Weight (kg)</Label>
+            <Input type="number" min={20} max={200} value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="70" />
+          </div>
+          <div>
+            <Label>Preferred Hand</Label>
+            <Select value={preferredHand} onChange={(e) => setPreferredHand(e.target.value)}>
+              <option value="">Select...</option>
+              <option value="right">Right</option>
+              <option value="left">Left</option>
+            </Select>
+          </div>
+          <div>
+            <Label>Preferred Position</Label>
+            <Select value={preferredPosition} onChange={(e) => setPreferredPosition(e.target.value)}>
+              <option value="">Select...</option>
+              <option value="defender">Defender</option>
+              <option value="blocker">Blocker</option>
+            </Select>
+          </div>
+          {dateOfBirth && (() => {
+            const age = Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            return age < 16;
+          })() && (
+            <>
+              <div>
+                <Label required>Guardian Name</Label>
+                <Input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="Parent/guardian name" />
+              </div>
+              <div>
+                <Label required>Guardian Phone</Label>
+                <Input value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} placeholder="01XXXXXXXXX" />
+              </div>
+            </>
+          )}
         </div>
 
         <hr className="my-5 border-slate-200" />
 
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subscription & Payment (Optional)</p>
+          <p className="text-xs text-slate-400 mt-0.5">Select a package to create a subscription, or leave empty to add the player without one.</p>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <Label required>Package</Label>
+            <Label>Package</Label>
             <Select value={packageId} onChange={(e) => handlePackageChange(e.target.value)}>
-              <option value="">Select package...</option>
+              <option value="">No package</option>
               {packages.map((pkg) => (
                 <option key={pkg.id} value={pkg.id}>
                   {pkg.name} — {pkg.price.toLocaleString()} EGP
@@ -214,45 +283,51 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
               ))}
             </Select>
           </div>
-          <div>
-            <Label required>Start Date</Label>
-            <DatePicker
-              value={startDate}
-              onChange={(e) => handleStartDateChange(e.target.value)}
-              placeholder="Start date"
-            />
-          </div>
-          <div>
-            <Label required>End Date</Label>
-            <DatePicker
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              placeholder="End date"
-            />
-          </div>
+          {hasSubscription && (
+            <>
+              <div>
+                <Label required>Start Date</Label>
+                <DatePicker
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  placeholder="Start date"
+                />
+              </div>
+              <div>
+                <Label required>End Date</Label>
+                <DatePicker
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  placeholder="End date"
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-          <div>
-            <Label required>Sessions Total</Label>
-            <Input type="number" min={1} value={sessionsTotal} onChange={(e) => setSessionsTotal(e.target.value)} placeholder="0" />
+        {hasSubscription && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            <div>
+              <Label required>Sessions Total</Label>
+              <Input type="number" min={1} value={sessionsTotal} onChange={(e) => setSessionsTotal(e.target.value)} placeholder="0" />
+            </div>
+            <div>
+              <Label required>Sessions Remaining</Label>
+              <Input type="number" min={0} value={sessionsRemaining} onChange={(e) => setSessionsRemaining(e.target.value)} placeholder="0" />
+            </div>
+            <div>
+              <Label required>Amount (EGP)</Label>
+              <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+            </div>
+            <div>
+              <Label required>Payment Method</Label>
+              <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <option value="cash">Cash</option>
+                <option value="instapay">InstaPay</option>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label required>Sessions Remaining</Label>
-            <Input type="number" min={0} value={sessionsRemaining} onChange={(e) => setSessionsRemaining(e.target.value)} placeholder="0" />
-          </div>
-          <div>
-            <Label required>Amount (EGP)</Label>
-            <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
-          </div>
-          <div>
-            <Label required>Payment Method</Label>
-            <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="instapay">InstaPay</option>
-            </Select>
-          </div>
-        </div>
+        )}
 
         {error && (
           <div className="mt-4 px-4 py-3 bg-red-50 rounded-lg text-sm text-red-600">

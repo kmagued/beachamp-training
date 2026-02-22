@@ -23,6 +23,12 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
   const playingLevel = (formData.get("playing_level") as string)?.trim() || null;
   const trainingGoals = (formData.get("training_goals") as string)?.trim() || null;
   const healthConditions = (formData.get("health_conditions") as string)?.trim() || null;
+  const height = formData.get("height") ? Number(formData.get("height")) : null;
+  const weight = formData.get("weight") ? Number(formData.get("weight")) : null;
+  const preferredHand = (formData.get("preferred_hand") as string)?.trim() || null;
+  const preferredPosition = (formData.get("preferred_position") as string)?.trim() || null;
+  const guardianName = (formData.get("guardian_name") as string)?.trim() || null;
+  const guardianPhone = (formData.get("guardian_phone") as string)?.trim() || null;
   const packageId = formData.get("package_id") as string;
   const startDate = formData.get("start_date") as string;
   const endDate = formData.get("end_date") as string;
@@ -34,11 +40,15 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
   if (!firstName || !lastName || !email) {
     return { error: "First name, last name, and email are required" };
   }
-  if (!packageId || !startDate || !endDate) {
-    return { error: "Package, start date, and end date are required" };
-  }
-  if (!sessionsTotal || !amount || !paymentMethod) {
-    return { error: "Sessions total, amount, and payment method are required" };
+
+  const hasSubscription = !!packageId;
+  if (hasSubscription) {
+    if (!startDate || !endDate) {
+      return { error: "Start date and end date are required for subscriptions" };
+    }
+    if (!sessionsTotal || !amount || !paymentMethod) {
+      return { error: "Sessions total, amount, and payment method are required for subscriptions" };
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +83,12 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
     playing_level: playingLevel,
     training_goals: trainingGoals,
     health_conditions: healthConditions,
+    height,
+    weight,
+    preferred_hand: preferredHand,
+    preferred_position: preferredPosition,
+    guardian_name: guardianName,
+    guardian_phone: guardianPhone,
     role: "player",
     is_active: true,
     profile_completed: true,
@@ -82,37 +98,38 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
     return { error: `Profile creation failed: ${profileError.message}` };
   }
 
-  // 3. Create subscription
-  const { data: subscription, error: subError } = await admin
-    .from("subscriptions")
-    .insert({
+  // 3. Create subscription + payment (if package selected)
+  if (hasSubscription) {
+    const { data: subscription, error: subError } = await admin
+      .from("subscriptions")
+      .insert({
+        player_id: userId,
+        package_id: packageId,
+        sessions_remaining: sessionsRemaining,
+        sessions_total: sessionsTotal,
+        start_date: startDate,
+        end_date: endDate,
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (subError) {
+      return { error: `Subscription creation failed: ${subError.message}` };
+    }
+
+    const { error: payError } = await admin.from("payments").insert({
       player_id: userId,
-      package_id: packageId,
-      sessions_remaining: sessionsRemaining,
-      sessions_total: sessionsTotal,
-      start_date: startDate,
-      end_date: endDate,
-      status: "active",
-    })
-    .select("id")
-    .single();
+      subscription_id: subscription.id,
+      amount,
+      method: paymentMethod,
+      status: "confirmed",
+      confirmed_at: new Date().toISOString(),
+    });
 
-  if (subError) {
-    return { error: `Subscription creation failed: ${subError.message}` };
-  }
-
-  // 4. Create payment
-  const { error: payError } = await admin.from("payments").insert({
-    player_id: userId,
-    subscription_id: subscription.id,
-    amount,
-    method: paymentMethod,
-    status: "confirmed",
-    confirmed_at: new Date().toISOString(),
-  });
-
-  if (payError) {
-    return { error: `Payment creation failed: ${payError.message}` };
+    if (payError) {
+      return { error: `Payment creation failed: ${payError.message}` };
+    }
   }
 
   revalidatePath("/admin/players");
@@ -130,17 +147,6 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Fetch packages for name→id mapping
-  const { data: packages } = await admin
-    .from("packages")
-    .select("id, name")
-    .eq("is_active", true);
-
-  const packageMap = new Map<string, string>();
-  (packages || []).forEach((p: { id: string; name: string }) => {
-    packageMap.set(p.name.toLowerCase(), p.id);
-  });
-
   const results: BulkPlayerResult[] = [];
 
   for (const row of rows) {
@@ -151,21 +157,22 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
       continue;
     }
 
-    const packageId = packageMap.get(row.package_name.toLowerCase());
-    if (!packageId) {
-      results.push({ name, email: row.email, status: "error", error: `Package "${row.package_name}" not found` });
-      continue;
-    }
+    let userId: string | null = null;
 
     try {
       const password = generatePassword();
       const email = row.email.trim().toLowerCase();
 
-      // Create auth user
+      // 1. Create auth user
       const { data: authData, error: authError } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
+        user_metadata: {
+          first_name: row.first_name.trim(),
+          last_name: row.last_name.trim(),
+          role: "player",
+        },
       });
 
       if (authError) {
@@ -176,56 +183,59 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
         continue;
       }
 
-      const userId = authData.user.id;
+      userId = authData.user.id;
 
-      // Create profile
-      await admin.from("profiles").insert({
+      // 2. Create or update profile (upsert to handle any edge cases)
+      const { error: profileError } = await admin.from("profiles").upsert({
         id: userId,
         first_name: row.first_name.trim(),
         last_name: row.last_name.trim(),
         email,
         phone: row.phone?.trim() || null,
+        date_of_birth: row.date_of_birth || null,
+        area: row.area?.trim() || null,
+        height: row.height ?? null,
+        weight: row.weight ?? null,
+        preferred_hand: row.preferred_hand?.trim().toLowerCase() || null,
+        preferred_position: row.preferred_position?.trim().toLowerCase() || null,
+        health_conditions: row.health_conditions?.trim() || null,
+        training_goals: row.training_goals?.trim() || null,
+        guardian_name: row.guardian_name || null,
+        guardian_phone: row.guardian_phone || null,
         role: "player",
         is_active: true,
-        profile_completed: true,
-      });
+        profile_completed: false,
+      }, { onConflict: "id" });
 
-      // Create subscription
-      const { data: subscription } = await admin
-        .from("subscriptions")
-        .insert({
-          player_id: userId,
-          package_id: packageId,
-          sessions_remaining: row.sessions_remaining,
-          sessions_total: row.sessions_total,
-          start_date: row.start_date,
-          end_date: row.end_date,
-          status: "active",
-        })
-        .select("id")
-        .single();
-
-      // Create payment
-      if (subscription) {
-        await admin.from("payments").insert({
-          player_id: userId,
-          subscription_id: subscription.id,
-          amount: row.amount,
-          method: row.method,
-          status: "confirmed",
-          confirmed_at: new Date().toISOString(),
-        });
+      if (profileError) {
+        await admin.auth.admin.deleteUser(userId);
+        results.push({ name, email, status: "error", error: `Profile: ${profileError.message}` });
+        continue;
       }
 
       results.push({ name, email, status: "success", password });
     } catch (err) {
-      results.push({ name, email: row.email, status: "error", error: "Unexpected error" });
+      // Clean up orphaned auth user if profile step failed
+      if (userId) {
+        try { await admin.auth.admin.deleteUser(userId); } catch { /* ignore cleanup errors */ }
+      }
+      const msg = err instanceof Error ? err.message : "Unexpected error";
+      results.push({ name, email: row.email, status: "error", error: msg });
     }
   }
 
   revalidatePath("/admin/players");
-  revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
 
   return results;
+}
+
+export async function checkExistingEmails(emails: string[]): Promise<string[]> {
+  if (emails.length === 0) return [];
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("email")
+    .in("email", emails.map((e) => e.toLowerCase()));
+  return (data || []).filter((p) => p.email).map((p) => p.email!.toLowerCase());
 }

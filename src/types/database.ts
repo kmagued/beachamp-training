@@ -11,6 +11,8 @@ export type PaymentMethod = "instapay" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";
 export type RecurrenceType = "monthly" | "weekly";
+export type PreferredHand = "left" | "right";
+export type PreferredPosition = "defender" | "blocker";
 
 export interface Database {
   public: {
@@ -30,6 +32,12 @@ export interface Database {
           health_conditions: string | null;
           preferred_package_id: string | null;
           avatar_url: string | null;
+          height: number | null;
+          weight: number | null;
+          preferred_hand: PreferredHand | null;
+          preferred_position: PreferredPosition | null;
+          guardian_name: string | null;
+          guardian_phone: string | null;
           is_active: boolean;
           profile_completed: boolean;
           created_at: string;
@@ -49,6 +57,12 @@ export interface Database {
           health_conditions?: string | null;
           preferred_package_id?: string | null;
           avatar_url?: string | null;
+          height?: number | null;
+          weight?: number | null;
+          preferred_hand?: PreferredHand | null;
+          preferred_position?: PreferredPosition | null;
+          guardian_name?: string | null;
+          guardian_phone?: string | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
@@ -68,6 +82,12 @@ export interface Database {
           health_conditions?: string | null;
           preferred_package_id?: string | null;
           avatar_url?: string | null;
+          height?: number | null;
+          weight?: number | null;
+          preferred_hand?: PreferredHand | null;
+          preferred_position?: PreferredPosition | null;
+          guardian_name?: string | null;
+          guardian_phone?: string | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
@@ -429,6 +449,9 @@ export interface Database {
           is_active: boolean;
           created_by: string;
           notes: string | null;
+          court_count: number | null;
+          court_hours: number | null;
+          court_hourly_rate: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -443,6 +466,9 @@ export interface Database {
           is_active?: boolean;
           created_by: string;
           notes?: string | null;
+          court_count?: number | null;
+          court_hours?: number | null;
+          court_hourly_rate?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -457,6 +483,9 @@ export interface Database {
           is_active?: boolean;
           created_by?: string;
           notes?: string | null;
+          court_count?: number | null;
+          court_hours?: number | null;
+          court_hourly_rate?: number | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -1,5 +1,3 @@
-import type { PaymentMethod } from "@/types/database";
-
 export interface PackageOption {
   id: string;
   name: string;
@@ -12,14 +10,17 @@ export interface BulkPlayerRow {
   first_name: string;
   last_name: string;
   email: string;
-  phone: string;
-  package_name: string;
-  start_date: string;
-  end_date: string;
-  sessions_remaining: number;
-  sessions_total: number;
-  amount: number;
-  method: PaymentMethod;
+  phone?: string;
+  date_of_birth?: string;
+  area?: string;
+  height?: number | null;
+  weight?: number | null;
+  preferred_hand?: string;
+  preferred_position?: string;
+  health_conditions?: string;
+  training_goals?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
 }
 
 export interface BulkPlayerResult {

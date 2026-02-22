@@ -6,10 +6,12 @@ import { Badge, Card, Button, Input, Select, Label, DatePicker, Textarea } from 
 import {
   X, Mail, Phone, MapPin, Calendar, Heart, Target, Dumbbell,
   KeyRound, Pencil, Copy, Check, ExternalLink, Loader2, ArrowLeft, AlertTriangle,
+  Ruler, Hand, Shield, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
 import { updatePlayer, resetPlayerPassword } from "../[id]/actions";
+import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import type { PlayerRow } from "./types";
 import { getPlayerStatus } from "./types";
 
@@ -110,6 +112,7 @@ function DrawerContent({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isResetting, startResetTransition] = useTransition();
+  const [showAddPayment, setShowAddPayment] = useState(false);
 
   // Reset to detail view when player changes
   useEffect(() => {
@@ -117,6 +120,7 @@ function DrawerContent({
     setPasswordResult(null);
     setPasswordError(null);
     setCopied(false);
+    setShowAddPayment(false);
   }, [player.id]);
 
   function handleResetPassword() {
@@ -376,8 +380,56 @@ function DrawerContent({
                 <p className="text-sm text-slate-700">{player.health_conditions || "—"}</p>
               </div>
             </div>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Ruler className="w-4 h-4 text-slate-400 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400">Height / Weight</p>
+                <p className="text-sm text-slate-700">
+                  {player.height ? `${player.height} cm` : "—"} / {player.weight ? `${player.weight} kg` : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Hand className="w-4 h-4 text-slate-400 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400">Preferred Hand</p>
+                <p className="text-sm text-slate-700 capitalize">{player.preferred_hand || "—"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Shield className="w-4 h-4 text-slate-400 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400">Preferred Position</p>
+                <p className="text-sm text-slate-700 capitalize">{player.preferred_position || "—"}</p>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Guardian info (under 16) */}
+        {player.date_of_birth && Math.floor((Date.now() - new Date(player.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) < 16 && (player.guardian_name || player.guardian_phone) && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/30">
+            <div className="px-4 py-3 border-b border-amber-100">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Guardian Information</p>
+            </div>
+            <div className="divide-y divide-amber-100">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Users className="w-4 h-4 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400">Guardian Name</p>
+                  <p className="text-sm text-slate-700">{player.guardian_name || "—"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Phone className="w-4 h-4 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400">Guardian Phone</p>
+                  <p className="text-sm text-slate-700">{player.guardian_phone || "—"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Registered */}
         <div className="flex items-center gap-3 px-1 text-xs text-slate-400">
@@ -411,6 +463,9 @@ function DrawerContent({
             </span>
           </Button>
         </div>
+        <Button onClick={() => setShowAddPayment(true)} fullWidth>
+          + Add Payment
+        </Button>
         <Link href={`/admin/players/${player.id}`} className="block">
           <Button variant="secondary" fullWidth>
             <span className="flex items-center justify-center gap-1.5">
@@ -419,6 +474,14 @@ function DrawerContent({
           </Button>
         </Link>
       </div>
+
+      <NewPaymentDrawer
+        open={showAddPayment}
+        onClose={() => setShowAddPayment(false)}
+        onSuccess={onDataChange}
+        prefillPlayerId={player.id}
+        prefillPlayerName={`${player.first_name} ${player.last_name}`}
+      />
 
       {/* Password result modal */}
       {passwordResult && (
@@ -493,6 +556,12 @@ function EditView({
     player.training_goals ? player.training_goals.split(", ").filter(Boolean) : []
   );
   const [healthConditions, setHealthConditions] = useState(player.health_conditions || "");
+  const [height, setHeight] = useState(player.height ? String(player.height) : "");
+  const [weight, setWeight] = useState(player.weight ? String(player.weight) : "");
+  const [preferredHand, setPreferredHand] = useState(player.preferred_hand || "");
+  const [preferredPosition, setPreferredPosition] = useState(player.preferred_position || "");
+  const [guardianName, setGuardianName] = useState(player.guardian_name || "");
+  const [guardianPhone, setGuardianPhone] = useState(player.guardian_phone || "");
   const [isActive, setIsActive] = useState(player.is_active);
 
   function handleSubmit() {
@@ -507,6 +576,12 @@ function EditView({
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
+    formData.set("height", height);
+    formData.set("weight", weight);
+    formData.set("preferred_hand", preferredHand);
+    formData.set("preferred_position", preferredPosition);
+    formData.set("guardian_name", guardianName);
+    formData.set("guardian_phone", guardianPhone);
     formData.set("is_active", String(isActive));
 
     startTransition(async () => {
@@ -639,6 +714,52 @@ function EditView({
               rows={2}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Height (cm)</Label>
+              <Input type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} placeholder="170" />
+            </div>
+            <div>
+              <Label>Weight (kg)</Label>
+              <Input type="number" min={20} max={200} value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="70" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Preferred Hand</Label>
+              <Select value={preferredHand} onChange={(e) => setPreferredHand(e.target.value)}>
+                <option value="">Select...</option>
+                <option value="right">Right</option>
+                <option value="left">Left</option>
+              </Select>
+            </div>
+            <div>
+              <Label>Preferred Position</Label>
+              <Select value={preferredPosition} onChange={(e) => setPreferredPosition(e.target.value)}>
+                <option value="">Select...</option>
+                <option value="defender">Defender</option>
+                <option value="blocker">Blocker</option>
+              </Select>
+            </div>
+          </div>
+
+          {dateOfBirth && (() => {
+            const age = Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            return age < 16;
+          })() && (
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-amber-50/50 border border-amber-100">
+              <div>
+                <Label required>Guardian Name</Label>
+                <Input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="Parent/guardian name" />
+              </div>
+              <div>
+                <Label required>Guardian Phone</Label>
+                <Input value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} placeholder="01XXXXXXXXX" />
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (

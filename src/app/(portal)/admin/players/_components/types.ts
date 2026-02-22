@@ -9,6 +9,12 @@ export interface PlayerRow {
   playing_level: string | null;
   training_goals: string | null;
   health_conditions: string | null;
+  height: number | null;
+  weight: number | null;
+  preferred_hand: string | null;
+  preferred_position: string | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
   is_active: boolean;
   created_at: string;
   subscriptions: {
@@ -21,7 +27,7 @@ export interface PlayerRow {
   }[];
 }
 
-export type SortField = "date" | "level" | "package";
+export type SortField = "name" | "date" | "level" | "package";
 export type SortDir = "asc" | "desc";
 
 export function getPlayerStatus(player: PlayerRow): string {

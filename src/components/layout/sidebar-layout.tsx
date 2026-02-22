@@ -22,6 +22,7 @@ import {
   GraduationCap,
   UsersRound,
   Receipt,
+  ClipboardList,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 
@@ -60,6 +61,7 @@ const iconMap = {
   "my-groups": Users,
   schedule: Calendar,
   expenses: Receipt,
+  "daily-report": ClipboardList,
 } as const;
 
 const playerNav = [
@@ -88,6 +90,7 @@ const adminNav: NavItem[] = [
   { key: "packages", label: "Packages", href: "/admin/packages" },
   { key: "users", label: "User Mgmt", href: "/admin/users" },
   // Training Operations
+  { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
 ];

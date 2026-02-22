@@ -12,6 +12,7 @@ import { PaymentsFilters } from "./_components/filters";
 import { PaymentsTableView } from "./_components/table";
 import { RejectModal, ScreenshotLightbox } from "./_components/modals";
 import { PaymentDrawer } from "./_components/payment-drawer";
+import { NewPaymentDrawer } from "./_components/new-payment-drawer";
 
 export default function AdminPaymentsPage() {
   return (
@@ -30,6 +31,7 @@ function AdminPaymentsContent() {
   const [rejectReason, setRejectReason] = useState("");
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [drawerPayment, setDrawerPayment] = useState<PaymentRow | null>(null);
+  const [showNewPayment, setShowNewPayment] = useState(false);
 
   const searchParams = useSearchParams();
   const initialStatusParam = searchParams.get("status");
@@ -228,12 +230,20 @@ function AdminPaymentsContent() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
-        <p className="text-slate-500 text-sm">
-          {payments.length} total payments
-          {(!!search || !!monthFilter || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
+          <p className="text-slate-500 text-sm">
+            {payments.length} total payments
+            {(!!search || !!monthFilter || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowNewPayment(true)}
+          className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          + New Payment
+        </button>
       </div>
 
       <div className="flex gap-3 mb-6">
@@ -333,6 +343,12 @@ function AdminPaymentsContent() {
         onDataChange={() => { setDrawerPayment(null); fetchPayments(); }}
         isPending={isPending}
         actionId={actionId}
+      />
+
+      <NewPaymentDrawer
+        open={showNewPayment}
+        onClose={() => setShowNewPayment(false)}
+        onSuccess={fetchPayments}
       />
     </div>
   );
