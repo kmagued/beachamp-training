@@ -124,7 +124,7 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
 export async function updatePayment(
   paymentId: string,
-  updates: { amount?: number; method?: string; status?: string }
+  updates: { amount?: number; method?: string; status?: string; confirmed_at?: string }
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -145,6 +145,7 @@ export async function updatePayment(
   const paymentUpdate: Record<string, unknown> = {};
   if (updates.amount !== undefined) paymentUpdate.amount = updates.amount;
   if (updates.method !== undefined) paymentUpdate.method = updates.method;
+  if (updates.confirmed_at !== undefined) paymentUpdate.confirmed_at = new Date(updates.confirmed_at).toISOString();
 
   // Handle status change
   if (updates.status && updates.status !== payment.status) {
@@ -252,6 +253,7 @@ export async function createAdminPayment(data: {
   package_id: string;
   amount: number;
   method: PaymentMethod;
+  payment_date?: string;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -280,24 +282,30 @@ export async function createAdminPayment(data: {
 
   if (pkgError || !pkg) return { error: "Package not found" };
 
-  // Smart start_date: if player has active sub ending in future, start after it
+  // Use provided date or smart start_date
   const today = new Date();
-  let startDate = today;
+  let startDate: Date;
 
-  const { data: existingActiveSub } = await admin
-    .from("subscriptions")
-    .select("end_date")
-    .eq("player_id", data.player_id)
-    .eq("status", "active")
-    .order("end_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (data.payment_date) {
+    startDate = new Date(data.payment_date);
+  } else {
+    startDate = today;
 
-  if (existingActiveSub?.end_date) {
-    const activeEndDate = new Date(existingActiveSub.end_date);
-    if (activeEndDate > today) {
-      startDate = new Date(activeEndDate);
-      startDate.setDate(startDate.getDate() + 1);
+    const { data: existingActiveSub } = await admin
+      .from("subscriptions")
+      .select("end_date")
+      .eq("player_id", data.player_id)
+      .eq("status", "active")
+      .order("end_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingActiveSub?.end_date) {
+      const activeEndDate = new Date(existingActiveSub.end_date);
+      if (activeEndDate > today) {
+        startDate = new Date(activeEndDate);
+        startDate.setDate(startDate.getDate() + 1);
+      }
     }
   }
 
@@ -330,7 +338,7 @@ export async function createAdminPayment(data: {
     amount: data.amount,
     method: data.method,
     status: isCash ? "confirmed" : "pending",
-    confirmed_at: isCash ? new Date().toISOString() : null,
+    confirmed_at: isCash ? (data.payment_date ? new Date(data.payment_date).toISOString() : new Date().toISOString()) : null,
     confirmed_by: isCash ? user.id : null,
   });
 

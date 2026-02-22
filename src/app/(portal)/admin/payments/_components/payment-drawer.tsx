@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
-import { Badge, Button, Input, Select } from "@/components/ui";
+import { Badge, Button, Input, Select, DatePicker } from "@/components/ui";
 import { X, Check, Image as ImageIcon, Loader2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { updatePayment } from "../actions";
@@ -119,6 +119,7 @@ function DrawerContent({
   const [editAmount, setEditAmount] = useState(payment.amount);
   const [editMethod, setEditMethod] = useState(payment.method);
   const [editStatus, setEditStatus] = useState(payment.status);
+  const [editDate, setEditDate] = useState(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "");
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, startUpdateTransition] = useTransition();
 
@@ -128,8 +129,9 @@ function DrawerContent({
     setEditAmount(payment.amount);
     setEditMethod(payment.method);
     setEditStatus(payment.status);
+    setEditDate(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "");
     setEditError(null);
-  }, [payment.id, payment.amount, payment.method, payment.status]);
+  }, [payment.id, payment.amount, payment.method, payment.status, payment.confirmed_at]);
 
   function handleSaveEdit() {
     if (editAmount <= 0) {
@@ -138,10 +140,12 @@ function DrawerContent({
     }
     setEditError(null);
     startUpdateTransition(async () => {
+      const currentDate = payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "";
       const res = await updatePayment(payment.id, {
         amount: editAmount,
         method: editMethod,
         status: editStatus !== payment.status ? editStatus : undefined,
+        confirmed_at: editDate && editDate !== currentDate ? editDate : undefined,
       });
       if ("error" in res) {
         setEditError(res.error ?? "Failed to update payment");
@@ -197,6 +201,14 @@ function DrawerContent({
                 <option value="confirmed">Confirmed</option>
                 <option value="rejected">Rejected</option>
               </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Payment Date</label>
+              <DatePicker
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                placeholder="Select payment date..."
+              />
             </div>
             {editError && (
               <p className="text-xs text-red-600">{editError}</p>
@@ -266,7 +278,7 @@ function DrawerContent({
             <Button onClick={handleSaveEdit} disabled={isUpdating} fullWidth>
               {isUpdating ? "Saving..." : "Save Changes"}
             </Button>
-            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditError(null); }} disabled={isUpdating}>
+            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditDate(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : ""); setEditError(null); }} disabled={isUpdating}>
               Cancel
             </Button>
           </div>

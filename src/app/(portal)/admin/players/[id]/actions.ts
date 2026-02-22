@@ -58,6 +58,18 @@ export async function updatePlayerLevel(playerId: string, level: string | null) 
   return { success: true };
 }
 
+export async function bulkUpdatePlayerLevel(playerIds: string[], level: string | null) {
+  const admin = createAdminClient();
+  type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
+  const { error } = await admin
+    .from("profiles")
+    .update({ playing_level: (level as PlayingLevel) || null })
+    .in("id", playerIds);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/players");
+  return { success: true };
+}
+
 export async function resetPlayerPassword(playerId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

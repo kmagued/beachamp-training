@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Drawer } from "@/components/ui/drawer";
-import { Input, Select, Label, Button } from "@/components/ui";
+import { Input, Select, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Search, X } from "lucide-react";
 import { createAdminPayment } from "../actions";
 
@@ -54,6 +54,7 @@ export function NewPaymentDrawer({
   const [packageId, setPackageId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "instapay">(defaultMethod || "cash");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,6 +92,7 @@ export function NewPaymentDrawer({
       setPackageId("");
       setAmount("");
       setMethod(defaultMethod || "cash");
+      setPaymentDate(new Date().toISOString().split("T")[0]);
       setError("");
     }
   }, [open, prefillPlayerId, prefillPlayerName, defaultMethod]);
@@ -158,6 +160,7 @@ export function NewPaymentDrawer({
         package_id: packageId,
         amount: Number(amount),
         method,
+        payment_date: paymentDate,
       });
       if (res.error) {
         setError(res.error);
@@ -263,6 +266,15 @@ export function NewPaymentDrawer({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0"
+          />
+        </div>
+
+        {/* Payment date */}
+        <div>
+          <Label required>Payment Date</Label>
+          <DatePicker
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
           />
         </div>
 

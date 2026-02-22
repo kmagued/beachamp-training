@@ -5,10 +5,10 @@ import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { Pagination, SelectionBar, Button } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import { Plus, Users, ChevronDown, Loader2, Check } from "lucide-react";
+import { Plus, Users, ChevronDown, Loader2, Check, GraduationCap } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
 import { getPlayerStatus } from "./_components/types";
-import { updatePlayerLevel } from "./[id]/actions";
+import { updatePlayerLevel, bulkUpdatePlayerLevel } from "./[id]/actions";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
 import { PlayersFilters } from "./_components/filters";
 import { PlayersTableView } from "./_components/table";
@@ -187,6 +187,10 @@ function AdminPlayersContent() {
   const [addingToGroup, setAddingToGroup] = useState(false);
   const [addGroupSuccess, setAddGroupSuccess] = useState<string | null>(null);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
+  const [levelDropdownOpen, setLevelDropdownOpen] = useState(false);
+  const [bulkLevelUpdating, setBulkLevelUpdating] = useState(false);
+  const [bulkLevelSuccess, setBulkLevelSuccess] = useState<string | null>(null);
+  const levelDropdownRef = useRef<HTMLDivElement>(null);
   const [changingLevelId, setChangingLevelId] = useState<string | null>(null);
 
   const handleLevelChange = useCallback(async (playerId: string, newLevel: string | null) => {
@@ -221,6 +225,17 @@ function AdminPlayersContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [groupDropdownOpen]);
 
+  useEffect(() => {
+    if (!levelDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (levelDropdownRef.current && !levelDropdownRef.current.contains(e.target as Node)) {
+        setLevelDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [levelDropdownOpen]);
+
   async function handleAddToGroup(groupId: string) {
     setAddingToGroup(true);
     const rows = Array.from(selectedIds).map((playerId) => ({
@@ -235,6 +250,25 @@ function AdminPlayersContent() {
     setGroupDropdownOpen(false);
     setSelectedIds(new Set());
     setTimeout(() => setAddGroupSuccess(null), 3000);
+  }
+
+  async function handleBulkLevel(level: string | null) {
+    setBulkLevelUpdating(true);
+    const ids = Array.from(selectedIds);
+    const result = await bulkUpdatePlayerLevel(ids, level);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      const label = level ? level.charAt(0).toUpperCase() + level.slice(1) : "None";
+      setBulkLevelSuccess(`Updated ${ids.length} player${ids.length > 1 ? "s" : ""} to ${label}`);
+      setPlayers((prev) =>
+        prev.map((p) => (selectedIds.has(p.id) ? { ...p, playing_level: level } : p))
+      );
+      setSelectedIds(new Set());
+      setTimeout(() => setBulkLevelSuccess(null), 3000);
+    }
+    setBulkLevelUpdating(false);
+    setLevelDropdownOpen(false);
   }
 
   return (
@@ -301,10 +335,41 @@ function AdminPlayersContent() {
             </div>
           )}
         </div>
+        <div className="relative" ref={levelDropdownRef}>
+          <button
+            onClick={() => setLevelDropdownOpen((o) => !o)}
+            disabled={bulkLevelUpdating}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            Set Level
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          {levelDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+              {[
+                { value: "beginner", label: "Beginner" },
+                { value: "intermediate", label: "Intermediate" },
+                { value: "advanced", label: "Advanced" },
+                { value: "professional", label: "Professional" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleBulkLevel(opt.value)}
+                  disabled={bulkLevelUpdating}
+                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  {bulkLevelUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-2" /> : null}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </SelectionBar>
-      {addGroupSuccess && (
+      {(addGroupSuccess || bulkLevelSuccess) && (
         <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
-          <Check className="w-4 h-4" /> {addGroupSuccess}
+          <Check className="w-4 h-4" /> {addGroupSuccess || bulkLevelSuccess}
         </div>
       )}
 

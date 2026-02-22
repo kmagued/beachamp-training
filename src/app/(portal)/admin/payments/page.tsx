@@ -13,6 +13,7 @@ import { PaymentsTableView } from "./_components/table";
 import { RejectModal, ScreenshotLightbox } from "./_components/modals";
 import { PaymentDrawer } from "./_components/payment-drawer";
 import { NewPaymentDrawer } from "./_components/new-payment-drawer";
+import Link from "next/link";
 
 export default function AdminPaymentsPage() {
   return (
@@ -238,12 +239,20 @@ function AdminPaymentsContent() {
             {(!!search || !!monthFilter || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
           </p>
         </div>
-        <button
-          onClick={() => setShowNewPayment(true)}
-          className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          + New Payment
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/payments/import"
+            className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Import
+          </Link>
+          <button
+            onClick={() => setShowNewPayment(true)}
+            className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            + New Payment
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-3 mb-6">
