@@ -42,7 +42,7 @@ export default function AddPlayersPage() {
 
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Add Players</h1>
-        <p className="text-slate-500 text-sm">Create player accounts with subscriptions</p>
+        <p className="text-slate-500 text-sm">Create player accounts</p>
       </div>
 
       {/* Tabs */}
@@ -66,7 +66,7 @@ export default function AddPlayersPage() {
       {activeTab === "Add Player" ? (
         <AddPlayerForm packages={packages} />
       ) : (
-        <BulkImport packages={packages} />
+        <BulkImport />
       )}
     </div>
   );

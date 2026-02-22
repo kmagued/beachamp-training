@@ -8,6 +8,7 @@ import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { Plus, Users, ChevronDown, Loader2, Check } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
 import { getPlayerStatus } from "./_components/types";
+import { updatePlayerLevel } from "./[id]/actions";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
 import { PlayersFilters } from "./_components/filters";
 import { PlayersTableView } from "./_components/table";
@@ -44,7 +45,7 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
       .eq("role", "player")
       .order("created_at", { ascending: false });
     if (data) setPlayers(data as unknown as PlayerRow[]);
@@ -110,7 +111,11 @@ function AdminPlayersContent() {
 
     return [...result].sort((a, b) => {
       let cmp = 0;
-      if (sortField === "date") {
+      if (sortField === "name") {
+        const aName = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const bName = `${b.first_name} ${b.last_name}`.toLowerCase();
+        cmp = aName.localeCompare(bName);
+      } else if (sortField === "date") {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       } else if (sortField === "level") {
         cmp = (levelOrder[a.playing_level ?? ""] ?? 99) - (levelOrder[b.playing_level ?? ""] ?? 99);
@@ -182,6 +187,21 @@ function AdminPlayersContent() {
   const [addingToGroup, setAddingToGroup] = useState(false);
   const [addGroupSuccess, setAddGroupSuccess] = useState<string | null>(null);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
+  const [changingLevelId, setChangingLevelId] = useState<string | null>(null);
+
+  const handleLevelChange = useCallback(async (playerId: string, newLevel: string | null) => {
+    setChangingLevelId(playerId);
+    const result = await updatePlayerLevel(playerId, newLevel);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === playerId ? { ...p, playing_level: newLevel } : p))
+      );
+      setDrawerPlayer((prev) => prev && prev.id === playerId ? { ...prev, playing_level: newLevel } : prev);
+    }
+    setChangingLevelId(null);
+  }, []);
 
   useEffect(() => {
     supabase.from("groups").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
@@ -306,6 +326,8 @@ function AdminPlayersContent() {
             toggleSort={toggleSort}
             hasActiveFilters={hasActiveFilters}
             onPlayerClick={setDrawerPlayer}
+            onLevelChange={handleLevelChange}
+            changingLevelId={changingLevelId}
           />
         )}
       </div>

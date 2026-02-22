@@ -1,7 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { PaymentMethod } from "@/types/database";
 
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,6 +245,101 @@ export async function bulkUpdatePaymentStatus(paymentIds: string[], status: stri
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
   return { success: true, results };
+}
+
+export async function createAdminPayment(data: {
+  player_id: string;
+  package_id: string;
+  amount: number;
+  method: PaymentMethod;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  // Verify admin role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || profile.role !== "admin") return { error: "Unauthorized" };
+
+  // Get package details
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data: pkg, error: pkgError } = await admin
+    .from("packages")
+    .select("id, session_count, validity_days")
+    .eq("id", data.package_id)
+    .single();
+
+  if (pkgError || !pkg) return { error: "Package not found" };
+
+  // Smart start_date: if player has active sub ending in future, start after it
+  const today = new Date();
+  let startDate = today;
+
+  const { data: existingActiveSub } = await admin
+    .from("subscriptions")
+    .select("end_date")
+    .eq("player_id", data.player_id)
+    .eq("status", "active")
+    .order("end_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingActiveSub?.end_date) {
+    const activeEndDate = new Date(existingActiveSub.end_date);
+    if (activeEndDate > today) {
+      startDate = new Date(activeEndDate);
+      startDate.setDate(startDate.getDate() + 1);
+    }
+  }
+
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+  const isCash = data.method === "cash";
+
+  // Create subscription
+  const { data: subscription, error: subError } = await admin
+    .from("subscriptions")
+    .insert({
+      player_id: data.player_id,
+      package_id: data.package_id,
+      sessions_remaining: pkg.session_count,
+      sessions_total: pkg.session_count,
+      start_date: startDate.toISOString().split("T")[0],
+      end_date: endDate.toISOString().split("T")[0],
+      status: isCash ? "active" : "pending",
+    })
+    .select("id")
+    .single();
+
+  if (subError) return { error: subError.message };
+
+  // Create payment
+  const { error: payError } = await admin.from("payments").insert({
+    player_id: data.player_id,
+    subscription_id: subscription.id,
+    amount: data.amount,
+    method: data.method,
+    status: isCash ? "confirmed" : "pending",
+    confirmed_at: isCash ? new Date().toISOString() : null,
+    confirmed_by: isCash ? user.id : null,
+  });
+
+  if (payError) return { error: payError.message };
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
 }
 
 export async function getScreenshotUrl(path: string) {

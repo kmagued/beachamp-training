@@ -1,7 +1,7 @@
 import { RefObject, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Card, Badge } from "@/components/ui";
-import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { PlayerRow, SortField, SortDir } from "./types";
 import { getPlayerStatus } from "./types";
@@ -25,6 +25,8 @@ interface PlayersTableProps {
   toggleSort: (field: SortField) => void;
   hasActiveFilters: boolean;
   onPlayerClick: (player: PlayerRow) => void;
+  onLevelChange: (playerId: string, newLevel: string | null) => void;
+  changingLevelId: string | null;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200 whitespace-nowrap";
@@ -48,15 +50,47 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-function LevelBadge({ level }: { level: string | null }) {
-  if (!level) return <Badge variant="neutral">—</Badge>;
-  switch (level) {
-    case "beginner": return <Badge variant="info">Beginner</Badge>;
-    case "intermediate": return <Badge variant="info">Intermediate</Badge>;
-    case "advanced": return <Badge variant="success">Advanced</Badge>;
-    case "professional": return <Badge variant="success">Professional</Badge>;
-    default: return <Badge variant="neutral">{level}</Badge>;
-  }
+const LEVEL_OPTIONS = [
+  { value: "", label: "—" },
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+  { value: "professional", label: "Professional" },
+];
+
+function LevelSelect({
+  playerId,
+  currentLevel,
+  onLevelChange,
+  isChanging,
+}: {
+  playerId: string;
+  currentLevel: string | null;
+  onLevelChange: (playerId: string, newLevel: string | null) => void;
+  isChanging: boolean;
+}) {
+  return (
+    <div className="relative inline-flex items-center">
+      {isChanging ? (
+        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+      ) : (
+        <select
+          value={currentLevel || ""}
+          onChange={(e) => {
+            const newLevel = e.target.value || null;
+            if (newLevel === currentLevel) return;
+            onLevelChange(playerId, newLevel);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+        >
+          {LEVEL_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
 }
 
 function ContactMenu({ phone, email }: { phone: string | null; email: string | null }) {
@@ -142,7 +176,7 @@ export function PlayersTableView(props: PlayersTableProps) {
   const {
     players, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    hasActiveFilters, onPlayerClick,
+    hasActiveFilters, onPlayerClick, onLevelChange, changingLevelId,
   } = props;
 
   const emptyMessage = hasActiveFilters ? "No players match your filters" : "No players found";
@@ -151,7 +185,7 @@ export function PlayersTableView(props: PlayersTableProps) {
 
   function handleRowClick(e: React.MouseEvent, player: PlayerRow) {
     const target = e.target as HTMLElement;
-    if (target.closest("input, button, a")) return;
+    if (target.closest("input, button, a, select")) return;
     if (selectionMode) {
       toggleSelect(player.id);
     } else {
@@ -177,8 +211,11 @@ export function PlayersTableView(props: PlayersTableProps) {
                     className="table-checkbox"
                   />
                 </th>
-                <th className={cn(thBase, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")}>
-                  Player
+                <th
+                  className={cn(thSortable, "sticky left-12 z-20 bg-white min-w-[150px] border-r border-r-slate-200")}
+                  onClick={() => toggleSort("name")}
+                >
+                  <span className="inline-flex items-center gap-1">Player <SortIcon field="name" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 {/* Scrollable middle */}
                 <th className={thSortable} onClick={() => toggleSort("package")}>
@@ -236,7 +273,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       <p className="text-sm font-medium text-slate-900">
                         {player.first_name} {player.last_name}
                       </p>
-                      <p className="text-xs text-slate-400">{player.email}</p>
+                      <p className="text-xs text-slate-400 truncate max-w-[200px]">{player.email}</p>
                     </td>
                     {/* Scrollable middle */}
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
@@ -267,7 +304,12 @@ export function PlayersTableView(props: PlayersTableProps) {
                       ) : "—"}
                     </td>
                     <td className={tdBase}>
-                      <LevelBadge level={player.playing_level} />
+                      <LevelSelect
+                        playerId={player.id}
+                        currentLevel={player.playing_level}
+                        onLevelChange={onLevelChange}
+                        isChanging={changingLevelId === player.id}
+                      />
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700 max-w-[200px]")}>
                       {player.health_conditions ? (
@@ -369,7 +411,14 @@ export function PlayersTableView(props: PlayersTableProps) {
                 </div>
                 <div>
                   <span className="text-slate-400">Level</span>
-                  <div className="mt-0.5"><LevelBadge level={player.playing_level} /></div>
+                  <div className="mt-0.5">
+                    <LevelSelect
+                      playerId={player.id}
+                      currentLevel={player.playing_level}
+                      onLevelChange={onLevelChange}
+                      isChanging={changingLevelId === player.id}
+                    />
+                  </div>
                 </div>
                 {player.health_conditions && (
                   <div className="col-span-2">

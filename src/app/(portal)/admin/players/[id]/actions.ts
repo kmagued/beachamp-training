@@ -27,6 +27,12 @@ export async function updatePlayer(playerId: string, formData: FormData) {
       playing_level: (formData.get("playing_level") as string)?.trim() || null,
       training_goals: (formData.get("training_goals") as string)?.trim() || null,
       health_conditions: (formData.get("health_conditions") as string)?.trim() || null,
+      height: formData.get("height") ? Number(formData.get("height")) : null,
+      weight: formData.get("weight") ? Number(formData.get("weight")) : null,
+      preferred_hand: (formData.get("preferred_hand") as string)?.trim() || null,
+      preferred_position: (formData.get("preferred_position") as string)?.trim() || null,
+      guardian_name: (formData.get("guardian_name") as string)?.trim() || null,
+      guardian_phone: (formData.get("guardian_phone") as string)?.trim() || null,
       is_active: formData.get("is_active") === "true",
     })
     .eq("id", playerId);
@@ -37,6 +43,18 @@ export async function updatePlayer(playerId: string, formData: FormData) {
   revalidatePath("/admin/players");
   revalidatePath("/admin/dashboard");
 
+  return { success: true };
+}
+
+export async function updatePlayerLevel(playerId: string, level: string | null) {
+  const admin = createAdminClient();
+  type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
+  const { error } = await admin
+    .from("profiles")
+    .update({ playing_level: (level as PlayingLevel) || null })
+    .eq("id", playerId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/players");
   return { success: true };
 }
 

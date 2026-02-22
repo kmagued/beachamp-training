@@ -11,6 +11,9 @@ export interface ExpenseRow {
   created_at: string;
   updated_at: string;
   category_id: string;
+  court_count: number | null;
+  court_hours: number | null;
+  court_hourly_rate: number | null;
   expense_categories: { id: string; name: string; icon: string | null };
 }
 

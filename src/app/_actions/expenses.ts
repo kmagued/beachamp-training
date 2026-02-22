@@ -67,6 +67,9 @@ export async function createExpense(formData: FormData) {
     is_recurring: isRecurring,
     recurrence_type: recurrenceType,
     notes: (formData.get("notes") as string)?.trim() || null,
+    court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
+    court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
+    court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
     created_by: user!.id,
   });
 
@@ -114,6 +117,9 @@ export async function updateExpense(id: string, formData: FormData) {
       is_recurring: isRecurring,
       recurrence_type: recurrenceType,
       notes: (formData.get("notes") as string)?.trim() || null,
+      court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
+      court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
+      court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
     })
     .eq("id", id);
 

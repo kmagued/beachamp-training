@@ -9,6 +9,12 @@ export interface PlayerProfile {
   playing_level: string | null;
   training_goals: string | null;
   health_conditions: string | null;
+  height: number | null;
+  weight: number | null;
+  preferred_hand: string | null;
+  preferred_position: string | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
   is_active: boolean;
   created_at: string;
 }

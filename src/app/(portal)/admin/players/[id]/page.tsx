@@ -24,7 +24,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, is_active, created_at")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at")
       .eq("id", id)
       .eq("role", "player")
       .single(),

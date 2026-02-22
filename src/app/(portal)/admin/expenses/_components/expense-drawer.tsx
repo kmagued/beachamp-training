@@ -11,9 +11,10 @@ interface ExpenseDrawerProps {
   categories: CategoryRow[];
   editingExpense: ExpenseRow | null;
   onSuccess: () => void;
+  defaultDate?: string;
 }
 
-export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess }: ExpenseDrawerProps) {
+export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess, defaultDate }: ExpenseDrawerProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -25,10 +26,31 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const [recurrenceType, setRecurrenceType] = useState("monthly");
   const [notes, setNotes] = useState("");
 
+  // Court reservation fields
+  const [courtCount, setCourtCount] = useState("");
+  const [courtHours, setCourtHours] = useState("");
+  const [courtHourlyRate, setCourtHourlyRate] = useState("");
+
   // Inline new category
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryPending, setCategoryPending] = useState(false);
+
+  const activeCategories = categories.filter((c) => c.is_active);
+  const selectedCategory = activeCategories.find((c) => c.id === categoryId);
+  const isCourtReservation = selectedCategory?.name === "Court Reservation";
+
+  // Auto-calculate amount for court reservations
+  useEffect(() => {
+    if (isCourtReservation) {
+      const courts = Number(courtCount) || 0;
+      const hours = Number(courtHours) || 0;
+      const rate = Number(courtHourlyRate) || 0;
+      const calculated = courts * hours * rate;
+      if (calculated > 0) setAmount(String(calculated));
+      else setAmount("");
+    }
+  }, [courtCount, courtHours, courtHourlyRate, isCourtReservation]);
 
   // Reset form when opening/editing
   useEffect(() => {
@@ -41,20 +63,27 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setIsRecurring(editingExpense.is_recurring);
         setRecurrenceType(editingExpense.recurrence_type || "monthly");
         setNotes(editingExpense.notes || "");
+        setCourtCount(editingExpense.court_count ? String(editingExpense.court_count) : "");
+        setCourtHours(editingExpense.court_hours ? String(editingExpense.court_hours) : "");
+        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "");
       } else {
-        setCategoryId(categories[0]?.id || "");
+        setCategoryId(activeCategories[0]?.id || "");
         setDescription("");
         setAmount("");
-        setExpenseDate(new Date().toISOString().split("T")[0]);
+        setExpenseDate(defaultDate || new Date().toISOString().split("T")[0]);
         setIsRecurring(false);
         setRecurrenceType("monthly");
         setNotes("");
+        setCourtCount("");
+        setCourtHours("");
+        setCourtHourlyRate("");
       }
       setError("");
       setShowNewCategory(false);
       setNewCategoryName("");
     }
-  }, [open, editingExpense, categories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingExpense]);
 
   function handleSubmit() {
     setError("");
@@ -66,6 +95,11 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     formData.set("is_recurring", String(isRecurring));
     if (isRecurring) formData.set("recurrence_type", recurrenceType);
     formData.set("notes", notes);
+    if (isCourtReservation) {
+      formData.set("court_count", courtCount);
+      formData.set("court_hours", courtHours);
+      formData.set("court_hourly_rate", courtHourlyRate);
+    }
 
     startTransition(async () => {
       const res = editingExpense
@@ -96,12 +130,9 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     } else {
       setNewCategoryName("");
       setShowNewCategory(false);
-      // Refresh data so the new category appears, then select it
       onSuccess();
     }
   }
-
-  const activeCategories = categories.filter((c) => c.is_active);
 
   return (
     <Drawer open={open} onClose={onClose} title={editingExpense ? "Edit Expense" : "Add Expense"}>
@@ -163,6 +194,27 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
           )}
         </div>
 
+        {/* Court reservation calculator */}
+        {isCourtReservation && (
+          <div className="space-y-3 p-4 rounded-xl bg-primary-50/50 border border-primary-100">
+            <p className="text-xs font-semibold text-primary-700 uppercase tracking-wider">Court Calculator</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Courts</Label>
+                <Input type="number" min="1" value={courtCount} onChange={(e) => setCourtCount(e.target.value)} placeholder="1" />
+              </div>
+              <div>
+                <Label>Hours</Label>
+                <Input type="number" min="0.5" step="0.5" value={courtHours} onChange={(e) => setCourtHours(e.target.value)} placeholder="1" />
+              </div>
+              <div>
+                <Label>Rate/hr</Label>
+                <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div>
           <Label required>Description</Label>
           <Input
@@ -181,6 +233,8 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
+            readOnly={isCourtReservation}
+            className={isCourtReservation ? "bg-slate-50 cursor-not-allowed" : ""}
           />
         </div>
 
