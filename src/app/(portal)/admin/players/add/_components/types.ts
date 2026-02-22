@@ -26,7 +26,7 @@ export interface BulkPlayerRow {
 export interface BulkPlayerResult {
   name: string;
   email: string;
-  status: "success" | "error";
+  status: "success" | "updated" | "error";
   password?: string;
   error?: string;
 }

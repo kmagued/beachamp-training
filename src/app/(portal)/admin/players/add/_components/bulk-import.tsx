@@ -19,13 +19,14 @@ const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS];
 
 const SORTABLE_KEYS = ["name", "date_of_birth", "height", "weight", "preferred_hand", "preferred_position", "status"] as const;
 type SortKey = (typeof SORTABLE_KEYS)[number];
-type StatusFilter = "all" | "valid" | "error";
+type StatusFilter = "all" | "new" | "update" | "error";
 type SortDir = "asc" | "desc";
 
 interface PreviewRow {
   index: number;
   data: Record<string, string>;
   error?: string;
+  isUpdate?: boolean;
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -73,7 +74,8 @@ export function BulkImport() {
 
     // Filter
     let rows = preview;
-    if (statusFilter === "valid") rows = rows.filter((r) => !r.error);
+    if (statusFilter === "new") rows = rows.filter((r) => !r.error && !r.isUpdate);
+    else if (statusFilter === "update") rows = rows.filter((r) => r.isUpdate);
     else if (statusFilter === "error") rows = rows.filter((r) => !!r.error);
 
     // Sort
@@ -92,8 +94,8 @@ export function BulkImport() {
         aVal = (a.data[sortKey] || "").toLowerCase();
         bVal = (b.data[sortKey] || "").toLowerCase();
       } else if (sortKey === "status") {
-        aVal = a.error ? 1 : 0;
-        bVal = b.error ? 1 : 0;
+        aVal = a.error ? 2 : a.isUpdate ? 1 : 0;
+        bVal = b.error ? 2 : b.isUpdate ? 1 : 0;
       }
 
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
@@ -163,8 +165,8 @@ export function BulkImport() {
       if (basicError) return { index: i, data, error: basicError };
 
       const email = data.email.toLowerCase();
-      if (existingSet.has(email)) return { index: i, data, error: "Email already exists" };
       if (emailCount[email] > 1) return { index: i, data, error: "Duplicate email in CSV" };
+      if (existingSet.has(email)) return { index: i, data, isUpdate: true };
 
       return { index: i, data };
     });
@@ -210,11 +212,11 @@ export function BulkImport() {
 
   function toggleSelectAll() {
     if (!preview) return;
-    const validIndices = preview.filter((r) => !r.error).map((r) => r.index);
-    if (selected.size === validIndices.length) {
+    const selectableIndices = preview.filter((r) => !r.error).map((r) => r.index);
+    if (selected.size === selectableIndices.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(validIndices));
+      setSelected(new Set(selectableIndices));
     }
   }
 
@@ -394,20 +396,31 @@ export function BulkImport() {
           </div>
           <div className="px-5 py-2.5 border-b border-slate-100 flex items-center gap-1.5">
             <span className="text-[11px] font-medium text-slate-400 mr-1">Filter:</span>
-            {(["all", "valid", "error"] as StatusFilter[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => { setStatusFilter(f); setPage(0); }}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors capitalize",
-                  statusFilter === f
-                    ? f === "error" ? "bg-red-100 text-red-700" : f === "valid" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"
-                    : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                )}
-              >
-                {f === "all" ? `All (${preview.length})` : f === "valid" ? `Valid (${preview.length - errorCount})` : `Errors (${errorCount})`}
-              </button>
-            ))}
+            {(["all", "new", "update", "error"] as StatusFilter[]).map((f) => {
+              const newCount = preview.filter((r) => !r.error && !r.isUpdate).length;
+              const updateCount = preview.filter((r) => r.isUpdate).length;
+              const label = f === "all" ? `All (${preview.length})`
+                : f === "new" ? `New (${newCount})`
+                : f === "update" ? `Update (${updateCount})`
+                : `Errors (${errorCount})`;
+              return (
+                <button
+                  key={f}
+                  onClick={() => { setStatusFilter(f); setPage(0); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
+                    statusFilter === f
+                      ? f === "error" ? "bg-red-100 text-red-700"
+                        : f === "update" ? "bg-amber-100 text-amber-700"
+                        : f === "new" ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-200 text-slate-700"
+                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
           <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
@@ -453,8 +466,9 @@ export function BulkImport() {
               <tbody>
                 {paginatedPreview.map((row) => {
                   const hasError = !!row.error;
+                  const isUpdate = !!row.isUpdate;
                   const isSelected = selected.has(row.index);
-                  const rowBg = hasError ? "bg-red-50" : "bg-white";
+                  const rowBg = hasError ? "bg-red-50" : isUpdate ? "bg-amber-50" : "bg-white";
                   return (
                     <tr
                       key={row.index}
@@ -482,10 +496,12 @@ export function BulkImport() {
                         </td>
                       ))}
                       <td className={cn("px-4 py-2 whitespace-nowrap sticky right-0 z-10", rowBg)}>
-                        {row.error ? (
+                        {hasError ? (
                           <span className="text-xs text-red-500">{row.error}</span>
+                        ) : isUpdate ? (
+                          <Badge variant="warning">Update</Badge>
                         ) : (
-                          <Badge variant="success">Valid</Badge>
+                          <Badge variant="success">New</Badge>
                         )}
                       </td>
                     </tr>
@@ -542,6 +558,9 @@ export function BulkImport() {
               <h3 className="text-sm font-semibold text-slate-900">Import Results</h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 <span className="text-emerald-600">{results.filter((r) => r.status === "success").length} created</span>
+                {results.some((r) => r.status === "updated") && (
+                  <span className="text-amber-600 ml-2">{results.filter((r) => r.status === "updated").length} updated</span>
+                )}
                 {results.some((r) => r.status === "error") && (
                   <span className="text-red-500 ml-2">{results.filter((r) => r.status === "error").length} failed</span>
                 )}
@@ -574,6 +593,8 @@ export function BulkImport() {
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {r.status === "success" ? (
                         <Badge variant="success">Created</Badge>
+                      ) : r.status === "updated" ? (
+                        <Badge variant="warning">Updated</Badge>
                       ) : (
                         <span className="text-xs text-red-500">{r.error}</span>
                       )}

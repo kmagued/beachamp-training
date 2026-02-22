@@ -160,13 +160,13 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
     let userId: string | null = null;
 
     try {
-      const password = generatePassword();
       const email = row.email.trim().toLowerCase();
+      let isUpdate = false;
 
-      // 1. Create auth user
+      // 1. Try to create auth user
       const { data: authData, error: authError } = await admin.auth.admin.createUser({
         email,
-        password,
+        password: generatePassword(),
         email_confirm: true,
         user_metadata: {
           first_name: row.first_name.trim(),
@@ -176,16 +176,29 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
       });
 
       if (authError) {
-        const msg = authError.message?.includes("already been registered")
-          ? "Email already exists"
-          : authError.message;
-        results.push({ name, email, status: "error", error: msg });
-        continue;
+        if (authError.message?.includes("already been registered")) {
+          // Existing user — look up their ID and update profile
+          const { data: existingProfile } = await admin
+            .from("profiles")
+            .select("id")
+            .eq("email", email)
+            .single();
+
+          if (!existingProfile) {
+            results.push({ name, email, status: "error", error: "User exists in auth but profile not found" });
+            continue;
+          }
+          userId = existingProfile.id;
+          isUpdate = true;
+        } else {
+          results.push({ name, email, status: "error", error: authError.message });
+          continue;
+        }
+      } else {
+        userId = authData.user.id;
       }
 
-      userId = authData.user.id;
-
-      // 2. Create or update profile (upsert to handle any edge cases)
+      // 2. Create or update profile
       const { error: profileError } = await admin.from("profiles").upsert({
         id: userId,
         first_name: row.first_name.trim(),
@@ -204,16 +217,16 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
         guardian_phone: row.guardian_phone || null,
         role: "player",
         is_active: true,
-        profile_completed: false,
+        ...(isUpdate ? {} : { profile_completed: false }),
       }, { onConflict: "id" });
 
       if (profileError) {
-        await admin.auth.admin.deleteUser(userId);
+        if (!isUpdate) await admin.auth.admin.deleteUser(userId);
         results.push({ name, email, status: "error", error: `Profile: ${profileError.message}` });
         continue;
       }
 
-      results.push({ name, email, status: "success", password });
+      results.push({ name, email, status: isUpdate ? "updated" : "success" });
     } catch (err) {
       // Clean up orphaned auth user if profile step failed
       if (userId) {
