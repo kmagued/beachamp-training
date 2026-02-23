@@ -1,228 +1,285 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Pagination, SelectionBar } from "@/components/ui";
-import { useHighlightRow } from "@/hooks/use-highlight-row";
-import type { UserRow, SortField, SortDir } from "./_components/types";
-import type { UserRole } from "@/types/database";
-import { UsersPageSkeleton, UsersInlineSkeleton } from "./_components/skeleton";
-import { UsersFilters } from "./_components/filters";
-import { UsersTableView } from "./_components/table";
-import { UserDrawer } from "./_components/user-drawer";
+import { Card, Badge, Button, Drawer } from "@/components/ui";
+import { ShieldCheck, Plus, Search, Loader2, Mail, Phone } from "lucide-react";
 import { updateUserRole } from "./actions";
+import type { UserRole } from "@/types/database";
+
+interface AdminUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface SearchUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  role: UserRole;
+}
 
 export default function AdminUsersPage() {
   return (
-    <Suspense fallback={<UsersPageSkeleton />}>
+    <Suspense fallback={<PageSkeleton />}>
       <AdminUsersContent />
     </Suspense>
   );
 }
 
+function PageSkeleton() {
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="h-8 w-48 bg-slate-200 rounded mb-2 animate-pulse" />
+      <div className="h-4 w-32 bg-slate-100 rounded mb-6 animate-pulse" />
+      <Card className="animate-pulse">
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-slate-100 rounded-lg" />
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function AdminUsersContent() {
-  const [users, setUsers] = useState<UserRow[]>([]);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState("");
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
-  const [drawerUser, setDrawerUser] = useState<UserRow | null>(null);
-  const [pageSize, setPageSize] = useState(10);
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const { getRowId, isHighlighted } = useHighlightRow();
+  // Search state for add drawer
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  useEffect(() => {
-    async function load() {
-      const [{ data: { user } }, { data }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, email, phone, area, role, is_active, created_at")
-          .order("created_at", { ascending: false }),
-      ]);
-      if (user) setCurrentUserId(user.id);
-      if (data) setUsers(data as UserRow[]);
-      setLoading(false);
-    }
-    load();
+  const fetchAdmins = useCallback(async () => {
+    const [{ data: { user } }, { data }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, phone, is_active, created_at")
+        .eq("role", "admin")
+        .order("first_name"),
+    ]);
+    if (user) setCurrentUserId(user.id);
+    if (data) setAdmins(data as AdminUser[]);
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRoleChange = useCallback(async (userId: string, newRole: UserRole) => {
-    setChangingRoleId(userId);
-    const result = await updateUserRole(userId, newRole);
+  useEffect(() => {
+    fetchAdmins();
+  }, [fetchAdmins]);
+
+  async function handleSearch(query: string) {
+    setSearchQuery(query);
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const parts = query.trim().split(/\s+/);
+    let q = supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email, role")
+      .neq("role", "admin")
+      .eq("is_active", true);
+
+    if (parts.length >= 2) {
+      // "John Doe" → match first_name like John AND last_name like Doe
+      q = q.ilike("first_name", `%${parts[0]}%`).ilike("last_name", `%${parts.slice(1).join(" ")}%`);
+    } else {
+      q = q.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%`);
+    }
+
+    const { data } = await q.order("first_name").limit(20);
+    setSearchResults((data || []) as SearchUser[]);
+    setSearching(false);
+  }
+
+  async function handlePromote(userId: string) {
+    setPromotingId(userId);
+    const result = await updateUserRole(userId, "admin");
     if (result.error) {
       alert(result.error);
     } else {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-      );
-      setDrawerUser((prev) => prev && prev.id === userId ? { ...prev, role: newRole } : prev);
+      setSearchResults((prev) => prev.filter((u) => u.id !== userId));
+      fetchAdmins();
     }
-    setChangingRoleId(null);
-  }, []);
-
-  const filteredUsers = useMemo(() => {
-    const result = users.filter((u) => {
-      if (search) {
-        const q = search.toLowerCase();
-        const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
-        const matchesSearch =
-          fullName.includes(q) ||
-          (u.email?.toLowerCase().includes(q) ?? false);
-        if (!matchesSearch) return false;
-      }
-      if (roleFilter) {
-        const selected = roleFilter.split(",").map((s) => s.toLowerCase());
-        if (!selected.includes(u.role)) return false;
-      }
-      if (statusFilter) {
-        const selected = statusFilter.split(",").map((s) => s.toLowerCase());
-        const status = u.is_active ? "active" : "inactive";
-        if (!selected.includes(status)) return false;
-      }
-      return true;
-    });
-
-    return [...result].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "name") {
-        cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
-      } else if (sortField === "role") {
-        cmp = a.role.localeCompare(b.role);
-      } else {
-        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [users, search, roleFilter, statusFilter, sortField, sortDir]);
-
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / pageSize);
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, roleFilter, statusFilter]);
-
-  // Selection
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const selectAllRef = useRef<HTMLInputElement>(null);
-
-  const pageIds = paginatedUsers.map((u) => u.id);
-  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
-  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
-
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
-    }
-  }, [somePageSelected, allPageSelected]);
-
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allPageSelected) pageIds.forEach((id) => next.delete(id));
-      else pageIds.forEach((id) => next.add(id));
-      return next;
-    });
-  }, [allPageSelected, pageIds]);
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  function toggleSort(field: SortField) {
-    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortField(field);
-      setSortDir(field === "date" ? "desc" : "asc");
-    }
+    setPromotingId(null);
   }
 
-  const hasActiveFilters = !!search || !!roleFilter || !!statusFilter;
+  async function handleRemoveAdmin(userId: string) {
+    const confirmed = window.confirm("Remove admin access? The user will be set back to player role.");
+    if (!confirmed) return;
+    setRemovingId(userId);
+    const result = await updateUserRole(userId, "player");
+    if (result.error) {
+      alert(result.error);
+    } else {
+      setAdmins((prev) => prev.filter((u) => u.id !== userId));
+    }
+    setRemovingId(null);
+  }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">User Management</h1>
-        <p className="text-slate-500 text-sm">
-          {users.length} total users
-          {hasActiveFilters && ` · ${filteredUsers.length} matching`}
-        </p>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admins</h1>
+          <p className="text-slate-500 text-sm">
+            {admins.length} admin{admins.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Button onClick={() => { setShowAddDrawer(true); setSearchQuery(""); setSearchResults([]); }}>
+          <span className="flex items-center gap-1.5">
+            <Plus className="w-4 h-4" /> Add Admin
+          </span>
+        </Button>
       </div>
 
-      <UsersFilters
-        search={search}
-        onSearchChange={setSearch}
-        roleFilter={roleFilter}
-        onRoleFilterChange={setRoleFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        onReset={() => { setSearch(""); setRoleFilter(""); setStatusFilter(""); }}
-        hasActiveFilters={hasActiveFilters}
-      />
+      {loading ? (
+        <Card className="animate-pulse">
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-slate-100 rounded-lg" />
+            ))}
+          </div>
+        </Card>
+      ) : admins.length === 0 ? (
+        <Card>
+          <div className="text-center py-10">
+            <ShieldCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No admins found</p>
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-0">
+          <div className="divide-y divide-slate-100">
+            {admins.map((admin) => {
+              const isSelf = admin.id === currentUserId;
+              return (
+                <div key={admin.id} className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {admin.first_name?.[0]}{admin.last_name?.[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {admin.first_name} {admin.last_name}
+                        </p>
+                        {isSelf && <Badge variant="info">You</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                        {admin.email && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Mail className="w-3 h-3" /> {admin.email}
+                          </span>
+                        )}
+                        {admin.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {admin.phone}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {!isSelf && (
+                    <button
+                      onClick={() => handleRemoveAdmin(admin.id)}
+                      disabled={removingId === admin.id}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0 ml-3"
+                    >
+                      {removingId === admin.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        "Remove"
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
-      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />
-
-      <div className="flex-1">
-        {loading ? (
-          <UsersInlineSkeleton />
-        ) : (
-          <UsersTableView
-            users={paginatedUsers}
-            selectedIds={selectedIds}
-            toggleSelect={toggleSelect}
-            toggleSelectAll={toggleSelectAll}
-            allPageSelected={allPageSelected}
-            selectAllRef={selectAllRef}
-            getRowId={getRowId}
-            isHighlighted={isHighlighted}
-            sortField={sortField}
-            sortDir={sortDir}
-            toggleSort={toggleSort}
-            hasActiveFilters={hasActiveFilters}
-            onRoleChange={handleRoleChange}
-            changingRoleId={changingRoleId}
-            currentUserId={currentUserId}
-            onRowClick={setDrawerUser}
+      {/* Add Admin Drawer */}
+      <Drawer
+        open={showAddDrawer}
+        onClose={() => setShowAddDrawer(false)}
+        title="Add Admin"
+        width="max-w-lg"
+      >
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Search by name or email..."
+            className="w-full pl-10 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            autoFocus
           />
+        </div>
+
+        {searchQuery.length < 2 ? (
+          <p className="text-sm text-slate-400 text-center py-8">
+            Type at least 2 characters to search
+          </p>
+        ) : searching ? (
+          <div className="flex items-center justify-center py-8 gap-2 text-sm text-slate-400">
+            <Loader2 className="w-4 h-4 animate-spin" /> Searching...
+          </div>
+        ) : searchResults.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-8">No users found</p>
+        ) : (
+          <div className="space-y-1">
+            {searchResults.map((user) => (
+              <div
+                key={user.id}
+                className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900">
+                    {user.first_name} {user.last_name}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {user.email || "No email"} &middot; <span className="capitalize">{user.role}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => handlePromote(user.id)}
+                  disabled={promotingId === user.id}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-700 transition-colors disabled:opacity-50 shrink-0 ml-3"
+                >
+                  {promotingId === user.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    "Make Admin"
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        pageSize={pageSize}
-        onPageSizeChange={setPageSize}
-      />
-
-      <UserDrawer
-        user={drawerUser}
-        onClose={() => setDrawerUser(null)}
-        onRoleChange={handleRoleChange}
-        changingRoleId={changingRoleId}
-        currentUserId={currentUserId}
-      />
+      </Drawer>
     </div>
   );
 }

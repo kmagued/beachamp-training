@@ -88,7 +88,7 @@ const adminNav: NavItem[] = [
   { key: "payments", label: "Payments", href: "/admin/payments" },
   { key: "expenses", label: "Expenses", href: "/admin/expenses" },
   { key: "packages", label: "Packages", href: "/admin/packages" },
-  { key: "users", label: "User Mgmt", href: "/admin/users" },
+  { key: "users", label: "Admins", href: "/admin/users" },
   // Training Operations
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
