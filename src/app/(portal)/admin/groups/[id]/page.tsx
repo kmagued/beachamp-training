@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, useCallback, useTransition } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { Badge, Skeleton } from "@/components/ui";
-import { Pencil, ArrowLeft, Users, UserCheck, Calendar } from "lucide-react";
+import { Badge, Button, Skeleton } from "@/components/ui";
+import { ArrowLeft, Users, UserCheck, Calendar, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { deleteGroup } from "@/app/_actions/training";
 import { GroupModal } from "../_components/group-modal";
 import { getLevelVariant } from "../_components/types";
 import { PlayersSection } from "./_components/players-section";
@@ -25,9 +26,13 @@ export default function AdminGroupDetailPage() {
   const params = useParams();
   const groupId = params.id as string;
 
+  const router = useRouter();
   const [group, setGroup] = useState<GroupInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, startDeleteTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<TabKey>("players");
 
   const [players, setPlayers] = useState<GroupPlayerRow[]>([]);
@@ -127,12 +132,6 @@ export default function AdminGroupDetailPage() {
     init();
   }, [fetchGroup, fetchPlayers, fetchCoaches, fetchSchedule]);
 
-  const tabCounts: Record<TabKey, number> = {
-    players: players.length,
-    coaches: coaches.length,
-    schedule: schedule.length,
-  };
-
   if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -163,19 +162,73 @@ export default function AdminGroupDetailPage() {
         <Link href="/admin/groups" className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Groups
         </Link>
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{group.name}</h1>
-          <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="text-slate-400 hover:text-slate-600 p-1"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{group.name}</h1>
+            <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowEditModal(true)}
+            >
+              Edit
+            </Button>
+            <button
+              onClick={() => { setShowDeleteConfirm(true); setDeleteError(null); }}
+              className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Delete group"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         {group.description && <p className="text-slate-500 text-sm mt-1">{group.description}</p>}
-        <p className="text-xs text-slate-400 mt-1">{players.length} / {group.max_players} players</p>
       </div>
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete Group</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Are you sure you want to delete <span className="font-medium">{group.name}</span>? This action cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-4">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <button
+                onClick={() => {
+                  startDeleteTransition(async () => {
+                    const result = await deleteGroup(groupId);
+                    if ("error" in result) {
+                      setDeleteError(result.error);
+                    } else {
+                      router.push("/admin/groups");
+                    }
+                  });
+                }}
+                disabled={isDeleting}
+                className="px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Group Drawer */}
       <GroupModal
@@ -202,11 +255,6 @@ export default function AdminGroupDetailPage() {
             >
               <Icon className="w-4 h-4" />
               {tab.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                isActive ? "bg-primary-50 text-primary" : "bg-slate-100 text-slate-500"
-              }`}>
-                {tabCounts[tab.key]}
-              </span>
             </button>
           );
         })}

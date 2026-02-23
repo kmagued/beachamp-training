@@ -306,6 +306,9 @@ function AdminPlayersContent() {
         packageFilter={packageFilter}
         onPackageFilterChange={setPackageFilter}
         packageOptions={packageNames}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSortChange={toggleSort}
         onReset={() => { setSearch(""); setStatusFilter(""); setLevelFilter(""); setPackageFilter(""); }}
         hasActiveFilters={hasActiveFilters}
       />

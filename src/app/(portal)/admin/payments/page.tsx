@@ -45,6 +45,7 @@ function AdminPaymentsContent() {
   );
   const [packageFilter, setPackageFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -122,6 +123,11 @@ function AdminPaymentsContent() {
       result = result.filter((p) => selected.includes(p.subscriptions?.packages?.name ?? ""));
     }
 
+    if (typeFilter) {
+      if (typeFilter === "player") result = result.filter((p) => p.profiles !== null);
+      if (typeFilter === "quick") result = result.filter((p) => p.profiles === null);
+    }
+
     const statusOrder: Record<string, number> = { pending: 0, confirmed: 1, rejected: 2 };
 
     return [...result].sort((a, b) => {
@@ -137,7 +143,7 @@ function AdminPaymentsContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [payments, search, monthFilter, statusFilter, packageFilter, sortField, sortDir]);
+  }, [payments, search, monthFilter, statusFilter, packageFilter, typeFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE);
@@ -148,7 +154,7 @@ function AdminPaymentsContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, monthFilter, statusFilter, packageFilter]);
+  }, [search, monthFilter, statusFilter, packageFilter, typeFilter]);
 
   // Selection helpers
   const pageIds = paginatedPayments.map((p) => p.id);
@@ -276,8 +282,13 @@ function AdminPaymentsContent() {
         monthFilter={monthFilter}
         onMonthFilterChange={setMonthFilter}
         monthOptions={monthOptions}
-        onReset={() => { setSearch(""); setMonthFilter(""); setStatusFilter(""); setPackageFilter(""); }}
-        hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSortChange={toggleSort}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        onReset={() => { setSearch(""); setMonthFilter(""); setStatusFilter(""); setPackageFilter(""); setTypeFilter(""); }}
+        hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter || !!typeFilter}
       />
 
       <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>

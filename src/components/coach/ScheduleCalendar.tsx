@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Badge, Button, Skeleton, Drawer } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Clock, MapPin, Users, ClipboardCheck } from "lucide-react";
+import { Skeleton } from "@/components/ui";
+import { ChevronLeft, ChevronRight, Clock, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 
 // Saturday-first week for Egypt locale
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5]; // Sat, Sun, Mon, Tue, Wed, Thu, Fri
-const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface ScheduleBlock {
@@ -49,15 +48,6 @@ function getLevelColor(level: string) {
   }
 }
 
-function getLevelVariant(level: string): "success" | "warning" | "danger" | "info" {
-  switch (level) {
-    case "beginner": return "success";
-    case "intermediate": return "warning";
-    case "advanced": return "danger";
-    default: return "info";
-  }
-}
-
 function getWeekDates(offset: number) {
   const today = new Date();
   const currentDay = today.getDay();
@@ -80,7 +70,6 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAll, setShowAll] = useState(isAdmin);
-  const [selectedSession, setSelectedSession] = useState<ScheduleBlock | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -283,28 +272,31 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                     {daySessions.length === 0 ? (
                       <div className="text-center py-4 text-[10px] text-slate-300">—</div>
                     ) : (
-                      daySessions.map((session) => (
-                        <button
-                          key={session.id}
-                          onClick={() => setSelectedSession(session === selectedSession ? null : session)}
-                          className={`w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
-                            session.has_attendance ? "opacity-60" : ""
-                          } hover:shadow-sm transition-shadow cursor-pointer`}
-                        >
-                          <p className="text-[11px] font-semibold text-slate-900 truncate">
-                            {session.group_name}
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            {formatTime(session.start_time)}
-                          </p>
-                          {session.has_attendance && (
-                            <div className="flex items-center gap-0.5 mt-0.5">
-                              <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
-                              <span className="text-[9px] text-emerald-600">Logged</span>
-                            </div>
-                          )}
-                        </button>
-                      ))
+                      daySessions.map((session) => {
+                        const sessionDate = dateForDay.toISOString().split("T")[0];
+                        return (
+                          <Link
+                            key={session.id}
+                            href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
+                            className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
+                              session.has_attendance ? "opacity-60" : ""
+                            } hover:shadow-sm transition-shadow`}
+                          >
+                            <p className="text-[11px] font-semibold text-slate-900 truncate">
+                              {session.group_name}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {formatTime(session.start_time)}
+                            </p>
+                            {session.has_attendance && (
+                              <div className="flex items-center gap-0.5 mt-0.5">
+                                <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                <span className="text-[9px] text-emerald-600">Logged</span>
+                              </div>
+                            )}
+                          </Link>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -343,29 +335,32 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                       <span className="text-xs text-slate-300">No sessions</span>
                     ) : (
                       <div className="flex-1 space-y-1.5">
-                        {daySessions.map((session) => (
-                          <button
-                            key={session.id}
-                            onClick={() => setSelectedSession(session === selectedSession ? null : session)}
-                            className={`w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
-                              session.has_attendance ? "opacity-60" : ""
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-slate-900">{session.group_name}</span>
-                              <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatTime(session.start_time)}
-                              </span>
-                            </div>
-                            {session.has_attendance && (
-                              <div className="flex items-center gap-0.5 mt-0.5">
-                                <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
-                                <span className="text-[9px] text-emerald-600">Logged</span>
+                        {daySessions.map((session) => {
+                          const sessionDate = dateForDay.toISOString().split("T")[0];
+                          return (
+                            <Link
+                              key={session.id}
+                              href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
+                              className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
+                                session.has_attendance ? "opacity-60" : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-900">{session.group_name}</span>
+                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTime(session.start_time)}
+                                </span>
                               </div>
-                            )}
-                          </button>
-                        ))}
+                              {session.has_attendance && (
+                                <div className="flex items-center gap-0.5 mt-0.5">
+                                  <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                  <span className="text-[9px] text-emerald-600">Logged</span>
+                                </div>
+                              )}
+                            </Link>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -376,59 +371,6 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         </>
       )}
 
-      {/* Session Detail Drawer */}
-      <Drawer
-        open={!!selectedSession}
-        onClose={() => setSelectedSession(null)}
-        title={selectedSession?.group_name || "Session Details"}
-      >
-        {selectedSession && (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant={getLevelVariant(selectedSession.group_level)}>
-                {selectedSession.group_level}
-              </Badge>
-            </div>
-            <p className="text-sm text-slate-500 mb-4">
-              {DAY_NAMES_FULL[selectedSession.day_of_week]}
-            </p>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <Clock className="w-4 h-4 text-slate-400" />
-                {formatTime(selectedSession.start_time)} — {formatTime(selectedSession.end_time)}
-              </div>
-              {selectedSession.location && (
-                <div className="flex items-center gap-2 text-slate-600">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  {selectedSession.location}
-                </div>
-              )}
-              {selectedSession.coach_name && (
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Users className="w-4 h-4 text-slate-400" />
-                  Coach: {selectedSession.coach_name}
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-slate-600">
-                <Users className="w-4 h-4 text-slate-400" />
-                {selectedSession.player_count} players
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <Link href={`${sessionBasePath}/${selectedSession.id}?date=${weekDates.find((d) => d.getDay() === selectedSession.day_of_week)?.toISOString().split("T")[0] || ""}`}>
-                <Button size="sm" fullWidth>
-                  <span className="flex items-center gap-1.5">
-                    <ClipboardCheck className="w-4 h-4" />
-                    View Session
-                  </span>
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-      </Drawer>
     </div>
   );
 }

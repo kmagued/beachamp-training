@@ -1,8 +1,18 @@
 import { Input, MultiSelect, MobileFilterSheet } from "@/components/ui";
 import { Search, RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
+import type { SortField, SortDir } from "./types";
 
 const STATUS_OPTIONS = ["Active", "Completed", "Expiring Soon", "Expiring", "Expired", "Pending", "Inactive"] as const;
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "name", label: "Name" },
+  { value: "date", label: "Joined" },
+  { value: "level", label: "Level" },
+  { value: "package", label: "Package" },
+  { value: "expires", label: "Expires" },
+];
 
 interface PlayersFiltersProps {
   search: string;
@@ -14,6 +24,9 @@ interface PlayersFiltersProps {
   packageFilter: string;
   onPackageFilterChange: (value: string) => void;
   packageOptions: string[];
+  sortField: SortField;
+  sortDir: SortDir;
+  onSortChange: (field: SortField) => void;
   onReset: () => void;
   hasActiveFilters: boolean;
 }
@@ -28,6 +41,9 @@ export function PlayersFilters({
   packageFilter,
   onPackageFilterChange,
   packageOptions,
+  sortField,
+  sortDir,
+  onSortChange,
   onReset,
   hasActiveFilters,
 }: PlayersFiltersProps) {
@@ -70,6 +86,31 @@ export function PlayersFilters({
     </>
   );
 
+  const sortSection = (
+    <div className="sm:hidden">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sort by</p>
+      <div className="flex flex-wrap gap-2">
+        {SORT_OPTIONS.map((opt) => {
+          const isActive = sortField === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => onSortChange(opt.value)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                isActive
+                  ? "bg-primary-50 text-primary-700 border border-primary-200"
+                  : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              {opt.label} {isActive && (sortDir === "asc" ? "↑" : "↓")}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -87,8 +128,11 @@ export function PlayersFilters({
         </div>
       </div>
 
-      <MobileFilterSheet activeCount={activeFilterCount}>
+      <MobileFilterSheet activeCount={activeFilterCount} title="Sort & Filters">
         {filterDropdowns}
+        <div className="border-t border-slate-200 pt-4 mt-2">
+          {sortSection}
+        </div>
       </MobileFilterSheet>
     </>
   );

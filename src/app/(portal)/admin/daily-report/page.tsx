@@ -24,7 +24,7 @@ export default function DailyReportPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
+      <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Daily Report</h1>
           <p className="text-slate-500 text-sm">
@@ -37,11 +37,12 @@ export default function DailyReportPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-slate-400" />
+          <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
           <DatePicker
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             placeholder="Select date"
+            className="flex-1 sm:w-48"
           />
         </div>
       </div>

@@ -249,6 +249,29 @@ export async function removePlayerFromGroup(groupId: string, playerId: string) {
   return { success: true };
 }
 
+export async function removePlayersFromGroup(groupId: string, playerIds: string[]) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  if (playerIds.length === 0) return { error: "No players selected." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { error } = await admin
+    .from("group_players")
+    .update({ is_active: false })
+    .eq("group_id", groupId)
+    .in("player_id", playerIds);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/groups");
+  revalidatePath(`/admin/groups/${groupId}`);
+  return { success: true };
+}
+
 // ═══════════════════════════════════════
 // COACH ASSIGNMENT (Admin only)
 // ═══════════════════════════════════════
@@ -369,7 +392,9 @@ export async function createScheduleSession(formData: FormData) {
   const endTime = formData.get("end_time") as string;
 
   if (!startTime || !endTime) return { error: "Start time and end time are required." };
-  if (endTime <= startTime) return { error: "End time must be after start time." };
+  // Treat 00:00 as midnight (end of day), which is valid after any start time
+  const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
+  if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
 
   const { error } = await supabase.from("schedule_sessions").insert({
     group_id: groupId,
@@ -403,7 +428,8 @@ export async function updateScheduleSession(id: string, formData: FormData) {
   const endTime = formData.get("end_time") as string;
 
   if (!startTime || !endTime) return { error: "Start time and end time are required." };
-  if (endTime <= startTime) return { error: "End time must be after start time." };
+  const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
+  if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
 
   const { error } = await supabase
     .from("schedule_sessions")

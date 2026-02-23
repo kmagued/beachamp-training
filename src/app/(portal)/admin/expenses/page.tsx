@@ -319,6 +319,9 @@ function AdminExpensesContent() {
             monthOptions={monthOptions}
             typeFilter={typeFilter}
             onTypeFilterChange={setTypeFilter}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSortChange={toggleSort}
             onReset={resetFilters}
             hasActiveFilters={hasActiveFilters}
           />

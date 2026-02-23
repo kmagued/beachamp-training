@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Input } from "@/components/ui";
-import { Loader2, Check, Clock, Users, UserPlus, X } from "lucide-react";
+import { Loader2, Check, Clock, Users, UserPlus, X, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { submitAttendance, quickAddPlayer } from "@/app/_actions/training";
 
@@ -145,30 +145,13 @@ export function AttendanceTab({ date }: { date: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  function toggleStatus(sessionId: string, playerId: string) {
-    setAttendanceState((prev) => {
-      const current = prev[sessionId]?.[playerId] || "absent";
-      const next = current === "present" ? "absent" : current === "absent" ? "excused" : "present";
-      return {
-        ...prev,
-        [sessionId]: { ...prev[sessionId], [playerId]: next },
-      };
-    });
-    // Remove from saved when modified
-    setSavedSessions((prev) => {
-      const next = new Set(prev);
-      next.delete(sessionId);
-      return next;
-    });
-  }
-
-  function markAllPresent(sessionId: string, groupId: string) {
+  function markAll(sessionId: string, groupId: string, status: "present" | "absent") {
     const players = sessionPlayers[groupId] || [];
     const guests = guestPlayers[sessionId] || [];
     setAttendanceState((prev) => {
       const sessionState: SessionAttendanceState = {};
-      players.forEach((p) => { sessionState[p.player_id] = "present"; });
-      guests.forEach((g) => { sessionState[g.player_id] = "present"; });
+      players.forEach((p) => { sessionState[p.player_id] = status; });
+      guests.forEach((g) => { sessionState[g.player_id] = status; });
       return { ...prev, [sessionId]: sessionState };
     });
     setSavedSessions((prev) => {
@@ -290,57 +273,70 @@ export function AttendanceTab({ date }: { date: string }) {
 
         return (
           <Card key={session.id} className="p-0">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    {session.groups.name}
-                  </h3>
-                  <Badge variant="neutral">{session.groups.level}</Badge>
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      {session.groups.name}
+                    </h3>
+                    <Badge variant="neutral">{session.groups.level}</Badge>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
+                    {session.location && ` · ${session.location}`}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
-                  {session.location && ` · ${session.location}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">
-                  {presentCount}/{allPlayers.length} present
-                </span>
-                {isSaved ? (
-                  <Badge variant="success">
-                    <span className="flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Saved
-                    </span>
-                  </Badge>
-                ) : (
-                  <Button
-                    onClick={() => handleSaveSession(session)}
-                    disabled={isPending || allPlayers.length === 0}
-                  >
-                    {isSaving ? (
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-slate-400 hidden sm:inline">
+                    {presentCount}/{allPlayers.length} present
+                  </span>
+                  <span className="text-xs text-slate-400 sm:hidden">
+                    {presentCount}/{allPlayers.length}
+                  </span>
+                  {isSaved ? (
+                    <Badge variant="success">
+                      <span className="flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Saved
                       </span>
-                    ) : (
-                      "Save"
-                    )}
-                  </Button>
-                )}
+                    </Badge>
+                  ) : (
+                    <Button
+                      onClick={() => handleSaveSession(session)}
+                      disabled={isPending || allPlayers.length === 0}
+                    >
+                      {isSaving ? (
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+                        </span>
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
             <>
-              <div className="px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-4 sm:px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Players</span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {allPlayers.length > 0 && (
-                    <button
-                      onClick={() => markAllPresent(session.id, session.group_id)}
-                      className="text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
-                    >
-                      Mark All Present
-                    </button>
+                    <>
+                      <button
+                        onClick={() => markAll(session.id, session.group_id, "present")}
+                        className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                      >
+                        <CheckCircle2 className="w-3 h-3" /> All Present
+                      </button>
+                      <button
+                        onClick={() => markAll(session.id, session.group_id, "absent")}
+                        className="flex items-center gap-1 text-[11px] font-medium text-red-500 hover:text-red-600 transition-colors"
+                      >
+                        <XCircle className="w-3 h-3" /> All Absent
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => {
@@ -350,48 +346,53 @@ export function AttendanceTab({ date }: { date: string }) {
                     }}
                     className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700 transition-colors"
                   >
-                    <UserPlus className="w-3 h-3" /> Add Guest
+                    <UserPlus className="w-3 h-3" /> <span className="hidden sm:inline">Add</span> Guest
                   </button>
                 </div>
               </div>
 
               {/* Add guest inline form */}
               {addingGuestFor === session.id && (
-                <div className="px-5 py-3 bg-primary-50/30 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={guestFirstName}
-                      onChange={(e) => setGuestFirstName(e.target.value)}
-                      placeholder="First name"
-                      className="flex-1 text-sm"
-                    />
-                    <Input
-                      value={guestLastName}
-                      onChange={(e) => setGuestLastName(e.target.value)}
-                      placeholder="Last name"
-                      className="flex-1 text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddGuest(session.id);
-                      }}
-                    />
-                    <Button
-                      onClick={() => handleAddGuest(session.id)}
-                      disabled={addingGuest || !guestFirstName.trim() || !guestLastName.trim()}
-                    >
-                      {addingGuest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
-                    </Button>
-                    <button
-                      onClick={() => setAddingGuestFor(null)}
-                      className="p-1 rounded text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                <div className="px-4 sm:px-5 py-3 bg-primary-50/30 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex gap-2 flex-1">
+                      <Input
+                        value={guestFirstName}
+                        onChange={(e) => setGuestFirstName(e.target.value)}
+                        placeholder="First name"
+                        className="flex-1 text-sm"
+                      />
+                      <Input
+                        value={guestLastName}
+                        onChange={(e) => setGuestLastName(e.target.value)}
+                        placeholder="Last name"
+                        className="flex-1 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddGuest(session.id);
+                        }}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleAddGuest(session.id)}
+                        disabled={addingGuest || !guestFirstName.trim() || !guestLastName.trim()}
+                        className="flex-1 sm:flex-none"
+                      >
+                        {addingGuest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
+                      </Button>
+                      <button
+                        onClick={() => setAddingGuestFor(null)}
+                        className="p-2 rounded text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
               {allPlayers.length === 0 ? (
-                <div className="px-5 py-6 text-center">
+                <div className="px-4 sm:px-5 py-6 text-center">
                   <Users className="w-6 h-6 text-slate-300 mx-auto mb-2" />
                   <p className="text-xs text-slate-400">No players in this group</p>
                 </div>
@@ -403,25 +404,75 @@ export function AttendanceTab({ date }: { date: string }) {
                     return (
                       <div
                         key={gp.player_id}
-                        className="flex items-center justify-between px-5 py-3"
+                        className="flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3"
                       >
-                        <span className="text-sm text-slate-700">
-                          {gp.profiles.first_name} {gp.profiles.last_name}
-                          {isGuest && (
-                            <span className="ml-1.5 text-[10px] text-slate-400 font-medium uppercase">Guest</span>
-                          )}
-                        </span>
-                        <button
-                          onClick={() => toggleStatus(session.id, gp.player_id)}
-                          className={cn(
-                            "px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                            status === "present" && "bg-emerald-100 text-emerald-700",
-                            status === "absent" && "bg-red-100 text-red-600",
-                            status === "excused" && "bg-amber-100 text-amber-700"
-                          )}
-                        >
-                          {status === "present" ? "Present" : status === "absent" ? "Absent" : "Excused"}
-                        </button>
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
+                          {gp.profiles.first_name[0]}{gp.profiles.last_name[0]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {gp.profiles.first_name} {gp.profiles.last_name}
+                            {isGuest && (
+                              <span className="ml-1.5 text-[10px] text-slate-400 font-medium uppercase">Guest</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            onClick={() => {
+                              setAttendanceState((prev) => ({
+                                ...prev,
+                                [session.id]: { ...prev[session.id], [gp.player_id]: "present" },
+                              }));
+                              setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
+                            }}
+                            className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                              status === "present"
+                                ? "bg-emerald-500 text-white"
+                                : "bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                            )}
+                            title="Present"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAttendanceState((prev) => ({
+                                ...prev,
+                                [session.id]: { ...prev[session.id], [gp.player_id]: "absent" },
+                              }));
+                              setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
+                            }}
+                            className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                              status === "absent"
+                                ? "bg-red-500 text-white"
+                                : "bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            )}
+                            title="Absent"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAttendanceState((prev) => ({
+                                ...prev,
+                                [session.id]: { ...prev[session.id], [gp.player_id]: "excused" },
+                              }));
+                              setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
+                            }}
+                            className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                              status === "excused"
+                                ? "bg-amber-500 text-white"
+                                : "bg-slate-100 text-slate-400 hover:bg-amber-50 hover:text-amber-600"
+                            )}
+                            title="Excused"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

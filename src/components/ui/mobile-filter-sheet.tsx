@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils/cn";
 interface MobileFilterSheetProps {
   children: ReactNode;
   activeCount?: number;
+  title?: string;
 }
 
-export function MobileFilterSheet({ children, activeCount = 0 }: MobileFilterSheetProps) {
+export function MobileFilterSheet({ children, activeCount = 0, title = "Filters" }: MobileFilterSheetProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -48,7 +49,7 @@ export function MobileFilterSheet({ children, activeCount = 0 }: MobileFilterShe
       {/* Floating button — mobile only */}
       <button
         onClick={() => setOpen(true)}
-        className="sm:hidden fixed bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
+        className="sm:hidden fixed bottom-20 right-6 z-30 w-12 h-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
       >
         <SlidersHorizontal className="w-5 h-5" />
         {activeCount > 0 && (
@@ -79,7 +80,7 @@ export function MobileFilterSheet({ children, activeCount = 0 }: MobileFilterShe
               <div className="w-10 h-1 rounded-full bg-slate-300" />
             </div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 shrink-0">
-              <h3 className="font-semibold text-slate-900">Filters</h3>
+              <h3 className="font-semibold text-slate-900">{title}</h3>
               <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-1">
                 <X className="w-5 h-5" />
               </button>

@@ -1,10 +1,18 @@
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createExpense, updateExpense, createExpenseCategory } from "@/app/_actions/expenses";
 import type { ExpenseRow, CategoryRow } from "./types";
+
+export interface CourtSession {
+  id: string;
+  start_time: string;
+  end_time: string;
+  group_name: string;
+  location: string | null;
+}
 
 interface ExpenseDrawerProps {
   open: boolean;
@@ -13,9 +21,11 @@ interface ExpenseDrawerProps {
   editingExpense: ExpenseRow | null;
   onSuccess: () => void;
   defaultDate?: string;
+  /** When provided, court calculator shows session-based selection */
+  sessions?: CourtSession[];
 }
 
-export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess, defaultDate }: ExpenseDrawerProps) {
+export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess, defaultDate, sessions }: ExpenseDrawerProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -27,11 +37,15 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const [recurrenceType, setRecurrenceType] = useState("monthly");
   const [notes, setNotes] = useState("");
 
-  // Court reservation fields
+  // Court reservation fields (generic mode)
   const [courtCount, setCourtCount] = useState("");
   const [courtHours, setCourtHours] = useState("");
-  const [courtHourlyRate, setCourtHourlyRate] = useState("");
+  const [courtHourlyRate, setCourtHourlyRate] = useState("375");
   const [useCourtCalculator, setUseCourtCalculator] = useState(true);
+
+  // Session-based court calculator
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [sessionCourts, setSessionCourts] = useState<Record<string, string>>({});
 
   // Inline new category
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -42,17 +56,50 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const selectedCategory = activeCategories.find((c) => c.id === categoryId);
   const isCourtReservation = selectedCategory?.name === "Court Reservation";
 
+  const hasSessionMode = !!sessions && sessions.length > 0;
+
+  // Helper: calculate duration of a session in hours (handles midnight 00:00 as end-of-day)
+  function getSessionHours(session: CourtSession) {
+    const [sh, sm] = session.start_time.split(":").map(Number);
+    const [eh, em] = session.end_time.split(":").map(Number);
+    let endMinutes = eh * 60 + em;
+    const startMinutes = sh * 60 + sm;
+    if (endMinutes <= startMinutes) endMinutes += 24 * 60; // midnight wrap
+    return (endMinutes - startMinutes) / 60;
+  }
+
+  // Session-based total calculation
+  const sessionTotal = useMemo(() => {
+    if (!hasSessionMode || !isCourtReservation || !useCourtCalculator) return 0;
+    const rate = Number(courtHourlyRate) || 0;
+    let total = 0;
+    selectedSessions.forEach((sid) => {
+      const session = sessions!.find((s) => s.id === sid);
+      if (!session) return;
+      const courts = Number(sessionCourts[sid]) || 1;
+      const hours = getSessionHours(session);
+      total += courts * hours * rate;
+    });
+    return total;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessions, sessionCourts, courtHourlyRate, hasSessionMode, isCourtReservation, useCourtCalculator, sessions]);
+
   // Auto-calculate amount for court reservations (only when calculator is active)
   useEffect(() => {
     if (isCourtReservation && useCourtCalculator) {
-      const courts = Number(courtCount) || 0;
-      const hours = Number(courtHours) || 0;
-      const rate = Number(courtHourlyRate) || 0;
-      const calculated = courts * hours * rate;
-      if (calculated > 0) setAmount(String(calculated));
-      else setAmount("");
+      if (hasSessionMode) {
+        if (sessionTotal > 0) setAmount(String(sessionTotal));
+        else setAmount("");
+      } else {
+        const courts = Number(courtCount) || 0;
+        const hours = Number(courtHours) || 0;
+        const rate = Number(courtHourlyRate) || 0;
+        const calculated = courts * hours * rate;
+        if (calculated > 0) setAmount(String(calculated));
+        else setAmount("");
+      }
     }
-  }, [courtCount, courtHours, courtHourlyRate, isCourtReservation, useCourtCalculator]);
+  }, [courtCount, courtHours, courtHourlyRate, isCourtReservation, useCourtCalculator, hasSessionMode, sessionTotal]);
 
   // Reset form when opening/editing
   useEffect(() => {
@@ -67,8 +114,10 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setNotes(editingExpense.notes || "");
         setCourtCount(editingExpense.court_count ? String(editingExpense.court_count) : "");
         setCourtHours(editingExpense.court_hours ? String(editingExpense.court_hours) : "");
-        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "");
+        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "375");
         setUseCourtCalculator(!!editingExpense.court_count);
+        setSelectedSessions(new Set());
+        setSessionCourts({});
       } else {
         setCategoryId(activeCategories[0]?.id || "");
         setDescription("");
@@ -79,8 +128,10 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setNotes("");
         setCourtCount("");
         setCourtHours("");
-        setCourtHourlyRate("");
+        setCourtHourlyRate("375");
         setUseCourtCalculator(true);
+        setSelectedSessions(new Set());
+        setSessionCourts({});
       }
       setError("");
       setShowNewCategory(false);
@@ -100,9 +151,23 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     if (isRecurring) formData.set("recurrence_type", recurrenceType);
     formData.set("notes", notes);
     if (isCourtReservation && useCourtCalculator) {
-      formData.set("court_count", courtCount);
-      formData.set("court_hours", courtHours);
       formData.set("court_hourly_rate", courtHourlyRate);
+      if (hasSessionMode) {
+        // Aggregate court data from selected sessions
+        let totalCourts = 0;
+        let totalHours = 0;
+        selectedSessions.forEach((sid) => {
+          const session = sessions!.find((s) => s.id === sid);
+          if (!session) return;
+          totalCourts += Number(sessionCourts[sid]) || 1;
+          totalHours += getSessionHours(session);
+        });
+        formData.set("court_count", String(totalCourts));
+        formData.set("court_hours", String(totalHours));
+      } else {
+        formData.set("court_count", courtCount);
+        formData.set("court_hours", courtHours);
+      }
     }
 
     startTransition(async () => {
@@ -228,21 +293,101 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
               </button>
             </div>
             {useCourtCalculator && (
-              <div className="p-4 rounded-xl bg-primary-50/50 border border-primary-100">
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label>Courts</Label>
-                    <Input type="number" min="1" value={courtCount} onChange={(e) => setCourtCount(e.target.value)} placeholder="1" />
-                  </div>
-                  <div>
-                    <Label>Hours</Label>
-                    <Input type="number" min="0.5" step="0.5" value={courtHours} onChange={(e) => setCourtHours(e.target.value)} placeholder="1" />
-                  </div>
-                  <div>
-                    <Label>Rate/hr</Label>
-                    <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="0" />
-                  </div>
+              <div className="p-4 rounded-xl bg-primary-50/50 border border-primary-100 space-y-3">
+                {/* Hourly rate — shared for both modes */}
+                <div>
+                  <Label>Hourly Rate (EGP)</Label>
+                  <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="375" />
                 </div>
+
+                {hasSessionMode ? (
+                  <>
+                    {/* Session-based calculator */}
+                    <div>
+                      <Label>Sessions</Label>
+                      <div className="space-y-2 mt-1">
+                        {sessions!.map((session) => {
+                          const isSelected = selectedSessions.has(session.id);
+                          const hours = getSessionHours(session);
+                          const courtsStr = sessionCourts[session.id] ?? "";
+                          const courts = Number(courtsStr) || 1;
+                          return (
+                            <div
+                              key={session.id}
+                              className={cn(
+                                "rounded-lg border p-3 transition-colors",
+                                isSelected
+                                  ? "border-primary-200 bg-white"
+                                  : "border-slate-200 bg-slate-50/50"
+                              )}
+                            >
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const next = new Set(selectedSessions);
+                                    if (e.target.checked) next.add(session.id);
+                                    else next.delete(session.id);
+                                    setSelectedSessions(next);
+                                  }}
+                                  className="table-checkbox mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-900">{session.group_name}</p>
+                                  <p className="text-xs text-slate-400">
+                                    {session.start_time.slice(0, 5)} – {session.end_time.slice(0, 5)}
+                                    {" · "}{hours}h
+                                    {session.location && ` · ${session.location}`}
+                                  </p>
+                                </div>
+                              </label>
+                              {isSelected && (
+                                <div className="mt-2 ml-7 flex items-center gap-2">
+                                  <span className="text-xs text-slate-500 whitespace-nowrap">Courts:</span>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={courtsStr}
+                                    onChange={(e) => setSessionCourts((prev) => ({
+                                      ...prev,
+                                      [session.id]: e.target.value,
+                                    }))}
+                                    className="w-20 h-8 text-xs"
+                                    placeholder="1"
+                                  />
+                                  <span className="text-xs text-slate-400">
+                                    = {(courts * hours * (Number(courtHourlyRate) || 0)).toLocaleString()} EGP
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {sessionTotal > 0 && (
+                      <div className="flex items-center justify-between pt-2 border-t border-primary-100">
+                        <span className="text-xs font-medium text-slate-500">Total</span>
+                        <span className="text-sm font-bold text-primary-700">{sessionTotal.toLocaleString()} EGP</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Generic calculator */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Courts</Label>
+                        <Input type="number" min="1" value={courtCount} onChange={(e) => setCourtCount(e.target.value)} placeholder="1" />
+                      </div>
+                      <div>
+                        <Label>Hours</Label>
+                        <Input type="number" min="0.5" step="0.5" value={courtHours} onChange={(e) => setCourtHours(e.target.value)} placeholder="1" />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

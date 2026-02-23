@@ -57,11 +57,13 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
 
   function openAdd() {
     setEditingSession(null);
+    setError(null);
     setShowSessionDrawer(true);
   }
 
   function openEdit(session: ScheduleRow) {
     setEditingSession(session);
+    setError(null);
     setShowSessionDrawer(false);
   }
 
@@ -79,12 +81,6 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
           <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span><span className="sm:hidden">Add</span></span>
         </Button>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-4">
-          {error}
-        </div>
-      )}
 
       {schedule.length === 0 ? (
         <p className="text-sm text-slate-400 text-center py-8">No schedule set. Add session slots for this group.</p>
@@ -180,6 +176,11 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
         title={editingSession ? "Edit Session" : "New Session Slot"}
       >
         <form action={editingSession ? handleUpdateSession : handleCreateSession} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-slate-500 mb-1 block">Day</label>
             <Select name="day_of_week" defaultValue={editingSession?.day_of_week ?? ""}>

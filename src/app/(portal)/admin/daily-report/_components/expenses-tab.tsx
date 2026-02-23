@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button } from "@/components/ui";
 import { Receipt, Plus, Trash2 } from "lucide-react";
-import { ExpenseDrawer } from "../../expenses/_components/expense-drawer";
+import { ExpenseDrawer, type CourtSession } from "../../expenses/_components/expense-drawer";
 import { deleteExpense } from "@/app/_actions/expenses";
 import type { ExpenseRow, CategoryRow } from "../../expenses/_components/types";
 
@@ -14,6 +14,7 @@ export function ExpensesTab({ date }: { date: string }) {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
+  const [courtSessions, setCourtSessions] = useState<CourtSession[]>([]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +23,9 @@ export function ExpensesTab({ date }: { date: string }) {
 
   async function loadData() {
     setLoading(true);
-    const [{ data: expenseData }, { data: categoryData }] = await Promise.all([
+    const dayOfWeek = new Date(date + "T00:00:00").getDay();
+
+    const [{ data: expenseData }, { data: categoryData }, { data: sessionData }] = await Promise.all([
       supabase
         .from("expenses")
         .select("*, expense_categories(id, name, icon)")
@@ -35,9 +38,25 @@ export function ExpensesTab({ date }: { date: string }) {
         .eq("is_active", true)
         .order("is_default", { ascending: false })
         .order("name"),
+      supabase
+        .from("schedule_sessions")
+        .select("id, start_time, end_time, location, groups(name)")
+        .eq("day_of_week", dayOfWeek)
+        .eq("is_active", true)
+        .order("start_time"),
     ]);
     setExpenses((expenseData || []) as unknown as ExpenseRow[]);
     setCategories((categoryData || []) as unknown as CategoryRow[]);
+    setCourtSessions(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sessionData || []).map((s: any) => ({
+        id: s.id,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        group_name: s.groups?.name || "Unknown",
+        location: s.location,
+      }))
+    );
     setLoading(false);
   }
 
@@ -146,6 +165,7 @@ export function ExpensesTab({ date }: { date: string }) {
         editingExpense={editingExpense}
         onSuccess={() => { setDrawerOpen(false); setEditingExpense(null); loadData(); }}
         defaultDate={date}
+        sessions={courtSessions}
       />
     </div>
   );
