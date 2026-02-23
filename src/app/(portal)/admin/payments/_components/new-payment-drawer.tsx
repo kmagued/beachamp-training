@@ -65,7 +65,7 @@ export function NewPaymentDrawer({
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
   // Load packages
@@ -162,9 +162,18 @@ export function NewPaymentDrawer({
     setError("");
 
     if (paymentType === "standalone") {
-      if (!packageId) { setError("Please select a package"); return; }
-      if (!amount || Number(amount) <= 0) { setError("Please enter a valid amount"); return; }
-      if (!note.trim()) { setError("Please enter a note describing this payment"); return; }
+      if (!packageId) {
+        setError("Please select a package");
+        return;
+      }
+      if (!amount || Number(amount) <= 0) {
+        setError("Please enter a valid amount");
+        return;
+      }
+      if (!note.trim()) {
+        setError("Please enter the name");
+        return;
+      }
 
       startTransition(async () => {
         const res = await createStandalonePayment({
@@ -182,9 +191,18 @@ export function NewPaymentDrawer({
         }
       });
     } else {
-      if (!selectedPlayer) { setError("Please select a player"); return; }
-      if (!packageId) { setError("Please select a package"); return; }
-      if (!amount || Number(amount) <= 0) { setError("Please enter a valid amount"); return; }
+      if (!selectedPlayer) {
+        setError("Please select a player");
+        return;
+      }
+      if (!packageId) {
+        setError("Please select a package");
+        return;
+      }
+      if (!amount || Number(amount) <= 0) {
+        setError("Please enter a valid amount");
+        return;
+      }
 
       startTransition(async () => {
         const res = await createAdminPayment({
@@ -232,31 +250,27 @@ export function NewPaymentDrawer({
         {/* Payment type toggle */}
         {!prefillPlayerId && (
           <div>
-            <Label>Payment Type</Label>
+            <Label>Type</Label>
             <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
               <button
                 type="button"
                 onClick={() => setPaymentType("subscription")}
                 className={cn(
                   "py-2 text-xs font-medium rounded-md transition-colors",
-                  !isStandalone
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                  !isStandalone ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
                 )}
               >
-                Subscription
+                Player Payment
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentType("standalone")}
                 className={cn(
                   "py-2 text-xs font-medium rounded-md transition-colors",
-                  isStandalone
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                  isStandalone ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
                 )}
               >
-                Single / Private
+                Quick Payment
               </button>
             </div>
           </div>
@@ -271,7 +285,10 @@ export function NewPaymentDrawer({
                 <span className="text-sm font-medium text-slate-900">{selectedPlayer.name}</span>
                 {!prefillPlayerId && (
                   <button
-                    onClick={() => { setSelectedPlayer(null); setPlayerSearch(""); }}
+                    onClick={() => {
+                      setSelectedPlayer(null);
+                      setPlayerSearch("");
+                    }}
                     className="p-0.5 rounded text-slate-400 hover:text-slate-600"
                   >
                     <X className="w-4 h-4" />
@@ -298,7 +315,9 @@ export function NewPaymentDrawer({
                         onClick={() => handleSelectPlayer(p)}
                         className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
                       >
-                        <p className="text-sm font-medium text-slate-900">{p.first_name} {p.last_name}</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {p.first_name} {p.last_name}
+                        </p>
                         {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
                       </button>
                     ))}
@@ -317,13 +336,9 @@ export function NewPaymentDrawer({
         {/* Standalone mode: Note */}
         {isStandalone && (
           <div>
-            <Label required>Note</Label>
-            <Input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Single session — John"
-            />
-            <p className="text-xs text-slate-400 mt-1">Describe this payment (player name, session type, etc.)</p>
+            <Label required>Name</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. John Doe" />
+            <p className="text-xs text-slate-400 mt-1">Not linked to a player account</p>
           </div>
         )}
 
@@ -343,22 +358,13 @@ export function NewPaymentDrawer({
         {/* Amount */}
         <div>
           <Label required>Amount (EGP)</Label>
-          <Input
-            type="number"
-            min={0}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-          />
+          <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
         </div>
 
         {/* Payment date */}
         <div>
           <Label required>Payment Date</Label>
-          <DatePicker
-            value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
-          />
+          <DatePicker value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
         </div>
 
         {/* Payment method */}
@@ -369,15 +375,13 @@ export function NewPaymentDrawer({
             <option value="instapay">InstaPay</option>
           </Select>
           <p className="text-xs text-slate-400 mt-1.5">
-            {method === "cash" ? "Cash payments are confirmed immediately." : "InstaPay payments will be pending until confirmed."}
+            {method === "cash"
+              ? "Cash payments are confirmed immediately."
+              : "InstaPay payments will be pending until confirmed."}
           </p>
         </div>
 
-        {error && (
-          <div className="px-4 py-3 bg-red-50 rounded-lg text-sm text-red-600">
-            {error}
-          </div>
-        )}
+        {error && <div className="px-4 py-3 bg-red-50 rounded-lg text-sm text-red-600">{error}</div>}
       </div>
     </Drawer>
   );
