@@ -11,7 +11,7 @@ import { PaymentsTab } from "./_components/payments-tab";
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
   { key: "expenses", label: "Expenses", icon: Receipt },
-  { key: "payments", label: "Cash Payments", icon: CreditCard },
+  { key: "payments", label: "Payments", icon: CreditCard },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
