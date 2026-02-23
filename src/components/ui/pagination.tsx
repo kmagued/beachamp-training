@@ -1,13 +1,17 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
 }
 
-export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+export function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange }: PaginationProps) {
   const effectiveTotal = Math.max(totalPages, 1);
 
   // Build page numbers to show (max 5 around current)
@@ -60,6 +64,20 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
             )
           )}
         </div>
+        {pageSize && onPageSizeChange && (
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              onPageSizeChange(Number(e.target.value));
+              onPageChange(1);
+            }}
+            className="h-8 text-xs border border-slate-200 rounded-lg px-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>{size} / page</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <button

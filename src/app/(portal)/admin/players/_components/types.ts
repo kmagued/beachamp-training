@@ -28,7 +28,7 @@ export interface PlayerRow {
   }[];
 }
 
-export type SortField = "name" | "date" | "level" | "package" | "expires";
+export type SortField = "name" | "date" | "level" | "package" | "expires" | "status";
 export type SortDir = "asc" | "desc";
 
 export function getPlayerStatus(player: PlayerRow): string {

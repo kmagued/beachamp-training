@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import { Card, Button, Drawer } from "@/components/ui";
+import { Card, Badge, Button, Drawer } from "@/components/ui";
 import { Users, Plus, X, Search, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { addPlayersToGroup, removePlayersFromGroup } from "@/app/_actions/training";
 import type { GroupPlayerRow, AvailablePlayer } from "./types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type SortField = "name" | "sessions";
+type SortField = "name" | "sessions" | "status";
 type SortDir = "asc" | "desc";
+
+function getStatus(sessions: number | null): { label: string; variant: "success" | "warning" | "danger" | "neutral"; priority: number } {
+  if (sessions === null) return { label: "Inactive", variant: "neutral", priority: 3 };
+  if (sessions === 0) return { label: "Expired", variant: "danger", priority: 2 };
+  if (sessions <= 2) return { label: "Low", variant: "warning", priority: 1 };
+  return { label: "Active", variant: "success", priority: 0 };
+}
 
 interface PlayersSectionProps {
   groupId: string;
@@ -44,6 +51,8 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
       let cmp = 0;
       if (sortField === "name") {
         cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      } else if (sortField === "status") {
+        cmp = getStatus(a.sessions_remaining).priority - getStatus(b.sessions_remaining).priority;
       } else {
         if (a.sessions_remaining === null && b.sessions_remaining === null) cmp = 0;
         else if (a.sessions_remaining === null) cmp = 1;
@@ -209,6 +218,14 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                       Sessions Left <SortIcon field="sessions" />
                     </span>
                   </th>
+                  <th
+                    className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2 cursor-pointer hover:text-slate-600 select-none"
+                    onClick={() => toggleSort("status")}
+                  >
+                    <span className="flex items-center gap-1">
+                      Status <SortIcon field="status" />
+                    </span>
+                  </th>
                   <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">
                     Joined
                   </th>
@@ -243,6 +260,11 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                         <span className="text-slate-400">No sub</span>
                       )}
                     </td>
+                    <td className="py-2.5">
+                      <Badge variant={getStatus(p.sessions_remaining).variant}>
+                        {getStatus(p.sessions_remaining).label}
+                      </Badge>
+                    </td>
                     <td className="py-2.5 text-slate-500">{p.joined_at}</td>
                   </tr>
                 ))}
@@ -270,6 +292,14 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
               >
                 Sessions <SortIcon field="sessions" />
               </button>
+              <button
+                onClick={() => toggleSort("status")}
+                className={`text-xs px-2 py-1 rounded-md flex items-center gap-0.5 ${
+                  sortField === "status" ? "bg-primary/10 text-primary font-medium" : "text-slate-400"
+                }`}
+              >
+                Status <SortIcon field="status" />
+              </button>
             </div>
 
             <div className="divide-y divide-slate-100">
@@ -289,9 +319,14 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                     className="table-checkbox shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {p.first_name} {p.last_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {p.first_name} {p.last_name}
+                      </p>
+                      <Badge variant={getStatus(p.sessions_remaining).variant}>
+                        {getStatus(p.sessions_remaining).label}
+                      </Badge>
+                    </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                       {p.playing_level && <span className="capitalize">{p.playing_level}</span>}
                       {p.playing_level && <span>·</span>}

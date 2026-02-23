@@ -41,7 +41,7 @@ function AdminExpensesContent() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   // Drawer state
   const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
@@ -178,10 +178,10 @@ function AdminExpensesContent() {
   }, [expenses, tab, typeFilter, search, monthFilter, categoryFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredExpenses.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredExpenses.length / pageSize);
   const paginatedExpenses = filteredExpenses.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   useEffect(() => {
@@ -349,6 +349,8 @@ function AdminExpensesContent() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         </>
       )}

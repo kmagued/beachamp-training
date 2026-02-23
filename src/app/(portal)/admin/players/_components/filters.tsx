@@ -12,6 +12,7 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "level", label: "Level" },
   { value: "package", label: "Package" },
   { value: "expires", label: "Expires" },
+  { value: "status", label: "Status" },
 ];
 
 interface PlayersFiltersProps {

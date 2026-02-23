@@ -49,7 +49,7 @@ function AdminPaymentsContent() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -146,10 +146,10 @@ function AdminPaymentsContent() {
   }, [payments, search, monthFilter, statusFilter, packageFilter, typeFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredPayments.length / pageSize);
   const paginatedPayments = filteredPayments.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   useEffect(() => {
@@ -341,6 +341,8 @@ function AdminPaymentsContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
 
       <RejectModal

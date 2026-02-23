@@ -27,7 +27,7 @@ function AdminCoachesContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   // Add Coach state
   const [showAddCoach, setShowAddCoach] = useState(false);
@@ -113,10 +113,10 @@ function AdminCoachesContent() {
   }, [coaches, search, statusFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredCoaches.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredCoaches.length / pageSize);
   const paginatedCoaches = filteredCoaches.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   useEffect(() => {
@@ -306,6 +306,8 @@ function AdminCoachesContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
     </div>
   );

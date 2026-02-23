@@ -33,7 +33,7 @@ function AdminPlayersContent() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [drawerPlayer, setDrawerPlayer] = useState<PlayerRow | null>(null);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const { getRowId, isHighlighted } = useHighlightRow();
 
@@ -129,16 +129,19 @@ function AdminPlayersContent() {
         const aTime = aEnd ? new Date(aEnd).getTime() : 0;
         const bTime = bEnd ? new Date(bEnd).getTime() : 0;
         cmp = aTime - bTime;
+      } else if (sortField === "status") {
+        const statusOrder: Record<string, number> = { active: 0, "expiring soon": 1, expiring: 2, completed: 3, expired: 4, pending: 5, inactive: 6 };
+        cmp = (statusOrder[getPlayerStatus(a)] ?? 99) - (statusOrder[getPlayerStatus(b)] ?? 99);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [players, search, statusFilter, levelFilter, packageFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredPlayers.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredPlayers.length / pageSize);
   const paginatedPlayers = filteredPlayers.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   useEffect(() => {
@@ -410,6 +413,8 @@ function AdminPlayersContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
 
       <PlayerDrawer

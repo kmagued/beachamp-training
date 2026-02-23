@@ -32,7 +32,7 @@ function AdminUsersContent() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const [drawerUser, setDrawerUser] = useState<UserRow | null>(null);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const { getRowId, isHighlighted } = useHighlightRow();
 
@@ -108,10 +108,10 @@ function AdminUsersContent() {
   }, [users, search, roleFilter, statusFilter, sortField, sortDir]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
   const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   useEffect(() => {
@@ -212,6 +212,8 @@ function AdminUsersContent() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
       />
 
       <UserDrawer

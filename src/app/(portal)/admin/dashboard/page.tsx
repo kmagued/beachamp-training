@@ -62,7 +62,7 @@ export default async function AdminDashboard() {
       .limit(5),
     supabase
       .from("subscriptions")
-      .select("package_id, packages(name)")
+      .select("player_id, package_id, packages(name)")
       .eq("status", "active"),
     supabase
       .from("profiles")
@@ -132,6 +132,12 @@ export default async function AdminDashboard() {
 
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
+  // Active players (unique players with active subscriptions)
+  const activePlayerIds = new Set(
+    (activeSubscriptions || []).map((s: { player_id: string }) => s.player_id)
+  );
+  const activePlayerCount = activePlayerIds.size;
+
   // --- Chart data transformations ---
 
   // Subscriptions by package
@@ -168,9 +174,10 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <StatCard
           label="Active Players"
-          value={playerCount ?? 0}
+          value={activePlayerCount}
           accentColor="bg-primary"
           icon={<Users className="w-5 h-5" />}
+          subtitle={`Total: ${playerCount ?? 0}`}
         />
         <RevenueCard
           label={`Revenue (${currentMonth})`}
