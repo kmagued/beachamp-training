@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard, Card, Badge } from "@/components/ui";
-import { Users, CreditCard, CalendarDays, Receipt } from "lucide-react";
+import { Users, CreditCard, CalendarDays, Receipt, TrendingUp } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 
@@ -32,6 +32,7 @@ export default async function AdminDashboard() {
     { data: revenuePayments },
     { data: oneTimeExpenseData },
     { data: recurringExpenseData },
+    { data: allExpenseData },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -92,6 +93,11 @@ export default async function AdminDashboard() {
       .select("amount, recurrence_type")
       .eq("is_active", true)
       .eq("is_recurring", true),
+    // All expenses (for all-time total)
+    supabase
+      .from("expenses")
+      .select("amount")
+      .eq("is_active", true),
   ]);
 
   const monthlyRevenue = (revenueData || []).reduce(
@@ -117,6 +123,12 @@ export default async function AdminDashboard() {
     .reduce((sum: number, e: { amount: number }) => sum + e.amount * 4, 0);
   const monthlyExpenses = oneTimeExpenses + recurringExpenses;
   const monthlyProfit = monthlyRevenue - monthlyExpenses;
+
+  const allTimeExpenses = (allExpenseData || []).reduce(
+    (sum: number, e: { amount: number }) => sum + e.amount,
+    0
+  );
+  const allTimeProfit = totalRevenue - allTimeExpenses;
 
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
@@ -153,7 +165,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <StatCard
           label="Active Players"
           value={playerCount ?? 0}
@@ -170,7 +182,14 @@ export default async function AdminDashboard() {
           value={`${monthlyExpenses.toLocaleString()} EGP`}
           accentColor="bg-red-500"
           icon={<Receipt className="w-5 h-5" />}
-          subtitle={`Profit: ${monthlyProfit.toLocaleString()} EGP`}
+          subtitle={`All Time: ${allTimeExpenses.toLocaleString()} EGP`}
+        />
+        <StatCard
+          label={`Profit (${currentMonth})`}
+          value={`${monthlyProfit.toLocaleString()} EGP`}
+          accentColor={monthlyProfit >= 0 ? "bg-emerald-500" : "bg-red-500"}
+          icon={<TrendingUp className="w-5 h-5" />}
+          subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
         />
         <StatCard
           label="Pending Payments"

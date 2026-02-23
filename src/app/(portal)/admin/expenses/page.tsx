@@ -109,6 +109,10 @@ function AdminExpensesContent() {
     };
   }, [expenses]);
 
+  const allTimeTotal = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses]);
+
   const activeCategoryCount = categories.filter((c) => c.is_active).length;
 
   // Derive filter options
@@ -250,6 +254,7 @@ function AdminExpensesContent() {
           value={`${totalThisMonth.toLocaleString()} EGP`}
           accentColor="bg-red-500"
           icon={<Receipt className="w-5 h-5" />}
+          subtitle={`All Time: ${allTimeTotal.toLocaleString()} EGP`}
         />
         <StatCard
           label="Recurring / Month"
