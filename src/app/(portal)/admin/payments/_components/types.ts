@@ -7,8 +7,9 @@ export interface PaymentRow {
   created_at: string;
   confirmed_at: string | null;
   rejection_reason: string | null;
+  note: string | null;
   profiles: { first_name: string; last_name: string } | null;
-  subscriptions: { packages: { name: string } } | null;
+  subscriptions: { start_date: string | null; end_date: string | null; packages: { name: string } } | null;
 }
 
 export type SortField = "date" | "amount" | "status";

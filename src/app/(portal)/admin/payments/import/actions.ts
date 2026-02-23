@@ -4,6 +4,32 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PaymentImportRow, PaymentImportResult, PackageInfo } from "./_components/types";
 
+// Parse dates like "2/11/2026 17:11:38" — defaults to M/D/YYYY, auto-detects D/M/YYYY
+function parseDate(str: string): Date | null {
+  const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (match) {
+    const [, a, b, y, h, min, sec] = match;
+    let month = Number(a);
+    let day = Number(b);
+    // If first number > 12, it must be a day → format is D/M/YYYY, swap
+    if (month > 12 && day <= 12) {
+      [day, month] = [month, day];
+    }
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return new Date(Number(y), month - 1, day, Number(h || 0), Number(min || 0), Number(sec || 0));
+  }
+  const fallback = new Date(str);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+// Format a Date as YYYY-MM-DD using local time (avoids UTC timezone shift)
+function formatDateYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export async function getPackageMap(): Promise<PackageInfo[]> {
   const admin = createAdminClient();
   const { data } = await admin
@@ -80,8 +106,8 @@ export async function importBulkPayments(
 
     try {
       // Calculate dates
-      const startDate = new Date(row.date);
-      if (isNaN(startDate.getTime())) {
+      const startDate = parseDate(row.date);
+      if (!startDate) {
         results.push({ email, package: row.package, amount: row.amount, status: "error", error: "Invalid date" });
         continue;
       }
@@ -100,8 +126,8 @@ export async function importBulkPayments(
           package_id: pkg.id,
           sessions_remaining: subStatus === "expired" ? 0 : pkg.session_count,
           sessions_total: pkg.session_count,
-          start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
+          start_date: formatDateYMD(startDate),
+          end_date: formatDateYMD(endDate),
           status: subStatus,
         })
         .select("id")
@@ -120,7 +146,7 @@ export async function importBulkPayments(
         amount: row.amount,
         method,
         status: "confirmed",
-        confirmed_at: startDate.toISOString(),
+        confirmed_at: formatDateYMD(startDate) + "T00:00:00",
       });
 
       if (payError) {

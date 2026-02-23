@@ -163,7 +163,9 @@ function DrawerContent({
         <div>
           <h2 className="font-semibold text-slate-900">Payment Details</h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            {payment.profiles?.first_name} {payment.profiles?.last_name}
+            {payment.profiles
+              ? `${payment.profiles.first_name} ${payment.profiles.last_name}`
+              : payment.note || "Single session"}
           </p>
         </div>
         <button
@@ -222,8 +224,12 @@ function DrawerContent({
             </div>
 
             <div className="space-y-0">
-              <DetailRow label="Player" value={`${payment.profiles?.first_name ?? ""} ${payment.profiles?.last_name ?? ""}`} />
-              <DetailRow label="Package" value={payment.subscriptions?.packages?.name || "—"} />
+              {payment.profiles ? (
+                <DetailRow label="Player" value={`${payment.profiles.first_name} ${payment.profiles.last_name}`} />
+              ) : payment.note ? (
+                <DetailRow label="Note" value={payment.note} />
+              ) : null}
+              <DetailRow label="Package" value={payment.subscriptions?.packages?.name || (payment.profiles ? "—" : "Single session")} />
               <DetailRow
                 label="Method"
                 value={<span className="capitalize">{payment.method.replace(/_/g, " ")}</span>}

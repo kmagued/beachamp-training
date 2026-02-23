@@ -70,6 +70,26 @@ export async function bulkUpdatePlayerLevel(playerIds: string[], level: string |
   return { success: true };
 }
 
+export async function updateSubscriptionBalance(
+  subscriptionId: string,
+  sessionsRemaining: number,
+  sessionsTotal: number
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { error } = await admin
+    .from("subscriptions")
+    .update({ sessions_remaining: sessionsRemaining, sessions_total: sessionsTotal })
+    .eq("id", subscriptionId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
 export async function resetPlayerPassword(playerId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

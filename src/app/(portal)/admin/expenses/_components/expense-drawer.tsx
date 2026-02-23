@@ -2,6 +2,7 @@ import { useState, useTransition, useEffect } from "react";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 import { createExpense, updateExpense, createExpenseCategory } from "@/app/_actions/expenses";
 import type { ExpenseRow, CategoryRow } from "./types";
 
@@ -30,6 +31,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const [courtCount, setCourtCount] = useState("");
   const [courtHours, setCourtHours] = useState("");
   const [courtHourlyRate, setCourtHourlyRate] = useState("");
+  const [useCourtCalculator, setUseCourtCalculator] = useState(true);
 
   // Inline new category
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -40,9 +42,9 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const selectedCategory = activeCategories.find((c) => c.id === categoryId);
   const isCourtReservation = selectedCategory?.name === "Court Reservation";
 
-  // Auto-calculate amount for court reservations
+  // Auto-calculate amount for court reservations (only when calculator is active)
   useEffect(() => {
-    if (isCourtReservation) {
+    if (isCourtReservation && useCourtCalculator) {
       const courts = Number(courtCount) || 0;
       const hours = Number(courtHours) || 0;
       const rate = Number(courtHourlyRate) || 0;
@@ -50,7 +52,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
       if (calculated > 0) setAmount(String(calculated));
       else setAmount("");
     }
-  }, [courtCount, courtHours, courtHourlyRate, isCourtReservation]);
+  }, [courtCount, courtHours, courtHourlyRate, isCourtReservation, useCourtCalculator]);
 
   // Reset form when opening/editing
   useEffect(() => {
@@ -66,6 +68,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setCourtCount(editingExpense.court_count ? String(editingExpense.court_count) : "");
         setCourtHours(editingExpense.court_hours ? String(editingExpense.court_hours) : "");
         setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "");
+        setUseCourtCalculator(!!editingExpense.court_count);
       } else {
         setCategoryId(activeCategories[0]?.id || "");
         setDescription("");
@@ -77,6 +80,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setCourtCount("");
         setCourtHours("");
         setCourtHourlyRate("");
+        setUseCourtCalculator(true);
       }
       setError("");
       setShowNewCategory(false);
@@ -95,7 +99,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     formData.set("is_recurring", String(isRecurring));
     if (isRecurring) formData.set("recurrence_type", recurrenceType);
     formData.set("notes", notes);
-    if (isCourtReservation) {
+    if (isCourtReservation && useCourtCalculator) {
       formData.set("court_count", courtCount);
       formData.set("court_hours", courtHours);
       formData.set("court_hourly_rate", courtHourlyRate);
@@ -194,24 +198,53 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
           )}
         </div>
 
-        {/* Court reservation calculator */}
+        {/* Court reservation: toggle between calculator and manual */}
         {isCourtReservation && (
-          <div className="space-y-3 p-4 rounded-xl bg-primary-50/50 border border-primary-100">
-            <p className="text-xs font-semibold text-primary-700 uppercase tracking-wider">Court Calculator</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label>Courts</Label>
-                <Input type="number" min="1" value={courtCount} onChange={(e) => setCourtCount(e.target.value)} placeholder="1" />
-              </div>
-              <div>
-                <Label>Hours</Label>
-                <Input type="number" min="0.5" step="0.5" value={courtHours} onChange={(e) => setCourtHours(e.target.value)} placeholder="1" />
-              </div>
-              <div>
-                <Label>Rate/hr</Label>
-                <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="0" />
-              </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setUseCourtCalculator(true)}
+                className={cn(
+                  "py-2 text-xs font-medium rounded-md transition-colors",
+                  useCourtCalculator
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Calculator
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseCourtCalculator(false)}
+                className={cn(
+                  "py-2 text-xs font-medium rounded-md transition-colors",
+                  !useCourtCalculator
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Manual Amount
+              </button>
             </div>
+            {useCourtCalculator && (
+              <div className="p-4 rounded-xl bg-primary-50/50 border border-primary-100">
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Courts</Label>
+                    <Input type="number" min="1" value={courtCount} onChange={(e) => setCourtCount(e.target.value)} placeholder="1" />
+                  </div>
+                  <div>
+                    <Label>Hours</Label>
+                    <Input type="number" min="0.5" step="0.5" value={courtHours} onChange={(e) => setCourtHours(e.target.value)} placeholder="1" />
+                  </div>
+                  <div>
+                    <Label>Rate/hr</Label>
+                    <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -233,8 +266,8 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            readOnly={isCourtReservation}
-            className={isCourtReservation ? "bg-slate-50 cursor-not-allowed" : ""}
+            readOnly={isCourtReservation && useCourtCalculator}
+            className={isCourtReservation && useCourtCalculator ? "bg-slate-50 cursor-not-allowed" : ""}
           />
         </div>
 

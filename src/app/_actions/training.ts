@@ -546,6 +546,56 @@ export async function updateAttendanceRecord(
 }
 
 // ═══════════════════════════════════════
+// QUICK-ADD PLAYER (Admin only)
+// ═══════════════════════════════════════
+
+export async function quickAddPlayer(firstName: string, lastName: string) {
+  const user = await getCurrentUserRole();
+  const authErr = requireAdmin(user);
+  if (authErr) return authErr;
+
+  if (!firstName.trim() || !lastName.trim()) {
+    return { error: "First name and last name are required" };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Create a minimal auth user with a placeholder email (required by profiles FK to auth.users)
+  const placeholderEmail = `guest-${crypto.randomUUID()}@noaccount.local`;
+  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    email: placeholderEmail,
+    password: crypto.randomUUID(),
+    email_confirm: true,
+    user_metadata: {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      role: "player",
+    },
+  });
+
+  if (authError) return { error: authError.message };
+
+  const playerId = authData.user.id;
+
+  // Update the auto-created profile (trigger creates it) to clear the placeholder email
+  await admin
+    .from("profiles")
+    .update({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: null,
+      role: "player",
+      is_active: true,
+      profile_completed: true,
+    })
+    .eq("id", playerId);
+
+  revalidatePath("/admin/players");
+  return { success: true, playerId, name: `${firstName.trim()} ${lastName.trim()}` };
+}
+
+// ═══════════════════════════════════════
 // FEEDBACK (Coach + Admin)
 // ═══════════════════════════════════════
 

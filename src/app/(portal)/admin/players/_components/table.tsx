@@ -222,7 +222,9 @@ export function PlayersTableView(props: PlayersTableProps) {
                   <span className="inline-flex items-center gap-1">Package <SortIcon field="package" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 <th className={thBase}>Sessions</th>
-                <th className={thBase}>Expires</th>
+                <th className={thSortable} onClick={() => toggleSort("expires")}>
+                  <span className="inline-flex items-center gap-1">Expires <SortIcon field="expires" sortField={sortField} sortDir={sortDir} /></span>
+                </th>
                 <th className={thSortable} onClick={() => toggleSort("level")}>
                   <span className="inline-flex items-center gap-1">Level <SortIcon field="level" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
@@ -276,7 +278,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       <p className="text-xs text-slate-400 truncate max-w-[200px]">{player.email}</p>
                     </td>
                     {/* Scrollable middle */}
-                    <td className={cn(tdBase, "text-sm text-slate-700")}>
+                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
                       {activeSub?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>

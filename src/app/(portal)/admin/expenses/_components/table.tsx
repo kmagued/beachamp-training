@@ -12,6 +12,7 @@ interface ExpensesTableProps {
   onDelete: (id: string) => void;
   search: string;
   typeFilter: string;
+  grandTotal: number;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -24,9 +25,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 }
 
 export function ExpensesTableView(props: ExpensesTableProps) {
-  const { expenses, sortField, sortDir, toggleSort, onEdit, onDelete, search, typeFilter } = props;
-
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const { expenses, sortField, sortDir, toggleSort, onEdit, onDelete, search, typeFilter, grandTotal } = props;
 
   const emptyMessage = search || typeFilter
     ? "No expenses match your filters"
@@ -122,7 +121,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                   <td className="px-4 py-3 whitespace-nowrap" />
                   <td className="px-4 py-3 whitespace-nowrap" />
                   <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">
-                    {total.toLocaleString()} EGP
+                    {grandTotal.toLocaleString()} EGP
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" colSpan={2} />
                 </tr>
@@ -185,7 +184,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
         {expenses.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</span>
-            <span className="text-sm font-bold text-slate-900">{total.toLocaleString()} EGP</span>
+            <span className="text-sm font-bold text-slate-900">{grandTotal.toLocaleString()} EGP</span>
           </div>
         )}
         {expenses.length === 0 && (

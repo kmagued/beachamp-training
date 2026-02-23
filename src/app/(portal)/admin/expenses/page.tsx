@@ -332,6 +332,7 @@ function AdminExpensesContent() {
                 onDelete={handleDelete}
                 search={search}
                 typeFilter={typeFilter}
+                grandTotal={filteredExpenses.reduce((sum, e) => sum + e.amount, 0)}
               />
             )}
           </div>

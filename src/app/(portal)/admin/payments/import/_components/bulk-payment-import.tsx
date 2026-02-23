@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition, useRef, useCallback, useMemo, useEffect } from "react";
-import { Card, Button, Badge } from "@/components/ui";
-import { Upload, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Card, Button, Badge, Pagination } from "@/components/ui";
+import { Upload, Download, Loader2, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { importBulkPayments, checkImportEmails, getPackageMap } from "../actions";
 import type { PaymentImportRow, PaymentImportResult, PackageInfo } from "./types";
@@ -18,6 +18,25 @@ interface PreviewRow {
   index: number;
   data: Record<string, string>;
   error?: string;
+}
+
+// Parse dates — defaults to M/D/YYYY, auto-detects D/M/YYYY when first number > 12
+function parseDate(str: string): Date | null {
+  const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (match) {
+    const [, a, b, y, h, min, sec] = match;
+    let month = Number(a);
+    let day = Number(b);
+    // If first number > 12, it must be a day → format is D/M/YYYY, swap
+    if (month > 12 && day <= 12) {
+      [day, month] = [month, day];
+    }
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return new Date(Number(y), month - 1, day, Number(h || 0), Number(min || 0), Number(sec || 0));
+  }
+  // Fallback: try native parsing (handles YYYY-MM-DD, etc.)
+  const fallback = new Date(str);
+  return isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -86,8 +105,7 @@ export function BulkPaymentImport() {
     if (!method.includes("cash") && !method.includes("instapay")) return "Invalid method (cash/instapay)";
 
     // Validate date
-    const parsed = new Date(data.date);
-    if (isNaN(parsed.getTime())) return "Invalid date";
+    if (!parseDate(data.date)) return "Invalid date";
 
     return undefined;
   }
@@ -503,40 +521,12 @@ export function BulkPaymentImport() {
             </table>
           </div>
           {totalPages > 1 && (
-            <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between">
-              <p className="text-xs text-slate-400">
-                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, displayRows!.length)} of {displayRows!.length}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    className={cn(
-                      "w-7 h-7 rounded-lg text-xs font-medium transition-colors",
-                      i === page
-                        ? "bg-primary text-white"
-                        : "text-slate-500 hover:bg-slate-100"
-                    )}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page === totalPages - 1}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="px-5 pb-3">
+              <Pagination
+                currentPage={page + 1}
+                totalPages={totalPages}
+                onPageChange={(p) => setPage(p - 1)}
+              />
             </div>
           )}
         </Card>

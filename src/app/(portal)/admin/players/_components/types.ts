@@ -18,6 +18,7 @@ export interface PlayerRow {
   is_active: boolean;
   created_at: string;
   subscriptions: {
+    id: string;
     status: string;
     sessions_remaining: number;
     sessions_total: number;
@@ -27,7 +28,7 @@ export interface PlayerRow {
   }[];
 }
 
-export type SortField = "name" | "date" | "level" | "package";
+export type SortField = "name" | "date" | "level" | "package" | "expires";
 export type SortDir = "asc" | "desc";
 
 export function getPlayerStatus(player: PlayerRow): string {

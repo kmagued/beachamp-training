@@ -45,7 +45,7 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
       .eq("role", "player")
       .order("created_at", { ascending: false });
     if (data) setPlayers(data as unknown as PlayerRow[]);
@@ -123,6 +123,12 @@ function AdminPlayersContent() {
         const aName = a.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
         const bName = b.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
         cmp = aName.localeCompare(bName);
+      } else if (sortField === "expires") {
+        const aEnd = a.subscriptions?.find((s) => s.status === "active")?.end_date;
+        const bEnd = b.subscriptions?.find((s) => s.status === "active")?.end_date;
+        const aTime = aEnd ? new Date(aEnd).getTime() : 0;
+        const bTime = bEnd ? new Date(bEnd).getTime() : 0;
+        cmp = aTime - bTime;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });

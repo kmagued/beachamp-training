@@ -62,7 +62,7 @@ function AdminPaymentsContent() {
   async function fetchPayments() {
     const { data } = await supabase
       .from("payments")
-      .select("*, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(packages(name))")
+      .select("*, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(start_date, end_date, packages(name))")
       .order("created_at", { ascending: false });
     if (data) setPayments(data as unknown as PaymentRow[]);
     setLoading(false);
@@ -100,7 +100,8 @@ function AdminPaymentsContent() {
       const q = search.toLowerCase();
       result = result.filter((p) => {
         const name = `${p.profiles?.first_name ?? ""} ${p.profiles?.last_name ?? ""}`.toLowerCase();
-        return name.includes(q);
+        const note = (p.note ?? "").toLowerCase();
+        return name.includes(q) || note.includes(q);
       });
     }
 
@@ -126,7 +127,9 @@ function AdminPaymentsContent() {
     return [...result].sort((a, b) => {
       let cmp = 0;
       if (sortField === "date") {
-        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        const aDate = new Date(a.subscriptions?.start_date || a.confirmed_at || a.created_at).getTime();
+        const bDate = new Date(b.subscriptions?.start_date || b.confirmed_at || b.created_at).getTime();
+        cmp = aDate - bDate;
       } else if (sortField === "amount") {
         cmp = a.amount - b.amount;
       } else {
@@ -318,6 +321,7 @@ function AdminPaymentsContent() {
             onRowClick={setDrawerPayment}
             search={search}
             statusFilter={statusFilter}
+            grandTotal={filteredPayments.reduce((sum, p) => sum + p.amount, 0)}
           />
         )}
       </div>

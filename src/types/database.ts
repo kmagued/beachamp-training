@@ -176,8 +176,8 @@ export interface Database {
       payments: {
         Row: {
           id: string;
-          player_id: string;
-          subscription_id: string;
+          player_id: string | null;
+          subscription_id: string | null;
           amount: number;
           method: PaymentMethod;
           screenshot_url: string | null;
@@ -185,12 +185,13 @@ export interface Database {
           confirmed_by: string | null;
           rejection_reason: string | null;
           confirmed_at: string | null;
+          note: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
-          player_id: string;
-          subscription_id: string;
+          player_id?: string | null;
+          subscription_id?: string | null;
           amount: number;
           method: PaymentMethod;
           screenshot_url?: string | null;
@@ -198,12 +199,13 @@ export interface Database {
           confirmed_by?: string | null;
           rejection_reason?: string | null;
           confirmed_at?: string | null;
+          note?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          player_id?: string;
-          subscription_id?: string;
+          player_id?: string | null;
+          subscription_id?: string | null;
           amount?: number;
           method?: PaymentMethod;
           screenshot_url?: string | null;
@@ -211,6 +213,7 @@ export interface Database {
           confirmed_by?: string | null;
           rejection_reason?: string | null;
           confirmed_at?: string | null;
+          note?: string | null;
           created_at?: string;
         };
         Relationships: [];

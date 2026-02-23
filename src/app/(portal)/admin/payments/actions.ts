@@ -24,36 +24,7 @@ export async function confirmPayment(paymentId: string) {
   if (!payment) return { error: "Payment not found" };
   if (payment.status !== "pending") return { error: "Payment is not pending" };
 
-  const pkg = payment.subscriptions?.packages;
-  if (!pkg) return { error: "Package not found for this subscription" };
-
-  // Check if the player has an existing active subscription that hasn't expired
-  const { data: existingActiveSub } = await supabase
-    .from("subscriptions")
-    .select("end_date")
-    .eq("player_id", payment.player_id)
-    .eq("status", "active")
-    .neq("id", payment.subscription_id)
-    .order("end_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const today = new Date();
-  let startDate = today;
-
-  if (existingActiveSub?.end_date) {
-    const activeEndDate = new Date(existingActiveSub.end_date);
-    if (activeEndDate > today) {
-      // Start new subscription the day after current one ends
-      startDate = new Date(activeEndDate);
-      startDate.setDate(startDate.getDate() + 1);
-    }
-  }
-
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + pkg.validity_days);
-
-  // Update payment
+  // Update payment status
   const { error: payError } = await supabase
     .from("payments")
     .update({
@@ -65,17 +36,45 @@ export async function confirmPayment(paymentId: string) {
 
   if (payError) return { error: payError.message };
 
-  // Activate subscription
-  const { error: subError } = await supabase
-    .from("subscriptions")
-    .update({
-      status: "active",
-      start_date: startDate.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
-    })
-    .eq("id", payment.subscription_id);
+  // Activate subscription (only if payment has one)
+  if (payment.subscription_id && payment.subscriptions?.packages) {
+    const pkg = payment.subscriptions.packages;
 
-  if (subError) return { error: subError.message };
+    const { data: existingActiveSub } = await supabase
+      .from("subscriptions")
+      .select("end_date")
+      .eq("player_id", payment.player_id)
+      .eq("status", "active")
+      .neq("id", payment.subscription_id)
+      .order("end_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const today = new Date();
+    let startDate = today;
+
+    if (existingActiveSub?.end_date) {
+      const activeEndDate = new Date(existingActiveSub.end_date);
+      if (activeEndDate > today) {
+        startDate = new Date(activeEndDate);
+        startDate.setDate(startDate.getDate() + 1);
+      }
+    }
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .update({
+        status: "active",
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+      })
+      .eq("id", payment.subscription_id);
+
+    if (subError) return { error: subError.message };
+  }
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
@@ -108,13 +107,15 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
   if (payError) return { error: payError.message };
 
-  // Cancel subscription
-  const { error: subError } = await supabase
-    .from("subscriptions")
-    .update({ status: "cancelled" })
-    .eq("id", payment.subscription_id);
+  // Cancel subscription (only if payment has one)
+  if (payment.subscription_id) {
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .update({ status: "cancelled" })
+      .eq("id", payment.subscription_id);
 
-  if (subError) return { error: subError.message };
+    if (subError) return { error: subError.message };
+  }
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
@@ -156,57 +157,63 @@ export async function updatePayment(
       paymentUpdate.confirmed_at = new Date().toISOString();
       paymentUpdate.rejection_reason = null;
 
-      // Activate subscription with proper dates
-      const pkg = payment.subscriptions?.packages;
-      if (pkg) {
-        const { data: existingActiveSub } = await supabase
-          .from("subscriptions")
-          .select("end_date")
-          .eq("player_id", payment.player_id)
-          .eq("status", "active")
-          .neq("id", payment.subscription_id)
-          .order("end_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      // Activate subscription with proper dates (only if payment has one)
+      if (payment.subscription_id) {
+        const pkg = payment.subscriptions?.packages;
+        if (pkg) {
+          const { data: existingActiveSub } = await supabase
+            .from("subscriptions")
+            .select("end_date")
+            .eq("player_id", payment.player_id)
+            .eq("status", "active")
+            .neq("id", payment.subscription_id)
+            .order("end_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        const today = new Date();
-        let startDate = today;
-        if (existingActiveSub?.end_date) {
-          const activeEndDate = new Date(existingActiveSub.end_date);
-          if (activeEndDate > today) {
-            startDate = new Date(activeEndDate);
-            startDate.setDate(startDate.getDate() + 1);
+          const today = new Date();
+          let startDate = today;
+          if (existingActiveSub?.end_date) {
+            const activeEndDate = new Date(existingActiveSub.end_date);
+            if (activeEndDate > today) {
+              startDate = new Date(activeEndDate);
+              startDate.setDate(startDate.getDate() + 1);
+            }
           }
-        }
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + pkg.validity_days);
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + pkg.validity_days);
 
-        await supabase
-          .from("subscriptions")
-          .update({
-            status: "active",
-            start_date: startDate.toISOString().split("T")[0],
-            end_date: endDate.toISOString().split("T")[0],
-          })
-          .eq("id", payment.subscription_id);
+          await supabase
+            .from("subscriptions")
+            .update({
+              status: "active",
+              start_date: startDate.toISOString().split("T")[0],
+              end_date: endDate.toISOString().split("T")[0],
+            })
+            .eq("id", payment.subscription_id);
+        }
       }
     } else if (updates.status === "pending") {
       paymentUpdate.confirmed_by = null;
       paymentUpdate.confirmed_at = null;
       paymentUpdate.rejection_reason = null;
 
-      await supabase
-        .from("subscriptions")
-        .update({ status: "pending", start_date: null, end_date: null })
-        .eq("id", payment.subscription_id);
+      if (payment.subscription_id) {
+        await supabase
+          .from("subscriptions")
+          .update({ status: "pending", start_date: null, end_date: null })
+          .eq("id", payment.subscription_id);
+      }
     } else if (updates.status === "rejected") {
       paymentUpdate.confirmed_by = null;
       paymentUpdate.confirmed_at = null;
 
-      await supabase
-        .from("subscriptions")
-        .update({ status: "cancelled" })
-        .eq("id", payment.subscription_id);
+      if (payment.subscription_id) {
+        await supabase
+          .from("subscriptions")
+          .update({ status: "cancelled" })
+          .eq("id", payment.subscription_id);
+      }
     }
   }
 
@@ -346,6 +353,81 @@ export async function createAdminPayment(data: {
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+export async function createStandalonePayment(data: {
+  package_id: string;
+  amount: number;
+  method: PaymentMethod;
+  note: string;
+  payment_date?: string;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || profile.role !== "admin") return { error: "Unauthorized" };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Get package details
+  const { data: pkg, error: pkgError } = await admin
+    .from("packages")
+    .select("id, session_count, validity_days")
+    .eq("id", data.package_id)
+    .single();
+
+  if (pkgError || !pkg) return { error: "Package not found" };
+
+  const startDate = data.payment_date ? new Date(data.payment_date) : new Date();
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+  // Create subscription (no player) — always active for standalone
+  const { data: subscription, error: subError } = await admin
+    .from("subscriptions")
+    .insert({
+      player_id: null,
+      package_id: data.package_id,
+      sessions_remaining: pkg.session_count,
+      sessions_total: pkg.session_count,
+      start_date: startDate.toISOString().split("T")[0],
+      end_date: endDate.toISOString().split("T")[0],
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (subError) return { error: subError.message };
+
+  // Create payment — always confirmed for standalone
+  const confirmedAt = data.payment_date ? new Date(data.payment_date).toISOString() : new Date().toISOString();
+  const { error } = await admin.from("payments").insert({
+    player_id: null,
+    subscription_id: subscription.id,
+    amount: data.amount,
+    method: data.method,
+    note: data.note,
+    status: "confirmed",
+    confirmed_at: confirmedAt,
+    confirmed_by: user.id,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }

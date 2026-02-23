@@ -24,6 +24,7 @@ interface PaymentsTableProps {
   onRowClick: (payment: PaymentRow) => void;
   search: string;
   statusFilter: string;
+  grandTotal: number;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -44,11 +45,10 @@ export function PaymentsTableView(props: PaymentsTableProps) {
   const {
     payments, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    onConfirm, onReject, isPending, actionId, onViewScreenshot, onRowClick, search, statusFilter,
+    onConfirm, onReject, isPending, actionId, onViewScreenshot, onRowClick, search, statusFilter, grandTotal,
   } = props;
 
   const selectionMode = selectedIds.size > 0;
-  const total = payments.reduce((sum, p) => sum + p.amount, 0);
 
   function handleRowClick(e: React.MouseEvent, payment: PaymentRow) {
     const target = e.target as HTMLElement;
@@ -130,12 +130,14 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                       />
                     </td>
                     {/* Sticky left: player */}
-                    <td className={cn(tdBase, "sticky left-12 z-10 text-sm font-medium text-slate-900 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
-                      {payment.profiles?.first_name} {payment.profiles?.last_name}
+                    <td className={cn(tdBase, "sticky left-12 z-10 text-sm font-medium min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg, payment.profiles ? "text-slate-900" : "text-slate-500 italic")}>
+                      {payment.profiles
+                        ? `${payment.profiles.first_name} ${payment.profiles.last_name}`
+                        : payment.note || "Single session"}
                     </td>
                     {/* Scrollable middle */}
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {payment.subscriptions?.packages?.name || "—"}
+                      {payment.subscriptions?.packages?.name || (payment.profiles ? "—" : <Badge variant="neutral">Single</Badge>)}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {payment.amount.toLocaleString()} EGP
@@ -144,7 +146,11 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                       {payment.method.replace("_", " ")}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {new Date(payment.created_at).toLocaleDateString()}
+                      {payment.subscriptions?.start_date
+                        ? new Date(payment.subscriptions.start_date + "T00:00:00").toLocaleDateString()
+                        : payment.confirmed_at
+                          ? new Date(payment.confirmed_at).toLocaleDateString()
+                          : "—"}
                     </td>
                     <td className={tdBase}>
                       <StatusBadge status={payment.status} />
@@ -218,7 +224,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" />
                   <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">
-                    {total.toLocaleString()} EGP
+                    {grandTotal.toLocaleString()} EGP
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" colSpan={4} />
                   <td className="sticky right-0 z-10 bg-slate-50 px-4 py-3 border-l border-l-slate-200 whitespace-nowrap" />
@@ -253,17 +259,19 @@ export function PaymentsTableView(props: PaymentsTableProps) {
               />
               <div className="flex items-start justify-between flex-1 min-w-0">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {payment.profiles?.first_name} {payment.profiles?.last_name}
+                  <p className={cn("text-sm font-semibold", payment.profiles ? "text-slate-900" : "text-slate-500 italic")}>
+                    {payment.profiles
+                      ? `${payment.profiles.first_name} ${payment.profiles.last_name}`
+                      : payment.note || "Single session"}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {payment.subscriptions?.packages?.name || "—"}
+                    {payment.subscriptions?.packages?.name || (payment.profiles ? "—" : "Single session")}
                   </p>
                 </div>
                 <StatusBadge status={payment.status} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
+            <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
               <div>
                 <span className="text-slate-400">Amount</span>
                 <p className="text-slate-700 font-medium">{payment.amount.toLocaleString()} EGP</p>
@@ -272,9 +280,17 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 <span className="text-slate-400">Method</span>
                 <p className="text-slate-700 font-medium capitalize">{payment.method.replace("_", " ")}</p>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
               <div>
                 <span className="text-slate-400">Date</span>
-                <p className="text-slate-700 font-medium">{new Date(payment.created_at).toLocaleDateString()}</p>
+                <p className="text-slate-700 font-medium">
+                  {payment.subscriptions?.start_date
+                    ? new Date(payment.subscriptions.start_date + "T00:00:00").toLocaleDateString()
+                    : payment.confirmed_at
+                      ? new Date(payment.confirmed_at).toLocaleDateString()
+                      : "—"}
+                </p>
               </div>
             </div>
             {payment.status === "rejected" && payment.rejection_reason && (
@@ -319,7 +335,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
         {payments.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</span>
-            <span className="text-sm font-bold text-slate-900">{total.toLocaleString()} EGP</span>
+            <span className="text-sm font-bold text-slate-900">{grandTotal.toLocaleString()} EGP</span>
           </div>
         )}
         {payments.length === 0 && (

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
-import { updatePlayer, resetPlayerPassword } from "../[id]/actions";
+import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance } from "../[id]/actions";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import type { PlayerRow } from "./types";
 import { getPlayerStatus } from "./types";
@@ -113,6 +113,10 @@ function DrawerContent({
   const [copied, setCopied] = useState(false);
   const [isResetting, startResetTransition] = useTransition();
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [editingSessions, setEditingSessions] = useState(false);
+  const [editRemaining, setEditRemaining] = useState(0);
+  const [editTotal, setEditTotal] = useState(0);
+  const [isSavingSessions, startSessionsTransition] = useTransition();
 
   // Reset to detail view when player changes
   useEffect(() => {
@@ -121,6 +125,7 @@ function DrawerContent({
     setPasswordError(null);
     setCopied(false);
     setShowAddPayment(false);
+    setEditingSessions(false);
   }, [player.id]);
 
   function handleResetPassword() {
@@ -226,14 +231,68 @@ function DrawerContent({
                   </div>
                 </div>
                 <div className="flex items-start justify-between px-4 py-3">
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xs text-slate-400">Sessions</p>
-                    <p className={cn(
-                      "text-sm font-medium",
-                      sessionsOut ? "text-red-600" : sessionsLow ? "text-amber-600" : "text-slate-700"
-                    )}>
-                      {activeSub.sessions_remaining}/{activeSub.sessions_total} remaining
-                    </p>
+                    {editingSessions ? (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          value={editRemaining}
+                          onChange={(e) => setEditRemaining(Math.max(0, Number(e.target.value)))}
+                          className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                        />
+                        <span className="text-sm text-slate-400">/</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={editTotal}
+                          onChange={(e) => setEditTotal(Math.max(1, Number(e.target.value)))}
+                          className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                        />
+                        <button
+                          onClick={() => {
+                            startSessionsTransition(async () => {
+                              const res = await updateSubscriptionBalance(activeSub.id, editRemaining, editTotal);
+                              if (!("error" in res)) {
+                                setEditingSessions(false);
+                                onDataChange();
+                              }
+                            });
+                          }}
+                          disabled={isSavingSessions}
+                          className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
+                        >
+                          {isSavingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => setEditingSessions(false)}
+                          className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <p className={cn(
+                          "text-sm font-medium",
+                          sessionsOut ? "text-red-600" : sessionsLow ? "text-amber-600" : "text-slate-700"
+                        )}>
+                          {activeSub.sessions_remaining}/{activeSub.sessions_total} remaining
+                        </p>
+                        <button
+                          onClick={() => {
+                            setEditRemaining(activeSub.sessions_remaining);
+                            setEditTotal(activeSub.sessions_total);
+                            setEditingSessions(true);
+                          }}
+                          className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                          title="Edit balance"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-slate-400">Expires</p>

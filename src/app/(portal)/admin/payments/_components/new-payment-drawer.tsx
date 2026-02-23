@@ -5,7 +5,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Select, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Search, X } from "lucide-react";
-import { createAdminPayment } from "../actions";
+import { cn } from "@/lib/utils/cn";
+import { createAdminPayment, createStandalonePayment } from "../actions";
 
 interface PackageOption {
   id: string;
@@ -21,6 +22,8 @@ interface PlayerOption {
   last_name: string;
   email: string | null;
 }
+
+type PaymentType = "subscription" | "standalone";
 
 interface NewPaymentDrawerProps {
   open: boolean;
@@ -42,6 +45,9 @@ export function NewPaymentDrawer({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
+  // Payment type toggle
+  const [paymentType, setPaymentType] = useState<PaymentType>("subscription");
+
   // Player search
   const [playerSearch, setPlayerSearch] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerOption[]>([]);
@@ -55,6 +61,7 @@ export function NewPaymentDrawer({
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "instapay">(defaultMethod || "cash");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [note, setNote] = useState("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,6 +86,7 @@ export function NewPaymentDrawer({
   useEffect(() => {
     if (open && prefillPlayerId && prefillPlayerName) {
       setSelectedPlayer({ id: prefillPlayerId, name: prefillPlayerName });
+      setPaymentType("subscription");
     }
   }, [open, prefillPlayerId, prefillPlayerName]);
 
@@ -93,7 +101,9 @@ export function NewPaymentDrawer({
       setAmount("");
       setMethod(defaultMethod || "cash");
       setPaymentDate(new Date().toISOString().split("T")[0]);
+      setNote("");
       setError("");
+      setPaymentType(prefillPlayerId ? "subscription" : "subscription");
     }
   }, [open, prefillPlayerId, prefillPlayerName, defaultMethod]);
 
@@ -150,26 +160,51 @@ export function NewPaymentDrawer({
 
   function handleSubmit() {
     setError("");
-    if (!selectedPlayer) { setError("Please select a player"); return; }
-    if (!packageId) { setError("Please select a package"); return; }
-    if (!amount || Number(amount) <= 0) { setError("Please enter a valid amount"); return; }
 
-    startTransition(async () => {
-      const res = await createAdminPayment({
-        player_id: selectedPlayer.id,
-        package_id: packageId,
-        amount: Number(amount),
-        method,
-        payment_date: paymentDate,
+    if (paymentType === "standalone") {
+      if (!packageId) { setError("Please select a package"); return; }
+      if (!amount || Number(amount) <= 0) { setError("Please enter a valid amount"); return; }
+      if (!note.trim()) { setError("Please enter a note describing this payment"); return; }
+
+      startTransition(async () => {
+        const res = await createStandalonePayment({
+          package_id: packageId,
+          amount: Number(amount),
+          method,
+          note: note.trim(),
+          payment_date: paymentDate,
+        });
+        if (res.error) {
+          setError(res.error);
+        } else {
+          onSuccess();
+          onClose();
+        }
       });
-      if (res.error) {
-        setError(res.error);
-      } else {
-        onSuccess();
-        onClose();
-      }
-    });
+    } else {
+      if (!selectedPlayer) { setError("Please select a player"); return; }
+      if (!packageId) { setError("Please select a package"); return; }
+      if (!amount || Number(amount) <= 0) { setError("Please enter a valid amount"); return; }
+
+      startTransition(async () => {
+        const res = await createAdminPayment({
+          player_id: selectedPlayer.id,
+          package_id: packageId,
+          amount: Number(amount),
+          method,
+          payment_date: paymentDate,
+        });
+        if (res.error) {
+          setError(res.error);
+        } else {
+          onSuccess();
+          onClose();
+        }
+      });
+    }
   }
+
+  const isStandalone = paymentType === "standalone";
 
   return (
     <Drawer
@@ -194,57 +229,105 @@ export function NewPaymentDrawer({
       }
     >
       <div className="space-y-5">
-        {/* Player selection */}
-        <div>
-          <Label required>Player</Label>
-          {selectedPlayer ? (
-            <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-200">
-              <span className="text-sm font-medium text-slate-900">{selectedPlayer.name}</span>
-              {!prefillPlayerId && (
-                <button
-                  onClick={() => { setSelectedPlayer(null); setPlayerSearch(""); }}
-                  className="p-0.5 rounded text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+        {/* Payment type toggle */}
+        {!prefillPlayerId && (
+          <div>
+            <Label>Payment Type</Label>
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setPaymentType("subscription")}
+                className={cn(
+                  "py-2 text-xs font-medium rounded-md transition-colors",
+                  !isStandalone
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Subscription
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentType("standalone")}
+                className={cn(
+                  "py-2 text-xs font-medium rounded-md transition-colors",
+                  isStandalone
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Single / Private
+              </button>
             </div>
-          ) : (
-            <div ref={searchRef} className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  value={playerSearch}
-                  onChange={(e) => setPlayerSearch(e.target.value)}
-                  onFocus={() => playerResults.length > 0 && setShowResults(true)}
-                  placeholder="Search by name or email..."
-                  className="pl-9"
-                />
-              </div>
-              {showResults && playerResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {playerResults.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => handleSelectPlayer(p)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
-                    >
-                      <p className="text-sm font-medium text-slate-900">{p.first_name} {p.last_name}</p>
-                      {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {showResults && playerSearch.trim() && playerResults.length === 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-3 text-sm text-slate-400 text-center">
-                  No players found
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Package */}
+        {/* Subscription mode: Player selection */}
+        {!isStandalone && (
+          <div>
+            <Label required>Player</Label>
+            {selectedPlayer ? (
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-200">
+                <span className="text-sm font-medium text-slate-900">{selectedPlayer.name}</span>
+                {!prefillPlayerId && (
+                  <button
+                    onClick={() => { setSelectedPlayer(null); setPlayerSearch(""); }}
+                    className="p-0.5 rounded text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div ref={searchRef} className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    onFocus={() => playerResults.length > 0 && setShowResults(true)}
+                    placeholder="Search by name or email..."
+                    className="pl-9"
+                  />
+                </div>
+                {showResults && playerResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {playerResults.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleSelectPlayer(p)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                      >
+                        <p className="text-sm font-medium text-slate-900">{p.first_name} {p.last_name}</p>
+                        {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showResults && playerSearch.trim() && playerResults.length === 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-3 text-sm text-slate-400 text-center">
+                    No players found
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Standalone mode: Note */}
+        {isStandalone && (
+          <div>
+            <Label required>Note</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Single session — John"
+            />
+            <p className="text-xs text-slate-400 mt-1">Describe this payment (player name, session type, etc.)</p>
+          </div>
+        )}
+
+        {/* Package (shown for both modes) */}
         <div>
           <Label required>Package</Label>
           <Select value={packageId} onChange={(e) => handlePackageChange(e.target.value)}>

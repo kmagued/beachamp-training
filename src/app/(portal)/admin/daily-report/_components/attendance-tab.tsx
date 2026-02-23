@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button } from "@/components/ui";
-import { Loader2, Check, Clock, Users } from "lucide-react";
+import { Card, Badge, Button, Input } from "@/components/ui";
+import { Loader2, Check, Clock, Users, UserPlus, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { submitAttendance } from "@/app/_actions/training";
+import { submitAttendance, quickAddPlayer } from "@/app/_actions/training";
 
 interface ScheduleSession {
   id: string;
@@ -47,6 +47,12 @@ export function AttendanceTab({ date }: { date: string }) {
   const [savedSessions, setSavedSessions] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
+  const [addingGuestFor, setAddingGuestFor] = useState<string | null>(null);
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName] = useState("");
+  const [addingGuest, setAddingGuest] = useState(false);
+  // Track guest players added to sessions (not in the group)
+  const [guestPlayers, setGuestPlayers] = useState<Record<string, GroupPlayer[]>>({});
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -158,9 +164,11 @@ export function AttendanceTab({ date }: { date: string }) {
 
   function markAllPresent(sessionId: string, groupId: string) {
     const players = sessionPlayers[groupId] || [];
+    const guests = guestPlayers[sessionId] || [];
     setAttendanceState((prev) => {
       const sessionState: SessionAttendanceState = {};
       players.forEach((p) => { sessionState[p.player_id] = "present"; });
+      guests.forEach((g) => { sessionState[g.player_id] = "present"; });
       return { ...prev, [sessionId]: sessionState };
     });
     setSavedSessions((prev) => {
@@ -168,6 +176,49 @@ export function AttendanceTab({ date }: { date: string }) {
       next.delete(sessionId);
       return next;
     });
+  }
+
+  async function handleAddGuest(sessionId: string) {
+    if (!guestFirstName.trim() || !guestLastName.trim()) return;
+
+    setAddingGuest(true);
+    const res = await quickAddPlayer(guestFirstName.trim(), guestLastName.trim());
+    setAddingGuest(false);
+
+    if ("error" in res) return;
+
+    const newPlayer: GroupPlayer = {
+      player_id: res.playerId!,
+      profiles: {
+        id: res.playerId!,
+        first_name: guestFirstName.trim(),
+        last_name: guestLastName.trim(),
+      },
+    };
+
+    // Add to guest players for this session
+    setGuestPlayers((prev) => ({
+      ...prev,
+      [sessionId]: [...(prev[sessionId] || []), newPlayer],
+    }));
+
+    // Set as present in attendance state
+    setAttendanceState((prev) => ({
+      ...prev,
+      [sessionId]: { ...prev[sessionId], [res.playerId!]: "present" },
+    }));
+
+    // Mark session as unsaved
+    setSavedSessions((prev) => {
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
+
+    // Reset form
+    setGuestFirstName("");
+    setGuestLastName("");
+    setAddingGuestFor(null);
   }
 
   function handleSaveSession(session: ScheduleSession) {
@@ -230,6 +281,8 @@ export function AttendanceTab({ date }: { date: string }) {
     <div className="space-y-4">
       {sessions.map((session) => {
         const players = sessionPlayers[session.group_id] || [];
+        const guests = guestPlayers[session.id] || [];
+        const allPlayers = [...players, ...guests];
         const state = attendanceState[session.id] || {};
         const presentCount = Object.values(state).filter((s) => s === "present").length;
         const isSaved = savedSessions.has(session.id);
@@ -252,7 +305,7 @@ export function AttendanceTab({ date }: { date: string }) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">
-                  {presentCount}/{players.length} present
+                  {presentCount}/{allPlayers.length} present
                 </span>
                 {isSaved ? (
                   <Badge variant="success">
@@ -263,7 +316,7 @@ export function AttendanceTab({ date }: { date: string }) {
                 ) : (
                   <Button
                     onClick={() => handleSaveSession(session)}
-                    disabled={isPending || players.length === 0}
+                    disabled={isPending || allPlayers.length === 0}
                   >
                     {isSaving ? (
                       <span className="flex items-center gap-1.5">
@@ -277,25 +330,76 @@ export function AttendanceTab({ date }: { date: string }) {
               </div>
             </div>
 
-            {players.length === 0 ? (
-              <div className="px-5 py-6 text-center">
-                <Users className="w-6 h-6 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">No players in this group</p>
-              </div>
-            ) : (
-              <>
-                <div className="px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Players</span>
+            <>
+              <div className="px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Players</span>
+                <div className="flex items-center gap-3">
+                  {allPlayers.length > 0 && (
+                    <button
+                      onClick={() => markAllPresent(session.id, session.group_id)}
+                      className="text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Mark All Present
+                    </button>
+                  )}
                   <button
-                    onClick={() => markAllPresent(session.id, session.group_id)}
-                    className="text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                    onClick={() => {
+                      setAddingGuestFor(addingGuestFor === session.id ? null : session.id);
+                      setGuestFirstName("");
+                      setGuestLastName("");
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700 transition-colors"
                   >
-                    Mark All Present
+                    <UserPlus className="w-3 h-3" /> Add Guest
                   </button>
                 </div>
+              </div>
+
+              {/* Add guest inline form */}
+              {addingGuestFor === session.id && (
+                <div className="px-5 py-3 bg-primary-50/30 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={guestFirstName}
+                      onChange={(e) => setGuestFirstName(e.target.value)}
+                      placeholder="First name"
+                      className="flex-1 text-sm"
+                    />
+                    <Input
+                      value={guestLastName}
+                      onChange={(e) => setGuestLastName(e.target.value)}
+                      placeholder="Last name"
+                      className="flex-1 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddGuest(session.id);
+                      }}
+                    />
+                    <Button
+                      onClick={() => handleAddGuest(session.id)}
+                      disabled={addingGuest || !guestFirstName.trim() || !guestLastName.trim()}
+                    >
+                      {addingGuest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
+                    </Button>
+                    <button
+                      onClick={() => setAddingGuestFor(null)}
+                      className="p-1 rounded text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {allPlayers.length === 0 ? (
+                <div className="px-5 py-6 text-center">
+                  <Users className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">No players in this group</p>
+                </div>
+              ) : (
                 <div className="divide-y divide-slate-100">
-                  {players.map((gp) => {
+                  {allPlayers.map((gp) => {
                     const status = state[gp.player_id] || "absent";
+                    const isGuest = guests.some((g) => g.player_id === gp.player_id);
                     return (
                       <div
                         key={gp.player_id}
@@ -303,6 +407,9 @@ export function AttendanceTab({ date }: { date: string }) {
                       >
                         <span className="text-sm text-slate-700">
                           {gp.profiles.first_name} {gp.profiles.last_name}
+                          {isGuest && (
+                            <span className="ml-1.5 text-[10px] text-slate-400 font-medium uppercase">Guest</span>
+                          )}
                         </span>
                         <button
                           onClick={() => toggleStatus(session.id, gp.player_id)}
@@ -319,8 +426,8 @@ export function AttendanceTab({ date }: { date: string }) {
                     );
                   })}
                 </div>
-              </>
-            )}
+              )}
+            </>
           </Card>
         );
       })}
