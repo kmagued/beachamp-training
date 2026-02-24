@@ -6,24 +6,31 @@ import { Badge, Card, Button, Input, Select, Label, DatePicker, Textarea } from 
 import {
   X, Mail, Phone, MapPin, Calendar, Heart, Target, Dumbbell,
   KeyRound, Pencil, Copy, Check, ExternalLink, Loader2, ArrowLeft, AlertTriangle,
-  Ruler, Hand, Shield, Users,
+  Ruler, Hand, Shield, Users, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
-import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance } from "../[id]/actions";
+import { useRouter } from "next/navigation";
+import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance, deletePlayer } from "../[id]/actions";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
-import type { PlayerRow } from "./types";
-import { getPlayerStatus } from "./types";
+import type { PlayerRow, ActivityStatus, SubscriptionStatus } from "./types";
+import { getActivityStatus, getSubscriptionStatus } from "./types";
 
-function StatusBadge({ status }: { status: string }) {
+function ActivityBadge({ status }: { status: ActivityStatus }) {
+  if (status === "active") return <Badge variant="success">Active</Badge>;
+  return <Badge variant="neutral">Inactive</Badge>;
+}
+
+function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
   switch (status) {
-    case "active": return <Badge variant="success">Active</Badge>;
+    case "active": return <Badge variant="success">Subscribed</Badge>;
+    case "attended": return <Badge variant="success">Attended</Badge>;
     case "completed": return <Badge variant="neutral">Completed</Badge>;
     case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
     case "expiring": return <Badge variant="danger">Expiring</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending</Badge>;
-    default: return <Badge variant="neutral">Inactive</Badge>;
+    case "none": return <Badge variant="neutral">No Sub</Badge>;
   }
 }
 
@@ -107,6 +114,7 @@ function DrawerContent({
   onClose: () => void;
   onDataChange: () => void;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<"detail" | "edit">("detail");
   const [passwordResult, setPasswordResult] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -117,6 +125,8 @@ function DrawerContent({
   const [editRemaining, setEditRemaining] = useState(0);
   const [editTotal, setEditTotal] = useState(0);
   const [isSavingSessions, startSessionsTransition] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   // Reset to detail view when player changes
   useEffect(() => {
@@ -126,6 +136,7 @@ function DrawerContent({
     setCopied(false);
     setShowAddPayment(false);
     setEditingSessions(false);
+    setConfirmDelete(false);
   }, [player.id]);
 
   function handleResetPassword() {
@@ -159,7 +170,8 @@ function DrawerContent({
     );
   }
 
-  const status = getPlayerStatus(player);
+  const activity = getActivityStatus(player);
+  const subStatus = getSubscriptionStatus(player);
   const now = Date.now();
   const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
   // Current subscription: covers today's date
@@ -196,8 +208,9 @@ function DrawerContent({
             <p className="text-lg font-bold text-slate-900 truncate">
               {player.first_name} {player.last_name}
             </p>
-            <div className="flex items-center gap-2 mt-1">
-              <StatusBadge status={status} />
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <ActivityBadge status={activity} />
+              <SubscriptionBadge status={subStatus} />
               <LevelBadge level={player.playing_level} />
             </div>
           </div>
@@ -205,17 +218,20 @@ function DrawerContent({
 
         {/* Active subscription card */}
         {activeSub && (() => {
+          const isSingleSession = activeSub.sessions_total === 1;
           const daysLeft = activeSub.end_date
             ? Math.ceil((new Date(activeSub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : null;
-          const isExpiringSoon = daysLeft !== null && daysLeft <= 7;
-          const isExpired = daysLeft !== null && daysLeft <= 0;
-          const sessionsLow = activeSub.sessions_remaining <= 2;
-          const sessionsOut = activeSub.sessions_remaining <= 0;
+          const isExpiringSoon = !isSingleSession && daysLeft !== null && daysLeft <= 7;
+          const isExpired = !isSingleSession && daysLeft !== null && daysLeft <= 0;
+          const sessionsLow = !isSingleSession && activeSub.sessions_remaining <= 2;
+          const sessionsOut = !isSingleSession && activeSub.sessions_remaining <= 0;
+          const isAttended = isSingleSession && activeSub.sessions_remaining <= 0;
 
           return (
             <div className={cn(
               "rounded-xl border bg-white",
+              isAttended ? "border-emerald-200" :
               isExpired || sessionsOut ? "border-red-200" :
               isExpiringSoon || sessionsLow ? "border-amber-200" : "border-slate-200"
             )}>
@@ -278,7 +294,7 @@ function DrawerContent({
                           "text-sm font-medium",
                           sessionsOut ? "text-red-600" : sessionsLow ? "text-amber-600" : "text-slate-700"
                         )}>
-                          {activeSub.sessions_remaining}/{activeSub.sessions_total} remaining
+                          {activeSub.sessions_total === 1 ? activeSub.sessions_remaining : `${activeSub.sessions_remaining}/${activeSub.sessions_total}`} remaining
                         </p>
                         <button
                           onClick={() => {
@@ -302,12 +318,18 @@ function DrawerContent({
                       isExpiringSoon ? "text-amber-600 font-medium" : "text-slate-700"
                     )}>
                       {activeSub.end_date
-                        ? new Date(activeSub.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        ? new Date(activeSub.end_date).toLocaleDateString("en-GB")
                         : "—"}
                     </p>
                   </div>
                 </div>
-                {(isExpiringSoon || sessionsLow) && (
+                {isAttended && (
+                  <div className="px-4 py-2 flex items-center gap-2 text-xs bg-emerald-50 text-emerald-600">
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                    Session attended
+                  </div>
+                )}
+                {!isAttended && (isExpiringSoon || sessionsLow) && (
                   <div className={cn(
                     "px-4 py-2 flex items-center gap-2 text-xs",
                     isExpired || sessionsOut ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
@@ -343,14 +365,14 @@ function DrawerContent({
                 <div>
                   <p className="text-xs text-slate-400">Sessions</p>
                   <p className="text-sm text-slate-700 font-medium">
-                    {upcomingSub.sessions_remaining}/{upcomingSub.sessions_total}
+                    {upcomingSub.sessions_total === 1 ? upcomingSub.sessions_remaining : `${upcomingSub.sessions_remaining}/${upcomingSub.sessions_total}`}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400">Starts</p>
                   <p className="text-sm text-primary font-medium">
                     {upcomingSub.start_date
-                      ? new Date(upcomingSub.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      ? new Date(upcomingSub.start_date).toLocaleDateString("en-GB")
                       : "—"}
                   </p>
                 </div>
@@ -420,7 +442,7 @@ function DrawerContent({
                 <p className="text-xs text-slate-400">Date of Birth</p>
                 <p className="text-sm text-slate-700">
                   {player.date_of_birth
-                    ? new Date(player.date_of_birth).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                    ? new Date(player.date_of_birth).toLocaleDateString("en-GB")
                     : "—"}
                 </p>
               </div>
@@ -493,7 +515,7 @@ function DrawerContent({
         {/* Registered */}
         <div className="flex items-center gap-3 px-1 text-xs text-slate-400">
           <Calendar className="w-3.5 h-3.5" />
-          Registered {new Date(player.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+          Registered {new Date(player.created_at).toLocaleDateString("en-GB")}
         </div>
       </div>
 
@@ -521,6 +543,13 @@ function DrawerContent({
               Reset Password
             </span>
           </Button>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+            title="Delete Player"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
         <Button onClick={() => setShowAddPayment(true)} fullWidth>
           + Add Payment
@@ -586,6 +615,56 @@ function DrawerContent({
           </Card>
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <Card className="w-full max-w-md mx-4">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">Delete Player</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Are you sure you want to delete <span className="font-medium text-slate-700">{player.first_name} {player.last_name}</span>? This will permanently remove their profile, subscriptions, payments, and attendance records.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setConfirmDelete(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <button
+                onClick={() => {
+                  startDeleteTransition(async () => {
+                    const res = await deletePlayer(player.id);
+                    if (res.success) {
+                      setConfirmDelete(false);
+                      onClose();
+                      onDataChange();
+                    }
+                  });
+                }}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Deleting...
+                  </span>
+                ) : (
+                  "Delete Player"
+                )}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
@@ -622,6 +701,9 @@ function EditView({
   const [guardianName, setGuardianName] = useState(player.guardian_name || "");
   const [guardianPhone, setGuardianPhone] = useState(player.guardian_phone || "");
   const [isActive, setIsActive] = useState(player.is_active);
+  const [registrationDate, setRegistrationDate] = useState(
+    player.created_at ? new Date(player.created_at).toISOString().split("T")[0] : ""
+  );
 
   function handleSubmit() {
     setError("");
@@ -642,6 +724,7 @@ function EditView({
     formData.set("guardian_name", guardianName);
     formData.set("guardian_phone", guardianPhone);
     formData.set("is_active", String(isActive));
+    formData.set("created_at", registrationDate);
 
     startTransition(async () => {
       const res = await updatePlayer(player.id, formData);
@@ -708,14 +791,23 @@ function EditView({
               />
             </div>
             <div>
-              <Label>Area</Label>
-              <Select value={area} onChange={(e) => setArea(e.target.value)}>
-                <option value="">Select area...</option>
-                {branding.areas.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </Select>
+              <Label>Registration Date</Label>
+              <DatePicker
+                value={registrationDate}
+                onChange={(e) => setRegistrationDate(e.target.value)}
+                placeholder="Registration date"
+              />
             </div>
+          </div>
+
+          <div>
+            <Label>Area</Label>
+            <Select value={area} onChange={(e) => setArea(e.target.value)}>
+              <option value="">Select area...</option>
+              {branding.areas.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

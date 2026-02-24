@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200, 500];
 
 interface PaginationProps {
   currentPage: number;

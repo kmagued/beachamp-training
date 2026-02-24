@@ -33,7 +33,7 @@ function formatTime(time: string) {
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(date).toLocaleDateString("en-GB");
 }
 
 interface SessionEntry {

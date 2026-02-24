@@ -2,8 +2,8 @@ import { RefObject, useState } from "react";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import type { PlayerRow, SortField, SortDir } from "./types";
-import { getPlayerStatus } from "./types";
+import type { PlayerRow, SortField, SortDir, ActivityStatus, SubscriptionStatus } from "./types";
+import { getActivityStatus, getSubscriptionStatus, getLatestSubscription } from "./types";
 
 function getDaysLeft(endDate: string | null): number | null {
   if (!endDate) return null;
@@ -37,15 +37,21 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
   return sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function ActivityBadge({ status }: { status: ActivityStatus }) {
+  if (status === "active") return <Badge variant="success">Active</Badge>;
+  return <Badge variant="neutral">Inactive</Badge>;
+}
+
+function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
   switch (status) {
     case "active": return <Badge variant="success">Active</Badge>;
+    case "attended": return <Badge variant="success">Attended</Badge>;
     case "completed": return <Badge variant="neutral">Completed</Badge>;
     case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
     case "expiring": return <Badge variant="danger">Expiring</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending</Badge>;
-    default: return <Badge variant="neutral">Inactive</Badge>;
+    case "none": return <Badge variant="neutral">No Sub</Badge>;
   }
 }
 
@@ -176,7 +182,9 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <th className={thSortable} onClick={() => toggleSort("package")}>
                   <span className="inline-flex items-center gap-1">Package <SortIcon field="package" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                <th className={thBase}>Sessions</th>
+                <th className={thSortable} onClick={() => toggleSort("sessions")}>
+                  <span className="inline-flex items-center gap-1">Sessions <SortIcon field="sessions" sortField={sortField} sortDir={sortDir} /></span>
+                </th>
                 <th className={thSortable} onClick={() => toggleSort("expires")}>
                   <span className="inline-flex items-center gap-1">Expires <SortIcon field="expires" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
@@ -187,24 +195,27 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <th className={thSortable} onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1">Registered <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
-                {/* Sticky right */}
-                <th className={cn(thSortable, "sticky right-0 z-20 bg-white border-l border-l-slate-200")} onClick={() => toggleSort("status")}>
-                  <div className="flex items-center gap-3 justify-between">
-                    <span className="inline-flex items-center gap-1">Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} /></span>
-                    <span>Contact</span>
-                  </div>
+                {/* Sticky right group */}
+                <th className={cn(thBase, "sticky right-[200px] z-20 bg-white border-l border-l-slate-200")}>Activity</th>
+                <th className={cn(thSortable, "sticky right-[72px] z-20 bg-white")} onClick={() => toggleSort("subscription")}>
+                  <span className="inline-flex items-center gap-1">Subscription <SortIcon field="subscription" sortField={sortField} sortDir={sortDir} /></span>
+                </th>
+                <th className={cn(thBase, "sticky right-0 z-20 bg-white")}>
+                  Contact
                 </th>
               </tr>
             </thead>
             <tbody>
               {players.map((player, i) => {
-                const activeSub = player.subscriptions?.find((s) => s.status === "active");
-                const status = getPlayerStatus(player);
+                const latestSub = getLatestSubscription(player);
+                const activity = getActivityStatus(player);
+                const subStatus = getSubscriptionStatus(player);
+                const isSingleSession = latestSub?.sessions_total === 1;
                 const highlighted = isHighlighted(player.id);
                 const selected = selectedIds.has(player.id);
                 const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
-                const daysLeft = activeSub ? getDaysLeft(activeSub.end_date) : null;
-                const showExpiryWarning = status !== "completed" && daysLeft !== null;
+                const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
+                const showExpiryWarning = subStatus !== "completed" && daysLeft !== null;
                 return (
                   <tr
                     key={player.id}
@@ -234,20 +245,20 @@ export function PlayersTableView(props: PlayersTableProps) {
                     </td>
                     {/* Scrollable middle */}
                     <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
-                      {activeSub?.packages?.name || "—"}
+                      {latestSub?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
+                      {latestSub ? (latestSub.sessions_total === 1 ? latestSub.sessions_remaining : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`) : "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm")}>
-                      {activeSub?.end_date ? (
+                    <td className={cn(tdBase, "text-sm whitespace-nowrap")}>
+                      {isSingleSession ? "—" : latestSub?.end_date ? (
                         <div>
                           <span className={cn(
                             showExpiryWarning && daysLeft! <= 3 ? "text-red-600 font-medium" :
                             showExpiryWarning && daysLeft! <= 7 ? "text-amber-600 font-medium" :
                             "text-slate-500"
                           )}>
-                            {new Date(activeSub.end_date).toLocaleDateString()}
+                            {new Date(latestSub.end_date).toLocaleDateString("en-GB")}
                           </span>
                           {showExpiryWarning && daysLeft! <= 7 && (
                             <p className={cn(
@@ -277,22 +288,25 @@ export function PlayersTableView(props: PlayersTableProps) {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {new Date(player.created_at).toLocaleDateString()}
+                    <td className={cn(tdBase, "text-sm text-slate-500 whitespace-nowrap")}>
+                      {new Date(player.created_at).toLocaleDateString("en-GB")}
                     </td>
-                    {/* Sticky right: status + contact */}
-                    <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
-                      <div className="flex items-center gap-3 justify-between">
-                        <StatusBadge status={status} />
-                        <ContactIcons phone={player.phone} email={player.email} />
-                      </div>
+                    {/* Sticky right group: activity + subscription + contact */}
+                    <td className={cn(tdBase, "sticky right-[200px] z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
+                      <ActivityBadge status={activity} />
+                    </td>
+                    <td className={cn(tdBase, "sticky right-[72px] z-10 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
+                      <SubscriptionBadge status={subStatus} />
+                    </td>
+                    <td className={cn(tdBase, "sticky right-0 z-10 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
+                      <ContactIcons phone={player.phone} email={player.email} />
                     </td>
                   </tr>
                 );
               })}
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -305,11 +319,13 @@ export function PlayersTableView(props: PlayersTableProps) {
       {/* Mobile Cards */}
       <div className="sm:hidden space-y-3">
         {players.map((player) => {
-          const activeSub = player.subscriptions?.find((s) => s.status === "active");
-          const status = getPlayerStatus(player);
+          const latestSub = getLatestSubscription(player);
+          const activity = getActivityStatus(player);
+          const subStatus = getSubscriptionStatus(player);
+          const isSingleSession = latestSub?.sessions_total === 1;
           const selected = selectedIds.has(player.id);
-          const daysLeft = activeSub ? getDaysLeft(activeSub.end_date) : null;
-          const showExpiryWarning = status !== "completed" && daysLeft !== null;
+          const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
+          const showExpiryWarning = subStatus !== "completed" && daysLeft !== null;
           return (
             <Card
               key={player.id}
@@ -335,21 +351,21 @@ export function PlayersTableView(props: PlayersTableProps) {
                     </p>
                     <p className="text-xs text-slate-400">{player.email}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={status} />
-                    <ContactIcons phone={player.phone} email={player.email} />
+                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                    <ActivityBadge status={activity} />
+                    <SubscriptionBadge status={subStatus} />
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                 <div>
                   <span className="text-slate-400">Package</span>
-                  <p className="text-slate-700 font-medium">{activeSub?.packages?.name || "—"}</p>
+                  <p className="text-slate-700 font-medium">{latestSub?.packages?.name || "—"}</p>
                 </div>
                 <div>
                   <span className="text-slate-400">Sessions</span>
                   <p className="font-medium text-slate-700">
-                    {activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
+                    {latestSub ? (latestSub.sessions_total === 1 ? latestSub.sessions_remaining : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`) : "—"}
                   </p>
                 </div>
                 <div>
@@ -360,7 +376,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                     showExpiryWarning && daysLeft! <= 7 ? "text-amber-600" :
                     "text-slate-700"
                   )}>
-                    {activeSub?.end_date ? new Date(activeSub.end_date).toLocaleDateString() : "—"}
+                    {isSingleSession ? "—" : latestSub?.end_date ? new Date(latestSub.end_date).toLocaleDateString("en-GB") : "—"}
                     {showExpiryWarning && daysLeft! <= 7 && (
                       <span className="ml-1">({daysLeft! <= 0 ? "Expired" : `${daysLeft}d`})</span>
                     )}
@@ -386,7 +402,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <div>
                   <span className="text-slate-400">Registered</span>
                   <p className="text-slate-700 font-medium">
-                    {new Date(player.created_at).toLocaleDateString()}
+                    {new Date(player.created_at).toLocaleDateString("en-GB")}
                   </p>
                 </div>
               </div>

@@ -2,10 +2,10 @@
 
 import { Suspense, useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Badge, Pagination, SelectionBar } from "@/components/ui";
+import { Badge, Pagination, SelectionBar, DatePicker } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import { useSearchParams } from "next/navigation";
-import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus } from "./actions";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus, bulkUpdatePaymentDate } from "./actions";
 import type { PaymentRow, SortField, SortDir } from "./_components/types";
 import { PaymentsPageSkeleton, PaymentsInlineSkeleton } from "./_components/skeleton";
 import { PaymentsFilters } from "./_components/filters";
@@ -23,6 +23,9 @@ export default function AdminPaymentsPage() {
   );
 }
 
+const VALID_PAY_SORT_FIELDS: SortField[] = ["date", "amount", "status"];
+const VALID_PAY_SORT_DIRS: SortDir[] = ["asc", "desc"];
+
 function AdminPaymentsContent() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,23 +36,50 @@ function AdminPaymentsContent() {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [drawerPayment, setDrawerPayment] = useState<PaymentRow | null>(null);
   const [showNewPayment, setShowNewPayment] = useState(false);
+  const [bulkDate, setBulkDate] = useState("");
 
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const initialStatusParam = searchParams.get("status");
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(
-    initialStatusParam
-      ? initialStatusParam.charAt(0).toUpperCase() + initialStatusParam.slice(1)
-      : ""
+    searchParams.get("statusFilter")
+      || (initialStatusParam ? initialStatusParam.charAt(0).toUpperCase() + initialStatusParam.slice(1) : "")
   );
-  const [packageFilter, setPackageFilter] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [sortField, setSortField] = useState<SortField>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [packageFilter, setPackageFilter] = useState(searchParams.get("package") || "");
+  const [monthFilter, setMonthFilter] = useState(searchParams.get("month") || "");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
+  const [sortField, setSortField] = useState<SortField>(
+    VALID_PAY_SORT_FIELDS.includes(searchParams.get("sort") as SortField) ? (searchParams.get("sort") as SortField) : "date"
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(
+    VALID_PAY_SORT_DIRS.includes(searchParams.get("dir") as SortDir) ? (searchParams.get("dir") as SortDir) : "desc"
+  );
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
+  const [pageSize, setPageSize] = useState(Number(searchParams.get("size")) || 10);
+
+  // Sync state to URL search params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (statusFilter) params.set("statusFilter", statusFilter);
+    if (packageFilter) params.set("package", packageFilter);
+    if (monthFilter) params.set("month", monthFilter);
+    if (typeFilter) params.set("type", typeFilter);
+    if (sortField !== "date") params.set("sort", sortField);
+    if (sortDir !== "desc") params.set("dir", sortDir);
+    if (currentPage > 1) params.set("page", String(currentPage));
+    if (pageSize !== 10) params.set("size", String(pageSize));
+    // Preserve highlight param if present
+    const highlight = searchParams.get("highlight");
+    if (highlight) params.set("highlight", highlight);
+    const qs = params.toString();
+    const url = qs ? `${pathname}?${qs}` : pathname;
+    router.replace(url, { scroll: false });
+  }, [search, statusFilter, packageFilter, monthFilter, typeFilter, sortField, sortDir, currentPage, pageSize, pathname, router, searchParams]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -64,7 +94,8 @@ function AdminPaymentsContent() {
     const { data } = await supabase
       .from("payments")
       .select("*, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(start_date, end_date, packages(name))")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(5000);
     if (data) setPayments(data as unknown as PaymentRow[]);
     setLoading(false);
   }
@@ -83,14 +114,21 @@ function AdminPaymentsContent() {
     return [...names].sort();
   }, [payments]);
 
+  function getPaymentDate(p: PaymentRow): Date {
+    if (p.subscriptions?.start_date) return new Date(p.subscriptions.start_date + "T00:00:00");
+    if (p.confirmed_at) return new Date(p.confirmed_at);
+    return new Date(p.created_at);
+  }
+
   // Derive unique months from payments (sorted newest first)
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
     payments.forEach((p) => {
-      const d = new Date(p.created_at);
+      const d = getPaymentDate(p);
       months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
     });
-    return [...months];
+    return [...months].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payments]);
 
   // Filtered + sorted payments
@@ -108,7 +146,7 @@ function AdminPaymentsContent() {
 
     if (monthFilter) {
       result = result.filter((p) => {
-        const d = new Date(p.created_at);
+        const d = getPaymentDate(p);
         return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === monthFilter;
       });
     }
@@ -225,6 +263,16 @@ function AdminPaymentsContent() {
     });
   }
 
+  function handleBulkDate(date: string) {
+    if (isPending || selectedIds.size === 0 || !date) return;
+    const ids = [...selectedIds];
+    startTransition(async () => {
+      await bulkUpdatePaymentDate(ids, date);
+      setSelectedIds(new Set());
+      fetchPayments();
+    });
+  }
+
   async function handleViewScreenshot(path: string) {
     const result = await getScreenshotUrl(path);
     if (result.url) setScreenshotUrl(result.url);
@@ -291,7 +339,7 @@ function AdminPaymentsContent() {
         hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter || !!typeFilter}
       />
 
-      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+      <SelectionBar count={selectedIds.size} onClear={() => { setSelectedIds(new Set()); setBulkDate(""); }}>
         <button
           onClick={() => handleBulkStatus("confirmed")}
           disabled={isPending}
@@ -306,6 +354,23 @@ function AdminPaymentsContent() {
         >
           Reject All
         </button>
+        <div className="inline-flex items-center gap-1.5">
+          <DatePicker
+            value={bulkDate}
+            onChange={(e) => setBulkDate(e.target.value)}
+            placeholder="Set date..."
+            className="w-40"
+          />
+          {bulkDate && (
+            <button
+              onClick={() => { handleBulkDate(bulkDate); setBulkDate(""); }}
+              disabled={isPending}
+              className="px-2.5 py-1 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {isPending ? "Updating..." : "Set Date"}
+            </button>
+          )}
+        </div>
       </SelectionBar>
 
       <div className="flex-1">

@@ -36,7 +36,7 @@ export function ProfileCard({ player }: { player: PlayerProfile }) {
         <div>
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Personal Details</h2>
           <div className="space-y-3">
-            <InfoItem icon={<Calendar className="w-4 h-4" />} label="Date of Birth" value={player.date_of_birth ? new Date(player.date_of_birth).toLocaleDateString() : null} />
+            <InfoItem icon={<Calendar className="w-4 h-4" />} label="Date of Birth" value={player.date_of_birth ? new Date(player.date_of_birth).toLocaleDateString("en-GB") : null} />
             <InfoItem icon={<Phone className="w-4 h-4" />} label="Phone" value={player.phone} />
             <InfoItem icon={<Mail className="w-4 h-4" />} label="Email" value={player.email} />
             <InfoItem icon={<MapPin className="w-4 h-4" />} label="Area" value={player.area} />

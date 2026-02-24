@@ -73,10 +73,7 @@ export default async function PlayerSubscriptionsPage() {
           title="No Subscriptions Yet"
           description="Subscribe to a training package to start attending sessions."
           action={
-            <Link
-              href="/player/packages"
-              className="text-sm font-medium text-primary hover:underline"
-            >
+            <Link href="/player/packages" className="text-sm font-medium text-primary hover:underline">
               Browse Packages
             </Link>
           }
@@ -116,24 +113,21 @@ export default async function PlayerSubscriptionsPage() {
                   {subs.map((sub, i) => {
                     const display = getDisplayStatus(sub);
                     return (
-                      <tr
-                        key={sub.id}
-                        className="border-b border-slate-100"
-                      >
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900">
-                          {sub.packages?.name || "—"}
-                        </td>
+                      <tr key={sub.id} className="border-b border-slate-100">
+                        <td className="px-4 py-3 text-sm font-medium text-slate-900">{sub.packages?.name || "—"}</td>
                         <td className="px-4 py-3 text-sm text-slate-700">
-                          {sub.sessions_remaining} / {sub.sessions_total}
+                          {sub.sessions_total === 1
+                            ? sub.sessions_total
+                            : `${sub.sessions_remaining} / ${sub.sessions_total}`}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-700">
                           {sub.packages?.price ? `${sub.packages.price.toLocaleString("en-US")} EGP` : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">
-                          {sub.start_date ? new Date(sub.start_date).toLocaleDateString() : "—"}
+                          {sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">
-                          {sub.end_date ? new Date(sub.end_date).toLocaleDateString() : "—"}
+                          {sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={display.variant}>{display.label}</Badge>
@@ -162,16 +156,16 @@ export default async function PlayerSubscriptionsPage() {
               return (
                 <Card key={sub.id} className="p-4">
                   <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {sub.packages?.name || "—"}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900">{sub.packages?.name || "—"}</p>
                     <Badge variant={display.variant}>{display.label}</Badge>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <span className="text-slate-400">Sessions</span>
                       <p className="text-slate-700 font-medium">
-                        {sub.sessions_remaining}/{sub.sessions_total}
+                        {sub.sessions_total === 1
+                          ? sub.sessions_total
+                          : `${sub.sessions_remaining}/${sub.sessions_total}`}
                       </p>
                     </div>
                     <div>
@@ -184,8 +178,8 @@ export default async function PlayerSubscriptionsPage() {
                       <span className="text-slate-400">Date</span>
                       <p className="text-slate-700 font-medium">
                         {sub.start_date
-                          ? new Date(sub.start_date).toLocaleDateString()
-                          : new Date(sub.created_at).toLocaleDateString()}
+                          ? new Date(sub.start_date).toLocaleDateString("en-GB")
+                          : new Date(sub.created_at).toLocaleDateString("en-GB")}
                       </p>
                     </div>
                   </div>

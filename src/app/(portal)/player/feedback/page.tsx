@@ -54,12 +54,7 @@ export default async function PlayerFeedbackPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mb-2">
                     <span className="inline-flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {new Date(fb.session_date).toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      {new Date(fb.session_date).toLocaleDateString("en-GB")}
                     </span>
                     {fb.group && (
                       <span className="inline-flex items-center gap-1">

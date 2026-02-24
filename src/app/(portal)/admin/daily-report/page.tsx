@@ -28,11 +28,11 @@ export default function DailyReportPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Daily Report</h1>
           <p className="text-slate-500 text-sm">
-            {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+            {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-GB", {
               weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
               year: "numeric",
-              month: "long",
-              day: "numeric",
             })}
           </p>
         </div>

@@ -125,7 +125,7 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
 export async function updatePayment(
   paymentId: string,
-  updates: { amount?: number; method?: string; status?: string; confirmed_at?: string }
+  updates: { amount?: number; method?: string; status?: string; confirmed_at?: string; payment_date?: string }
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -147,6 +147,7 @@ export async function updatePayment(
   if (updates.amount !== undefined) paymentUpdate.amount = updates.amount;
   if (updates.method !== undefined) paymentUpdate.method = updates.method;
   if (updates.confirmed_at !== undefined) paymentUpdate.confirmed_at = new Date(updates.confirmed_at).toISOString();
+  if (updates.payment_date !== undefined) paymentUpdate.confirmed_at = new Date(updates.payment_date).toISOString();
 
   // Handle status change
   if (updates.status && updates.status !== payment.status) {
@@ -225,6 +226,24 @@ export async function updatePayment(
     .eq("id", paymentId);
 
   if (error) return { error: error.message };
+
+  // Update subscription start_date (and recalculate end_date) when payment date changes
+  if (updates.payment_date !== undefined && payment.subscription_id) {
+    const pkg = payment.subscriptions?.packages;
+    const newStart = new Date(updates.payment_date);
+    const subUpdate: Record<string, string> = {
+      start_date: newStart.toISOString().split("T")[0],
+    };
+    if (pkg?.validity_days) {
+      const newEnd = new Date(newStart);
+      newEnd.setDate(newEnd.getDate() + pkg.validity_days);
+      subUpdate.end_date = newEnd.toISOString().split("T")[0];
+    }
+    await supabase
+      .from("subscriptions")
+      .update(subUpdate)
+      .eq("id", payment.subscription_id);
+  }
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
@@ -429,6 +448,118 @@ export async function createStandalonePayment(data: {
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+export async function bulkUpdatePaymentDate(paymentIds: string[], date: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const results = { success: 0, failed: 0 };
+
+  for (const id of paymentIds) {
+    const res = await updatePayment(id, { payment_date: date });
+    if ("error" in res) results.failed++;
+    else results.success++;
+  }
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/dashboard");
+  return { success: true, results };
+}
+
+export async function linkPaymentToPlayer(paymentId: string, playerId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: payment } = await supabase
+    .from("payments")
+    .select("id, player_id, subscription_id")
+    .eq("id", paymentId)
+    .single();
+
+  if (!payment) return { error: "Payment not found" };
+  if (payment.player_id) return { error: "Payment is already linked to a player" };
+
+  const { error: payError } = await supabase
+    .from("payments")
+    .update({ player_id: playerId })
+    .eq("id", paymentId);
+
+  if (payError) return { error: payError.message };
+
+  if (payment.subscription_id) {
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .update({ player_id: playerId })
+      .eq("id", payment.subscription_id);
+
+    if (subError) return { error: subError.message };
+  }
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+export async function deletePayment(paymentId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || profile.role !== "admin") return { error: "Unauthorized" };
+
+  // Fetch payment to check for linked subscription
+  const { data: payment } = await supabase
+    .from("payments")
+    .select("id, subscription_id")
+    .eq("id", paymentId)
+    .single();
+
+  if (!payment) return { error: "Payment not found" };
+
+  // Delete associated subscription first (if any)
+  if (payment.subscription_id) {
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .delete()
+      .eq("id", payment.subscription_id);
+    if (subError) return { error: subError.message };
+  }
+
+  // Delete the payment
+  const { error } = await supabase
+    .from("payments")
+    .delete()
+    .eq("id", paymentId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/player/subscriptions");
+  revalidatePath("/player/dashboard");
   return { success: true };
 }
 

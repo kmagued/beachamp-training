@@ -7,17 +7,14 @@ import {
   Area,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
   Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
-import { TrendingUp, Package, Activity } from "lucide-react";
+import { TrendingUp, Package } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 type RevenueView = "30d" | "monthly" | "quarterly" | "yearly";
@@ -30,9 +27,8 @@ const REVENUE_VIEWS: { key: RevenueView; label: string }[] = [
 ];
 
 interface DashboardChartsProps {
-  revenuePayments: { amount: number; confirmed_at: string }[];
+  revenuePayments: { amount: number; date: string }[];
   subsByPackage: { name: string; count: number }[];
-  playersByLevel: { level: string; count: number }[];
 }
 
 const COLORS = {
@@ -43,13 +39,6 @@ const COLORS = {
   blue: "#3B82F6",
   purple: "#8B5CF6",
   indigo: "#6366F1",
-};
-
-const LEVEL_COLORS: Record<string, string> = {
-  beginner: COLORS.emerald,
-  intermediate: COLORS.amber,
-  advanced: COLORS.red,
-  professional: COLORS.purple,
 };
 
 const PACKAGE_COLORS = [COLORS.primary, COLORS.emerald, COLORS.blue, COLORS.amber, COLORS.purple, COLORS.indigo];
@@ -69,20 +58,9 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function PieTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const { name, value } = payload[0];
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-sm">
-      <p className="font-medium text-slate-900 capitalize">{name}: {value}</p>
-    </div>
-  );
-}
 
-export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel }: DashboardChartsProps) {
+export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardChartsProps) {
   const [revenueView, setRevenueView] = useState<RevenueView>("30d");
-  const totalPlayers = playersByLevel.reduce((sum, s) => sum + s.count, 0);
 
   const revenueChartData = useMemo(() => {
     const now = new Date();
@@ -90,10 +68,10 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
     switch (revenueView) {
       case "30d": {
         const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const filtered = revenuePayments.filter(p => new Date(p.confirmed_at) >= cutoff);
+        const filtered = revenuePayments.filter(p => new Date(p.date) >= cutoff);
         const map: Record<string, number> = {};
         for (const p of filtered) {
-          const d = new Date(p.confirmed_at);
+          const d = new Date(p.date);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
           map[key] = (map[key] || 0) + p.amount;
         }
@@ -107,7 +85,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
       case "monthly": {
         const map: Record<string, number> = {};
         for (const p of revenuePayments) {
-          const d = new Date(p.confirmed_at);
+          const d = new Date(p.date);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           map[key] = (map[key] || 0) + p.amount;
         }
@@ -125,7 +103,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
       case "quarterly": {
         const map: Record<string, number> = {};
         for (const p of revenuePayments) {
-          const d = new Date(p.confirmed_at);
+          const d = new Date(p.date);
           const q = Math.floor(d.getMonth() / 3) + 1;
           const key = `${d.getFullYear()}-Q${q}`;
           map[key] = (map[key] || 0) + p.amount;
@@ -147,7 +125,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
       case "yearly": {
         const map: Record<string, number> = {};
         for (const p of revenuePayments) {
-          const year = new Date(p.confirmed_at).getFullYear().toString();
+          const year = new Date(p.date).getFullYear().toString();
           map[year] = (map[year] || 0) + p.amount;
         }
         return Object.entries(map)
@@ -222,7 +200,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
       </Card>
 
       {/* Subscriptions by Package */}
-      <Card className="sm:col-span-2 lg:col-span-1">
+      <Card className="sm:col-span-2">
         <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
           <Package className="w-4 h-4 text-slate-400" />
           Active Subscriptions
@@ -253,46 +231,6 @@ export function DashboardCharts({ revenuePayments, subsByPackage, playersByLevel
           </ResponsiveContainer>
         ) : (
           <p className="text-sm text-slate-400 text-center py-12">No active subscriptions</p>
-        )}
-      </Card>
-
-      {/* Player Levels */}
-      <Card className="sm:col-span-2 lg:col-span-1">
-        <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
-          <Activity className="w-4 h-4 text-slate-400" />
-          Player Levels
-          {totalPlayers > 0 && <span className="text-xs text-slate-400 font-normal">({totalPlayers} total)</span>}
-        </h2>
-        {totalPlayers > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={playersByLevel}
-                dataKey="count"
-                nameKey="level"
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={3}
-                strokeWidth={0}
-              >
-                {playersByLevel.map((entry) => (
-                  <Cell key={entry.level} fill={LEVEL_COLORS[entry.level] || "#94a3b8"} />
-                ))}
-              </Pie>
-              <Tooltip content={<PieTooltip />} />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                formatter={(value: string) => (
-                  <span className="text-xs text-slate-600 capitalize">{value}</span>
-                )}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        ) : (
-          <p className="text-sm text-slate-400 text-center py-12">No players yet</p>
         )}
       </Card>
     </div>

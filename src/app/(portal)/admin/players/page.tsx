@@ -3,11 +3,12 @@
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Pagination, SelectionBar, Button } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { Plus, Users, ChevronDown, Loader2, Check, GraduationCap } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
-import { getPlayerStatus } from "./_components/types";
+import { getActivityStatus, getSubscriptionStatus, getLatestSubscription } from "./_components/types";
 import { updatePlayerLevel, bulkUpdatePlayerLevel } from "./[id]/actions";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
 import { PlayersFilters } from "./_components/filters";
@@ -22,18 +23,47 @@ export default function AdminPlayersPage() {
   );
 }
 
+const VALID_SORT_FIELDS: SortField[] = ["name", "date", "level", "package", "sessions", "expires", "subscription"];
+const VALID_SORT_DIRS: SortDir[] = ["asc", "desc"];
+
 function AdminPlayersContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [levelFilter, setLevelFilter] = useState("");
-  const [packageFilter, setPackageFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [activityFilter, setActivityFilter] = useState(searchParams.get("activity") || "");
+  const [subscriptionFilter, setSubscriptionFilter] = useState(searchParams.get("subscription") || "");
+  const [levelFilter, setLevelFilter] = useState(searchParams.get("level") || "");
+  const [packageFilter, setPackageFilter] = useState(searchParams.get("package") || "");
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
+  const [sortField, setSortField] = useState<SortField>(
+    VALID_SORT_FIELDS.includes(searchParams.get("sort") as SortField) ? (searchParams.get("sort") as SortField) : "expires"
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(
+    VALID_SORT_DIRS.includes(searchParams.get("dir") as SortDir) ? (searchParams.get("dir") as SortDir) : "desc"
+  );
   const [drawerPlayer, setDrawerPlayer] = useState<PlayerRow | null>(null);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(Number(searchParams.get("size")) || 10);
+
+  // Sync state to URL search params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (activityFilter) params.set("activity", activityFilter);
+    if (subscriptionFilter) params.set("subscription", subscriptionFilter);
+    if (levelFilter) params.set("level", levelFilter);
+    if (packageFilter) params.set("package", packageFilter);
+    if (sortField !== "expires") params.set("sort", sortField);
+    if (sortDir !== "desc") params.set("dir", sortDir);
+    if (currentPage > 1) params.set("page", String(currentPage));
+    if (pageSize !== 10) params.set("size", String(pageSize));
+    const qs = params.toString();
+    const url = qs ? `${pathname}?${qs}` : pathname;
+    router.replace(url, { scroll: false });
+  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter, sortField, sortDir, currentPage, pageSize, pathname, router]);
 
   const { getRowId, isHighlighted } = useHighlightRow();
 
@@ -43,12 +73,38 @@ function AdminPlayersContent() {
   );
 
   const fetchPlayers = useCallback(async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
-      .eq("role", "player")
-      .order("created_at", { ascending: false });
-    if (data) setPlayers(data as unknown as PlayerRow[]);
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    const [{ data: profileData }, { data: attendanceData }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+        .eq("role", "player")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("attendance")
+        .select("player_id, session_date")
+        .eq("status", "present")
+        .gte("session_date", twoWeeksAgo)
+        .order("session_date", { ascending: false }),
+    ]);
+
+    const lastAttendedMap: Record<string, string> = {};
+    if (attendanceData) {
+      for (const row of attendanceData) {
+        if (!lastAttendedMap[row.player_id]) {
+          lastAttendedMap[row.player_id] = row.session_date;
+        }
+      }
+    }
+
+    if (profileData) {
+      const playersWithAttendance = (profileData as unknown as PlayerRow[]).map((p) => ({
+        ...p,
+        last_attended: lastAttendedMap[p.id] || null,
+      }));
+      setPlayers(playersWithAttendance);
+    }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,9 +149,18 @@ function AdminPlayersContent() {
           (p.email?.toLowerCase().includes(q) ?? false);
         if (!matchesSearch) return false;
       }
-      if (statusFilter) {
-        const selected = statusFilter.split(",").map((s) => s.toLowerCase());
-        if (!selected.includes(getPlayerStatus(p))) return false;
+      if (activityFilter) {
+        const selected = activityFilter.split(",").map((s) => s.toLowerCase());
+        if (!selected.includes(getActivityStatus(p))) return false;
+      }
+      if (subscriptionFilter) {
+        // Map display labels to status values
+        const labelToStatus: Record<string, string> = { "no sub": "none" };
+        const selected = subscriptionFilter.split(",").map((s) => {
+          const lower = s.toLowerCase();
+          return labelToStatus[lower] || lower;
+        });
+        if (!selected.includes(getSubscriptionStatus(p))) return false;
       }
       if (levelFilter) {
         const selected = levelFilter.split(",").map((s) => s.toLowerCase());
@@ -103,8 +168,8 @@ function AdminPlayersContent() {
       }
       if (packageFilter) {
         const selected = packageFilter.split(",");
-        const activePackage = p.subscriptions?.find((s) => s.status === "active")?.packages?.name;
-        if (!activePackage || !selected.includes(activePackage)) return false;
+        const latestPackage = getLatestSubscription(p)?.packages?.name;
+        if (!latestPackage || !selected.includes(latestPackage)) return false;
       }
       return true;
     });
@@ -120,22 +185,26 @@ function AdminPlayersContent() {
       } else if (sortField === "level") {
         cmp = (levelOrder[a.playing_level ?? ""] ?? 99) - (levelOrder[b.playing_level ?? ""] ?? 99);
       } else if (sortField === "package") {
-        const aName = a.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
-        const bName = b.subscriptions?.find((s) => s.status === "active")?.packages?.name ?? "";
+        const aName = getLatestSubscription(a)?.packages?.name ?? "";
+        const bName = getLatestSubscription(b)?.packages?.name ?? "";
         cmp = aName.localeCompare(bName);
+      } else if (sortField === "sessions") {
+        const aSess = getLatestSubscription(a)?.sessions_remaining ?? -1;
+        const bSess = getLatestSubscription(b)?.sessions_remaining ?? -1;
+        cmp = aSess - bSess;
       } else if (sortField === "expires") {
-        const aEnd = a.subscriptions?.find((s) => s.status === "active")?.end_date;
-        const bEnd = b.subscriptions?.find((s) => s.status === "active")?.end_date;
+        const aEnd = getLatestSubscription(a)?.end_date;
+        const bEnd = getLatestSubscription(b)?.end_date;
         const aTime = aEnd ? new Date(aEnd).getTime() : 0;
         const bTime = bEnd ? new Date(bEnd).getTime() : 0;
         cmp = aTime - bTime;
-      } else if (sortField === "status") {
-        const statusOrder: Record<string, number> = { active: 0, "expiring soon": 1, expiring: 2, completed: 3, expired: 4, pending: 5, inactive: 6 };
-        cmp = (statusOrder[getPlayerStatus(a)] ?? 99) - (statusOrder[getPlayerStatus(b)] ?? 99);
+      } else if (sortField === "subscription") {
+        const subOrder: Record<string, number> = { active: 0, "expiring soon": 1, expiring: 2, attended: 3, completed: 4, expired: 5, pending: 6, none: 7 };
+        cmp = (subOrder[getSubscriptionStatus(a)] ?? 99) - (subOrder[getSubscriptionStatus(b)] ?? 99);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, search, statusFilter, levelFilter, packageFilter, sortField, sortDir]);
+  }, [players, search, activityFilter, subscriptionFilter, levelFilter, packageFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPlayers.length / pageSize);
@@ -146,7 +215,7 @@ function AdminPlayersContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, levelFilter, packageFilter]);
+  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter]);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -188,7 +257,7 @@ function AdminPlayersContent() {
     }
   }
 
-  const hasActiveFilters = !!search || !!statusFilter || !!levelFilter || !!packageFilter;
+  const hasActiveFilters = !!search || !!activityFilter || !!subscriptionFilter || !!levelFilter || !!packageFilter;
 
   // Add to Group
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -302,8 +371,10 @@ function AdminPlayersContent() {
       <PlayersFilters
         search={search}
         onSearchChange={setSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
+        activityFilter={activityFilter}
+        onActivityFilterChange={setActivityFilter}
+        subscriptionFilter={subscriptionFilter}
+        onSubscriptionFilterChange={setSubscriptionFilter}
         levelFilter={levelFilter}
         onLevelFilterChange={setLevelFilter}
         packageFilter={packageFilter}
@@ -312,7 +383,7 @@ function AdminPlayersContent() {
         sortField={sortField}
         sortDir={sortDir}
         onSortChange={toggleSort}
-        onReset={() => { setSearch(""); setStatusFilter(""); setLevelFilter(""); setPackageFilter(""); }}
+        onReset={() => { setSearch(""); setActivityFilter(""); setSubscriptionFilter(""); setLevelFilter(""); setPackageFilter(""); }}
         hasActiveFilters={hasActiveFilters}
       />
 

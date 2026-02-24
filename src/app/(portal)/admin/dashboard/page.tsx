@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard, Card, Badge } from "@/components/ui";
-import { Users, CreditCard, CalendarDays, Receipt, TrendingUp } from "lucide-react";
+import { Users, CreditCard, CalendarDays, Receipt, TrendingUp, UserPlus, BarChart3, Target, RefreshCw, Gauge, UserMinus } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
+import { MonthlyFinancialTable } from "./_components/monthly-financial-table";
 
 export default async function AdminDashboard() {
   const currentUser = await getCurrentUser();
@@ -21,24 +22,29 @@ export default async function AdminDashboard() {
   const monthEndISO = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0];
 
   const [
-    { count: playerCount },
+    { data: activeProfiles, count: playerCount },
     { count: pendingPayments },
     { data: revenueData },
     { data: pendingPaymentsList },
-    { data: recentPlayers },
     { data: activeSubscriptions },
-    { data: playerLevels },
     { count: todaySessionCount },
     { data: revenuePayments },
     { data: oneTimeExpenseData },
     { data: recurringExpenseData },
     { data: allExpenseData },
+    { data: recentAttendance },
+    { data: allExpensesWithDates },
+    { count: newMembersCount },
+    { data: groupsData },
+    { data: groupPlayersData },
+    { data: attendanceAll30d },
+    { data: expiredSubsThisMonth },
+    { data: scheduleSessions },
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "player")
-      .eq("is_active", true),
+      .select("id", { count: "exact" })
+      .eq("role", "player"),
     supabase
       .from("payments")
       .select("*", { count: "exact", head: true })
@@ -55,20 +61,9 @@ export default async function AdminDashboard() {
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
-      .from("profiles")
-      .select("*, subscriptions!subscriptions_player_id_fkey(status, packages(name))")
-      .eq("role", "player")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
       .from("subscriptions")
       .select("player_id, package_id, packages(name)")
       .eq("status", "active"),
-    supabase
-      .from("profiles")
-      .select("playing_level")
-      .eq("role", "player")
-      .eq("is_active", true),
     supabase
       .from("schedule_sessions")
       .select("*", { count: "exact", head: true })
@@ -77,7 +72,7 @@ export default async function AdminDashboard() {
     // All confirmed payments for revenue chart
     supabase
       .from("payments")
-      .select("amount, confirmed_at")
+      .select("amount, confirmed_at, subscriptions!payments_subscription_id_fkey(start_date)")
       .eq("status", "confirmed"),
     // One-time expenses this month
     supabase
@@ -97,6 +92,50 @@ export default async function AdminDashboard() {
     supabase
       .from("expenses")
       .select("amount")
+      .eq("is_active", true),
+    // Recent attendance (last 2 weeks) for active player count
+    supabase
+      .from("attendance")
+      .select("player_id")
+      .eq("status", "present")
+      .gte("session_date", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
+    // All expenses with dates for monthly table
+    supabase
+      .from("expenses")
+      .select("amount, expense_date, is_recurring, recurrence_type")
+      .eq("is_active", true),
+    // New members (last 30 days)
+    supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "player")
+      .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    // Groups
+    supabase
+      .from("groups")
+      .select("id, name, max_players")
+      .eq("is_active", true),
+    // Group players (active)
+    supabase
+      .from("group_players")
+      .select("group_id, player_id")
+      .eq("is_active", true),
+    // All attendance last 30 days (for attendance rate)
+    supabase
+      .from("attendance")
+      .select("status, group_id, schedule_session_id")
+      .gte("session_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
+    // Subscriptions that expired/cancelled this month (churn)
+    supabase
+      .from("subscriptions")
+      .select("player_id")
+      .in("status", ["expired", "cancelled"])
+      .gte("end_date", monthStartISO)
+      .lte("end_date", monthEndISO),
+    // All active schedule sessions (for capacity utilization)
+    supabase
+      .from("schedule_sessions")
+      .select("id, group_id")
       .eq("is_active", true),
   ]);
 
@@ -132,11 +171,21 @@ export default async function AdminDashboard() {
 
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
-  // Active players (unique players with active subscriptions)
-  const activePlayerIds = new Set(
-    (activeSubscriptions || []).map((s: { player_id: string }) => s.player_id)
+  // Active players: has active subscription OR trained in last 2 weeks (matches getActivityStatus logic)
+  // Only count profiles with role=player
+  const playerIdSet = new Set(
+    (activeProfiles || []).map((p: { id: string }) => p.id)
   );
-  const activePlayerCount = activePlayerIds.size;
+  const activeIds = new Set<string>();
+  for (const s of activeSubscriptions || []) {
+    const pid = (s as { player_id: string }).player_id;
+    if (playerIdSet.has(pid)) activeIds.add(pid);
+  }
+  for (const a of recentAttendance || []) {
+    const pid = (a as { player_id: string }).player_id;
+    if (playerIdSet.has(pid)) activeIds.add(pid);
+  }
+  const activePlayerCount = activeIds.size;
 
   // --- Chart data transformations ---
 
@@ -150,13 +199,99 @@ export default async function AdminDashboard() {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
-  // Players by level
-  const levelCounts: Record<string, number> = {};
-  for (const p of playerLevels || []) {
-    const level = p.playing_level || "unknown";
-    levelCounts[level] = (levelCounts[level] || 0) + 1;
+  // --- Monthly financial table data ---
+  type MonthlyRow = { month: string; key: string; income: number; expenses: number; profit: number };
+
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = (key: string) => {
+    const [y, m] = key.split("-");
+    return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  };
+
+  // Income by month
+  const incomeByMonth: Record<string, number> = {};
+  for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }[]) {
+    const dateStr = p.subscriptions?.start_date || p.confirmed_at;
+    if (!dateStr) continue;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) continue;
+    const k = monthKey(d);
+    incomeByMonth[k] = (incomeByMonth[k] || 0) + p.amount;
   }
-  const playersByLevelData = Object.entries(levelCounts).map(([level, count]) => ({ level, count }));
+
+  // Expenses by month
+  const expenseByMonth: Record<string, number> = {};
+  const now = new Date();
+  const currentMonthKey = monthKey(now);
+  for (const e of (allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null }[]) {
+    if (!e.expense_date) continue;
+    if (!e.is_recurring) {
+      // One-time: assign to its month
+      const d = new Date(e.expense_date);
+      if (isNaN(d.getTime())) continue;
+      const k = monthKey(d);
+      expenseByMonth[k] = (expenseByMonth[k] || 0) + e.amount;
+    } else {
+      // Recurring: add to every month from expense_date to current month
+      const start = new Date(e.expense_date);
+      if (isNaN(start.getTime())) continue;
+      const monthlyAmount = e.recurrence_type === "weekly" ? e.amount * 4 : e.amount;
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+      while (cursor <= end) {
+        const k = monthKey(cursor);
+        expenseByMonth[k] = (expenseByMonth[k] || 0) + monthlyAmount;
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+  }
+
+  // Merge all months and sort newest first
+  const allMonthKeys = new Set([...Object.keys(incomeByMonth), ...Object.keys(expenseByMonth)]);
+  const monthlyData: MonthlyRow[] = Array.from(allMonthKeys)
+    .sort((a, b) => b.localeCompare(a))
+    .map((k) => {
+      const income = incomeByMonth[k] || 0;
+      const expenses = expenseByMonth[k] || 0;
+      return { month: monthLabel(k), key: k, income, expenses, profit: income - expenses };
+    });
+
+  // --- Dashboard metrics ---
+
+  // Group player counts
+  const groups = (groupsData || []) as { id: string; name: string; max_players: number }[];
+  const gpRows = (groupPlayersData || []) as { group_id: string; player_id: string }[];
+  const gpCountByGroup: Record<string, number> = {};
+  for (const gp of gpRows) {
+    gpCountByGroup[gp.group_id] = (gpCountByGroup[gp.group_id] || 0) + 1;
+  }
+  const groupCounts = groups
+    .map((g) => ({ name: g.name, count: gpCountByGroup[g.id] || 0, max: g.max_players }))
+    .sort((a, b) => b.count - a.count);
+
+  // Attendance rate (last 30 days)
+  const att30d = (attendanceAll30d || []) as { status: string; group_id: string | null; schedule_session_id: string | null }[];
+  const totalAttRecords = att30d.length;
+  const presentRecords = att30d.filter((a) => a.status === "present").length;
+  const attendanceRate = totalAttRecords > 0 ? Math.round((presentRecords / totalAttRecords) * 100) : 0;
+
+  // Retention rate: active players now / (active players now + churned this month)
+  const churnedThisMonth = new Set(
+    ((expiredSubsThisMonth || []) as { player_id: string }[]).map((s) => s.player_id)
+  ).size;
+  const retentionRate = activePlayerCount + churnedThisMonth > 0
+    ? Math.round((activePlayerCount / (activePlayerCount + churnedThisMonth)) * 100)
+    : 100;
+
+  // Capacity utilization: total active group players / total max capacity
+  const totalGroupPlayers = gpRows.length;
+  const totalCapacity = groups.reduce((s, g) => s + g.max_players, 0);
+  const capacityRate = totalCapacity > 0 ? Math.round((totalGroupPlayers / totalCapacity) * 100) : 0;
+
+  // Monthly churn rate: churned this month / (active + churned)
+  const churnRate = activePlayerCount + churnedThisMonth > 0
+    ? Math.round((churnedThisMonth / (activePlayerCount + churnedThisMonth)) * 100)
+    : 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -212,16 +347,86 @@ export default async function AdminDashboard() {
         />
       </div>
 
+      {/* Key Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <StatCard
+          label="New Members (30d)"
+          value={newMembersCount ?? 0}
+          accentColor="bg-blue-500"
+          icon={<UserPlus className="w-5 h-5" />}
+        />
+        <StatCard
+          label="Attendance Rate"
+          value={`${attendanceRate}%`}
+          accentColor={attendanceRate >= 70 ? "bg-emerald-500" : attendanceRate >= 50 ? "bg-amber-500" : "bg-red-500"}
+          icon={<Target className="w-5 h-5" />}
+          subtitle={`${presentRecords} / ${totalAttRecords} (30d)`}
+        />
+        <StatCard
+          label="Retention Rate"
+          value={`${retentionRate}%`}
+          accentColor={retentionRate >= 80 ? "bg-emerald-500" : retentionRate >= 60 ? "bg-amber-500" : "bg-red-500"}
+          icon={<RefreshCw className="w-5 h-5" />}
+        />
+        <StatCard
+          label="Capacity"
+          value={`${capacityRate}%`}
+          accentColor={capacityRate >= 80 ? "bg-red-500" : capacityRate >= 50 ? "bg-amber-500" : "bg-emerald-500"}
+          icon={<Gauge className="w-5 h-5" />}
+          subtitle={`${totalGroupPlayers} / ${totalCapacity} slots`}
+        />
+        <StatCard
+          label="Monthly Churn"
+          value={`${churnRate}%`}
+          accentColor={churnRate <= 5 ? "bg-emerald-500" : churnRate <= 15 ? "bg-amber-500" : "bg-red-500"}
+          icon={<UserMinus className="w-5 h-5" />}
+          subtitle={`${churnedThisMonth} left this month`}
+        />
+      </div>
+
+      {/* Group Breakdown */}
+      {groupCounts.length > 0 && (
+        <div className="mb-6">
+          <Card>
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
+              <BarChart3 className="w-4 h-4 text-slate-400" />
+              Players by Group
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {groupCounts.map((g) => (
+                <div key={g.name} className="bg-slate-50 rounded-lg px-4 py-3">
+                  <p className="text-xs font-medium text-slate-500 truncate">{g.name}</p>
+                  <p className="text-lg font-bold text-slate-900 mt-0.5">
+                    {g.count}
+                    <span className="text-xs font-normal text-slate-400 ml-1">/ {g.max}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Charts */}
       <DashboardCharts
-        revenuePayments={revenuePayments || []}
+        revenuePayments={(revenuePayments || [])
+          .map((p: { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }) => ({
+            amount: p.amount,
+            date: p.subscriptions?.start_date
+              ? p.subscriptions.start_date + "T00:00:00"
+              : p.confirmed_at || "",
+          }))
+          .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
         subsByPackage={subsByPackage}
-        playersByLevel={playersByLevelData}
       />
 
-      {/* Two column grid */}
-      <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Pending Payments */}
+      {/* Monthly Financial Table */}
+      <div className="mb-6">
+        <MonthlyFinancialTable data={monthlyData} />
+      </div>
+
+      {/* Pending Payments */}
+      <div className="max-w-lg">
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -262,57 +467,6 @@ export default async function AdminDashboard() {
           ) : (
             <p className="text-sm text-slate-400 text-center py-6">
               No pending payments
-            </p>
-          )}
-        </Card>
-
-        {/* Recent Registrations */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="w-4 h-4 text-slate-400" />
-              Recent Registrations
-            </h2>
-            <Link
-              href="/admin/players"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              View all
-            </Link>
-          </div>
-          {recentPlayers && recentPlayers.length > 0 ? (
-            <div className="space-y-3">
-              {recentPlayers.map((player: Record<string, unknown>) => {
-                const subs = player.subscriptions as { status: string }[] | null;
-                const hasActive = subs?.some((s) => s.status === "active");
-                const hasPending = subs?.some((s) => s.status === "pending");
-                return (
-                  <Link
-                    key={player.id as string}
-                    href={`/admin/players?highlight=${player.id as string}`}
-                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0 -mx-2 px-2 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">
-                        {player.first_name as string} {player.last_name as string}
-                      </p>
-                      <p className="text-xs text-slate-400 capitalize">
-                        {(player.playing_level as string) || "No level"} &middot;{" "}
-                        {new Date(player.created_at as string).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={hasActive ? "success" : hasPending ? "warning" : "neutral"}
-                    >
-                      {hasActive ? "Active" : hasPending ? "Pending" : "New"}
-                    </Badge>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400 text-center py-6">
-              No players yet
             </p>
           )}
         </Card>

@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Button, Input, Select, DatePicker } from "@/components/ui";
-import { X, Check, Image as ImageIcon, Loader2, Pencil } from "lucide-react";
+import { X, Check, Image as ImageIcon, Loader2, Pencil, Search, Link2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { updatePayment } from "../actions";
+import { updatePayment, linkPaymentToPlayer, deletePayment } from "../actions";
 import type { PaymentRow } from "./types";
+
+interface PlayerOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+}
 
 function StatusBadge({ status }: { status: string }) {
   const variant = status === "pending" ? "warning" : status === "confirmed" ? "success" : status === "rejected" ? "danger" : "neutral";
@@ -115,13 +123,86 @@ function DrawerContent({
   isPending: boolean;
   actionId: string | null;
 }) {
+  // Link to player state
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [playerResults, setPlayerResults] = useState<PlayerOption[]>([]);
+  const [selectedPlayer, setSelectedPlayer] = useState<{ id: string; name: string } | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [isLinking, startLinkTransition] = useTransition();
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  // Search players with debounce
+  useEffect(() => {
+    if (!playerSearch.trim() || selectedPlayer) {
+      setPlayerResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const q = playerSearch.trim().toLowerCase();
+      const words = q.split(/\s+/).filter(Boolean);
+      let query = supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .eq("role", "player")
+        .eq("is_active", true);
+      if (words.length >= 2) {
+        query = query.or(
+          `and(first_name.ilike.%${words[0]}%,last_name.ilike.%${words[1]}%),and(first_name.ilike.%${words[1]}%,last_name.ilike.%${words[0]}%)`
+        );
+      } else {
+        query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`);
+      }
+      const { data } = await query.limit(8);
+      if (data) {
+        setPlayerResults(data as PlayerOption[]);
+        setShowResults(true);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerSearch, selectedPlayer]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Reset link state when payment changes
+  useEffect(() => {
+    setPlayerSearch("");
+    setPlayerResults([]);
+    setSelectedPlayer(null);
+    setShowResults(false);
+    setLinkError(null);
+  }, [payment.id]);
+
   const [editing, setEditing] = useState(false);
   const [editAmount, setEditAmount] = useState(payment.amount);
   const [editMethod, setEditMethod] = useState(payment.method);
   const [editStatus, setEditStatus] = useState(payment.status);
-  const [editDate, setEditDate] = useState(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "");
+  function getDisplayDate(p: PaymentRow): string {
+    if (p.subscriptions?.start_date) return p.subscriptions.start_date;
+    if (p.confirmed_at) return new Date(p.confirmed_at).toISOString().split("T")[0];
+    return "";
+  }
+
+  const [editDate, setEditDate] = useState(getDisplayDate(payment));
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   // Reset edit state when payment changes
   useEffect(() => {
@@ -129,9 +210,10 @@ function DrawerContent({
     setEditAmount(payment.amount);
     setEditMethod(payment.method);
     setEditStatus(payment.status);
-    setEditDate(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "");
+    setEditDate(getDisplayDate(payment));
     setEditError(null);
-  }, [payment.id, payment.amount, payment.method, payment.status, payment.confirmed_at]);
+    setConfirmDelete(false);
+  }, [payment.id, payment.amount, payment.method, payment.status, payment.confirmed_at, payment.subscriptions?.start_date]);
 
   function handleSaveEdit() {
     if (editAmount <= 0) {
@@ -140,12 +222,12 @@ function DrawerContent({
     }
     setEditError(null);
     startUpdateTransition(async () => {
-      const currentDate = payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : "";
+      const currentDate = getDisplayDate(payment);
       const res = await updatePayment(payment.id, {
         amount: editAmount,
         method: editMethod,
         status: editStatus !== payment.status ? editStatus : undefined,
-        confirmed_at: editDate && editDate !== currentDate ? editDate : undefined,
+        payment_date: editDate && editDate !== currentDate ? editDate : undefined,
       });
       if ("error" in res) {
         setEditError(res.error ?? "Failed to update payment");
@@ -236,10 +318,10 @@ function DrawerContent({
               />
               <DetailRow
                 label="Submitted"
-                value={new Date(payment.created_at).toLocaleDateString("en-US", {
+                value={new Date(payment.created_at).toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
                   year: "numeric",
-                  month: "short",
-                  day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
@@ -247,10 +329,10 @@ function DrawerContent({
               {payment.confirmed_at && (
                 <DetailRow
                   label="Confirmed"
-                  value={new Date(payment.confirmed_at).toLocaleDateString("en-US", {
+                  value={new Date(payment.confirmed_at).toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
                     year: "numeric",
-                    month: "short",
-                    day: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
@@ -263,6 +345,80 @@ function DrawerContent({
                 />
               )}
             </div>
+
+            {/* Link to Player — only for standalone/quick payments */}
+            {!payment.player_id && (
+              <div className="mt-4 p-3 rounded-lg border border-dashed border-slate-300 bg-slate-50/50">
+                <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5" />
+                  Link to Player Account
+                </p>
+                {selectedPlayer ? (
+                  <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-200">
+                    <span className="text-sm font-medium text-slate-900">{selectedPlayer.name}</span>
+                    <button onClick={() => { setSelectedPlayer(null); setPlayerSearch(""); }} className="p-0.5 rounded text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div ref={searchRef} className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        value={playerSearch}
+                        onChange={(e) => setPlayerSearch(e.target.value)}
+                        onFocus={() => playerResults.length > 0 && setShowResults(true)}
+                        placeholder="Search by name or email..."
+                        className="pl-9"
+                      />
+                    </div>
+                    {showResults && playerResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {playerResults.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedPlayer({ id: p.id, name: `${p.first_name} ${p.last_name}` });
+                              setPlayerSearch("");
+                              setShowResults(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                          >
+                            <p className="text-sm font-medium text-slate-900">{p.first_name} {p.last_name}</p>
+                            {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showResults && playerSearch.trim() && playerResults.length === 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-3 text-sm text-slate-400 text-center">
+                        No players found
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedPlayer && (
+                  <button
+                    onClick={() => {
+                      setLinkError(null);
+                      startLinkTransition(async () => {
+                        const res = await linkPaymentToPlayer(payment.id, selectedPlayer.id);
+                        if ("error" in res) {
+                          setLinkError(res.error ?? "Failed to link");
+                        } else {
+                          onDataChange();
+                        }
+                      });
+                    }}
+                    disabled={isLinking}
+                    className="mt-2 w-full py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isLinking ? "Linking..." : "Link Payment to Player"}
+                  </button>
+                )}
+                {linkError && <p className="text-xs text-red-600 mt-1">{linkError}</p>}
+              </div>
+            )}
 
             {payment.screenshot_url && (
               <button
@@ -284,7 +440,7 @@ function DrawerContent({
             <Button onClick={handleSaveEdit} disabled={isUpdating} fullWidth>
               {isUpdating ? "Saving..." : "Save Changes"}
             </Button>
-            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditDate(payment.confirmed_at ? new Date(payment.confirmed_at).toISOString().split("T")[0] : ""); setEditError(null); }} disabled={isUpdating}>
+            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditDate(getDisplayDate(payment)); setEditError(null); }} disabled={isUpdating}>
               Cancel
             </Button>
           </div>
@@ -314,16 +470,60 @@ function DrawerContent({
                 </button>
               </div>
             )}
-            <button
-              onClick={() => setEditing(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-600 font-medium hover:bg-slate-50 transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit Payment
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditing(true)}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit Payment
+              </button>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-200 text-sm text-red-600 font-medium hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </>
         )}
       </div>
+
+      {/* Delete Confirmation */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-lg p-6 mx-5 max-w-sm w-full">
+            <h3 className="font-semibold text-slate-900 mb-2">Delete Payment</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              This will permanently delete this payment{payment.subscription_id ? " and its associated subscription" : ""}. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  startDeleteTransition(async () => {
+                    const res = await deletePayment(payment.id);
+                    if (!("error" in res)) {
+                      onClose();
+                      onDataChange();
+                    }
+                  });
+                }}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-600 font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

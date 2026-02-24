@@ -115,13 +115,20 @@ export function NewPaymentDrawer({
     }
     const timer = setTimeout(async () => {
       const q = playerSearch.trim().toLowerCase();
-      const { data } = await supabase
+      const words = q.split(/\s+/).filter(Boolean);
+      let query = supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
         .eq("role", "player")
-        .eq("is_active", true)
-        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
-        .limit(8);
+        .eq("is_active", true);
+      if (words.length >= 2) {
+        query = query.or(
+          `and(first_name.ilike.%${words[0]}%,last_name.ilike.%${words[1]}%),and(first_name.ilike.%${words[1]}%,last_name.ilike.%${words[0]}%)`
+        );
+      } else {
+        query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`);
+      }
+      const { data } = await query.limit(8);
       if (data) {
         setPlayerResults(data as PlayerOption[]);
         setShowResults(true);

@@ -1,5 +1,7 @@
 export interface PaymentRow {
   id: string;
+  player_id: string | null;
+  subscription_id: string | null;
   amount: number;
   method: string;
   status: string;

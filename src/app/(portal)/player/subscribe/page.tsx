@@ -248,12 +248,12 @@ function PlayerSubscribeContent() {
               <p className="text-xs text-slate-500">
                 {activeSubscription.sessions_remaining} sessions remaining
                 {activeSubscription.end_date &&
-                  ` · Expires ${new Date(activeSubscription.end_date).toLocaleDateString()}`}
+                  ` · Expires ${new Date(activeSubscription.end_date).toLocaleDateString("en-GB")}`}
               </p>
               {activeSubscription.end_date && (
                 <p className="text-xs text-primary font-medium mt-0.5">
                   Your new subscription will start after your current one ends on{" "}
-                  {new Date(activeSubscription.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {new Date(activeSubscription.end_date).toLocaleDateString("en-GB")}
                 </p>
               )}
             </div>

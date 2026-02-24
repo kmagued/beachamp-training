@@ -115,8 +115,8 @@ export function ExpensesFilters({
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
+        <div className="relative flex-1 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             value={search}

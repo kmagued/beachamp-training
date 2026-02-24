@@ -40,8 +40,7 @@ export async function createExpense(formData: FormData) {
   const amount = parseFloat(formData.get("amount") as string);
   if (!amount || amount <= 0) return { error: "Amount must be greater than 0" };
 
-  const description = (formData.get("description") as string)?.trim();
-  if (!description) return { error: "Description is required" };
+  const description = (formData.get("description") as string)?.trim() || null;
 
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };
@@ -88,8 +87,7 @@ export async function updateExpense(id: string, formData: FormData) {
   const amount = parseFloat(formData.get("amount") as string);
   if (!amount || amount <= 0) return { error: "Amount must be greater than 0" };
 
-  const description = (formData.get("description") as string)?.trim();
-  if (!description) return { error: "Description is required" };
+  const description = (formData.get("description") as string)?.trim() || null;
 
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };

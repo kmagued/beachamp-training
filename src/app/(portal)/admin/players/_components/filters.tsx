@@ -3,7 +3,8 @@ import { Search, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
 
-const STATUS_OPTIONS = ["Active", "Completed", "Expiring Soon", "Expiring", "Expired", "Pending", "Inactive"] as const;
+const ACTIVITY_OPTIONS = ["Active", "Inactive"] as const;
+const SUBSCRIPTION_OPTIONS = ["Active", "Attended", "Completed", "Expiring Soon", "Expiring", "Expired", "Pending", "No Sub"] as const;
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -11,15 +12,18 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "date", label: "Joined" },
   { value: "level", label: "Level" },
   { value: "package", label: "Package" },
+  { value: "sessions", label: "Sessions" },
   { value: "expires", label: "Expires" },
-  { value: "status", label: "Status" },
+  { value: "subscription", label: "Subscription" },
 ];
 
 interface PlayersFiltersProps {
   search: string;
   onSearchChange: (value: string) => void;
-  statusFilter: string;
-  onStatusFilterChange: (value: string) => void;
+  activityFilter: string;
+  onActivityFilterChange: (value: string) => void;
+  subscriptionFilter: string;
+  onSubscriptionFilterChange: (value: string) => void;
   levelFilter: string;
   onLevelFilterChange: (value: string) => void;
   packageFilter: string;
@@ -35,8 +39,10 @@ interface PlayersFiltersProps {
 export function PlayersFilters({
   search,
   onSearchChange,
-  statusFilter,
-  onStatusFilterChange,
+  activityFilter,
+  onActivityFilterChange,
+  subscriptionFilter,
+  onSubscriptionFilterChange,
   levelFilter,
   onLevelFilterChange,
   packageFilter,
@@ -48,17 +54,25 @@ export function PlayersFilters({
   onReset,
   hasActiveFilters,
 }: PlayersFiltersProps) {
-  const activeFilterCount = [statusFilter, levelFilter, packageFilter].filter(Boolean).length;
+  const activeFilterCount = [activityFilter, subscriptionFilter, levelFilter, packageFilter].filter(Boolean).length;
 
   const filterDropdowns = (
     <>
       <MultiSelect
-        options={STATUS_OPTIONS}
-        value={statusFilter}
-        onChange={onStatusFilterChange}
-        placeholder="All Status"
+        options={ACTIVITY_OPTIONS}
+        value={activityFilter}
+        onChange={onActivityFilterChange}
+        placeholder="All Activity"
         showChips={false}
-        className="sm:w-40"
+        className="sm:w-36"
+      />
+      <MultiSelect
+        options={SUBSCRIPTION_OPTIONS}
+        value={subscriptionFilter}
+        onChange={onSubscriptionFilterChange}
+        placeholder="All Subscriptions"
+        showChips={false}
+        className="sm:w-44"
       />
       <MultiSelect
         options={LEVEL_OPTIONS}
@@ -114,8 +128,8 @@ export function PlayersFilters({
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
+        <div className="relative flex-1 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             value={search}

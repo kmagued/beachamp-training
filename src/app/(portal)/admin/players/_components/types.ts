@@ -17,6 +17,7 @@ export interface PlayerRow {
   guardian_phone: string | null;
   is_active: boolean;
   created_at: string;
+  last_attended: string | null;
   subscriptions: {
     id: string;
     status: string;
@@ -28,10 +29,44 @@ export interface PlayerRow {
   }[];
 }
 
-export type SortField = "name" | "date" | "level" | "package" | "expires" | "status";
+export type ActivityStatus = "active" | "inactive";
+export type SubscriptionStatus =
+  | "active"
+  | "expiring soon"
+  | "expiring"
+  | "expired"
+  | "completed"
+  | "attended"
+  | "pending"
+  | "none";
+
+export type SortField = "name" | "date" | "level" | "package" | "sessions" | "expires" | "subscription";
 export type SortDir = "asc" | "desc";
 
-export function getPlayerStatus(player: PlayerRow): string {
+/** Pick the most recent subscription (by start_date, falling back to end_date). */
+export function getLatestSubscription(player: PlayerRow) {
+  if (!player.subscriptions?.length) return null;
+  return [...player.subscriptions].sort((a, b) => {
+    const aDate = a.start_date || a.end_date || "";
+    const bDate = b.start_date || b.end_date || "";
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  })[0];
+}
+
+/** Player is active if they have an active subscription OR trained in last 2 weeks. */
+export function getActivityStatus(player: PlayerRow): ActivityStatus {
+  const now = Date.now();
+  const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+  const recentlyTrained = !!player.last_attended &&
+    (now - new Date(player.last_attended).getTime()) <= twoWeeksMs;
+  const hasActiveSub = player.subscriptions?.some((s) => s.status === "active") || false;
+
+  if (hasActiveSub || recentlyTrained) return "active";
+  return "inactive";
+}
+
+/** Subscription-only status — independent of player activity. */
+export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
   const now = Date.now();
   const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
 
@@ -49,10 +84,17 @@ export function getPlayerStatus(player: PlayerRow): string {
 
   if (activeSub) {
     const { sessions_remaining, sessions_total, start_date, end_date } = activeSub;
+    const isSingleSession = sessions_total === 1;
+
+    // Single-session: no expiry concept, just attended or active
+    if (isSingleSession) {
+      if (sessions_remaining <= 0) return "attended";
+      return "active";
+    }
 
     // Time-based calculations
     let daysLeft: number | null = null;
-    let packageDays = 30; // fallback if no start_date
+    let packageDays = 30;
     if (end_date) {
       daysLeft = Math.ceil(
         (new Date(end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -69,20 +111,21 @@ export function getPlayerStatus(player: PlayerRow): string {
     const timeRatio = daysLeft !== null ? daysLeft / packageDays : 1;
     const sessionsRatio = sessions_total > 0 ? sessions_remaining / sessions_total : 1;
 
-    // Completed: all sessions used up
     if (sessions_remaining <= 0) return "completed";
-
-    // Expiring: <= 7 days left
     if (daysLeft !== null && daysLeft <= 7) return "expiring";
-
-    // Expiring soon: <= 30% of package time remaining OR <= 30% of sessions remaining
     if (timeRatio <= 0.3 || sessionsRatio <= 0.3) return "expiring soon";
 
     return "active";
   }
+
+  // No active subscription
   const expiredSub = player.subscriptions?.find((s) => s.status === "expired");
-  if (expiredSub) return "expired";
+  if (expiredSub) {
+    // Single-session packages never "expire" — they're just attended
+    if (expiredSub.sessions_total === 1) return "attended";
+    return "expired";
+  }
   const pendingSub = player.subscriptions?.find((s) => s.status === "pending");
   if (pendingSub) return "pending";
-  return "inactive";
+  return "none";
 }

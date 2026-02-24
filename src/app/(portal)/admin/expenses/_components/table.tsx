@@ -60,7 +60,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                   className="group hover:bg-primary-50 transition-colors"
                 >
                   <td className={cn(tdBase, "text-sm text-slate-700")}>
-                    {new Date(expense.expense_date).toLocaleDateString()}
+                    {new Date(expense.expense_date).toLocaleDateString("en-GB")}
                   </td>
                   <td className={cn(tdBase, "text-sm text-slate-700")}>
                     {expense.expense_categories?.name || "—"}
@@ -159,7 +159,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
               </div>
               <div>
                 <span className="text-slate-400">Date</span>
-                <p className="text-slate-700 font-medium">{new Date(expense.expense_date).toLocaleDateString()}</p>
+                <p className="text-slate-700 font-medium">{new Date(expense.expense_date).toLocaleDateString("en-GB")}</p>
               </div>
             </div>
             {expense.notes && (

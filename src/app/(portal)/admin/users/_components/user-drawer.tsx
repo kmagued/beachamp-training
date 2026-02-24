@@ -205,11 +205,7 @@ function DrawerContent({ user, onClose, onRoleChange, changingRoleId, isSelf }: 
               <div>
                 <p className="text-xs text-slate-400">Registered</p>
                 <p className="text-sm text-slate-700">
-                  {new Date(user.created_at).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {new Date(user.created_at).toLocaleDateString("en-GB")}
                 </p>
               </div>
             </div>

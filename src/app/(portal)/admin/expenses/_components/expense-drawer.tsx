@@ -394,7 +394,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         )}
 
         <div>
-          <Label required>Description</Label>
+          <Label>Description</Label>
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}

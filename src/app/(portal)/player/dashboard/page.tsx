@@ -105,10 +105,7 @@ export default async function PlayerDashboard() {
             value={
               isExpired ? "Expired" :
               subscription.end_date
-                ? new Date(subscription.end_date).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })
+                ? new Date(subscription.end_date).toLocaleDateString("en-GB")
                 : "—"
             }
             subtitle={daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days remaining` : undefined}
@@ -163,14 +160,14 @@ export default async function PlayerDashboard() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Sessions</span>
                 <span className="text-sm font-medium text-slate-900">
-                  {subscription.sessions_remaining} / {subscription.sessions_total}
+                  {subscription.sessions_total === 1 ? subscription.sessions_remaining : `${subscription.sessions_remaining} / ${subscription.sessions_total}`}
                 </span>
               </div>
               {subscription.start_date && (
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-500">Started</span>
                   <span className="text-sm text-slate-700">
-                    {new Date(subscription.start_date).toLocaleDateString()}
+                    {new Date(subscription.start_date).toLocaleDateString("en-GB")}
                   </span>
                 </div>
               )}
@@ -223,7 +220,7 @@ export default async function PlayerDashboard() {
                     {latestFeedback.coach?.first_name} {latestFeedback.coach?.last_name}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {new Date(latestFeedback.session_date).toLocaleDateString()}
+                    {new Date(latestFeedback.session_date).toLocaleDateString("en-GB")}
                   </p>
                 </div>
               </div>

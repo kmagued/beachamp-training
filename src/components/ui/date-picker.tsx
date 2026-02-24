@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils/cn";
 
 interface DatePickerProps {
@@ -35,9 +36,11 @@ export function DatePicker({
 }: DatePickerProps) {
   const today = new Date();
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Parse the controlled value (YYYY-MM-DD)
   const selectedDate = useMemo(() => {
@@ -54,10 +57,14 @@ export function DatePicker({
     }
   }, [open, selectedDate]);
 
-  // Close on click outside
+  // Close on click outside (check both trigger and portaled dropdown)
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -117,7 +124,20 @@ export function DatePicker({
       {/* Trigger */}
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (!open && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openAbove = spaceBelow < 360;
+            const left = Math.min(rect.left, window.innerWidth - 310);
+            if (openAbove) {
+              setDropdownStyle({ position: "fixed", bottom: window.innerHeight - rect.top + 4, left, zIndex: 9999 });
+            } else {
+              setDropdownStyle({ position: "fixed", top: rect.bottom + 4, left, zIndex: 9999 });
+            }
+          }
+          setOpen(!open);
+        }}
         className={cn(
           "w-full px-4 py-2.5 rounded-lg border bg-white text-left text-sm transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
@@ -144,8 +164,12 @@ export function DatePicker({
       </button>
 
       {/* Calendar Dropdown */}
-      {open && (
-        <div className="absolute z-20 mt-1 w-full min-w-[300px] bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="min-w-[300px] bg-white border border-slate-200 rounded-xl shadow-lg p-4"
+        >
           {/* Month/Year Header */}
           <div className="flex items-center justify-between mb-3">
             <button
@@ -238,7 +262,8 @@ export function DatePicker({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

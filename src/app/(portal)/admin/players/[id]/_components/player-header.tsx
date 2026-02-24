@@ -24,7 +24,7 @@ export function PlayerHeader({ player, actions }: PlayerHeaderProps) {
               {player.is_active ? "Active" : "Inactive"}
             </Badge>
             <span className="text-xs text-slate-400">
-              Registered {new Date(player.created_at).toLocaleDateString()}
+              Registered {new Date(player.created_at).toLocaleDateString("en-GB")}
             </span>
           </div>
         </div>

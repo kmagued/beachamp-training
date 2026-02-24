@@ -49,7 +49,7 @@ export function AttendanceHistory({ attendance }: { attendance: AttendanceRow[] 
                 {attendance.map((a) => (
                   <tr key={a.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-3 font-medium text-slate-900">
-                      {new Date(a.session_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(a.session_date).toLocaleDateString("en-GB")}
                     </td>
                     <td className="py-3 text-slate-500">
                       {a.session_time ? formatTime(a.session_time) : "—"}
@@ -72,7 +72,7 @@ export function AttendanceHistory({ attendance }: { attendance: AttendanceRow[] 
               <div key={a.id} className="border border-slate-100 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-slate-900 text-sm">
-                    {new Date(a.session_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(a.session_date).toLocaleDateString("en-GB")}
                   </span>
                   <StatusBadge status={a.status} />
                 </div>

@@ -59,9 +59,9 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub }: Subscripti
                   return (
                     <tr key={sub.id} className="border-b border-slate-100 last:border-0">
                       <td className="py-3 font-medium text-slate-900">{sub.packages?.name || "—"}</td>
-                      <td className="py-3 text-slate-700">{sub.sessions_remaining}/{sub.sessions_total}</td>
-                      <td className="py-3 text-slate-500">{sub.start_date ? new Date(sub.start_date).toLocaleDateString() : "—"}</td>
-                      <td className="py-3 text-slate-500">{sub.end_date ? new Date(sub.end_date).toLocaleDateString() : "—"}</td>
+                      <td className="py-3 text-slate-700">{sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`}</td>
+                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"}</td>
+                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}</td>
                       <td className="py-3"><SubStatusBadge status={sub.status} /></td>
                       <td className="py-3">
                         {displayPayment ? (
@@ -98,12 +98,12 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub }: Subscripti
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-slate-400">Sessions</span>
-                      <p className="text-slate-700 font-medium">{sub.sessions_remaining}/{sub.sessions_total}</p>
+                      <p className="text-slate-700 font-medium">{sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`}</p>
                     </div>
                     <div>
                       <span className="text-slate-400">Period</span>
                       <p className="text-slate-700 font-medium">
-                        {sub.start_date ? new Date(sub.start_date).toLocaleDateString() : "—"} — {sub.end_date ? new Date(sub.end_date).toLocaleDateString() : "—"}
+                        {sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"} — {sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}
                       </p>
                     </div>
                     {displayPayment && (

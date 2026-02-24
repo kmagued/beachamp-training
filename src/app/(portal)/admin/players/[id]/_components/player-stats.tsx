@@ -15,7 +15,7 @@ function getExpiryInfo(activeSub: SubscriptionRow | undefined) {
   if (daysLeft <= 0) return { label: "Expires", value: "Expired", color: "bg-red-500" };
   if (daysLeft <= 3) return { label: "Expires In", value: `${daysLeft} day${daysLeft === 1 ? "" : "s"}`, color: "bg-red-500" };
   if (daysLeft <= 7) return { label: "Expires In", value: `${daysLeft} days`, color: "bg-amber-500" };
-  return { label: "Expires", value: new Date(activeSub.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }), color: "bg-slate-400" };
+  return { label: "Expires", value: new Date(activeSub.end_date).toLocaleDateString("en-GB"), color: "bg-slate-400" };
 }
 
 export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: PlayerStatsProps) {
@@ -25,7 +25,7 @@ export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: 
   const expiry = getExpiryInfo(activeSub);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
       <StatCard
         label="Subscriptions"
         value={subsCount}
@@ -40,7 +40,7 @@ export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: 
       />
       <StatCard
         label="Sessions Left"
-        value={activeSub ? `${activeSub.sessions_remaining}/${activeSub.sessions_total}` : "—"}
+        value={activeSub ? (activeSub.sessions_total === 1 ? activeSub.sessions_remaining : `${activeSub.sessions_remaining}/${activeSub.sessions_total}`) : "—"}
         accentColor={sessionsColor}
         icon={<Activity className="w-5 h-5" />}
       />
