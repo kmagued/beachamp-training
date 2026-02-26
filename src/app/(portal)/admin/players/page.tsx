@@ -46,7 +46,7 @@ function AdminPlayersContent() {
     VALID_SORT_DIRS.includes(searchParams.get("dir") as SortDir) ? (searchParams.get("dir") as SortDir) : "desc"
   );
   const [drawerPlayer, setDrawerPlayer] = useState<PlayerRow | null>(null);
-  const [pageSize, setPageSize] = useState(Number(searchParams.get("size")) || 10);
+  const [pageSize, setPageSize] = useState(Number(searchParams.get("size")) || 50);
 
   // Sync state to URL search params
   useEffect(() => {
