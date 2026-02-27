@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { CalendarDays, ClipboardCheck, Receipt, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { DatePicker } from "@/components/ui";
@@ -17,10 +18,23 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function DailyReportPage() {
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const today = new Date().toISOString().split("T")[0];
+  const selectedDate = searchParams.get("date") || today;
   const [activeTab, setActiveTab] = useState<TabKey>("attendance");
+
+  const setSelectedDate = useCallback((date: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (date === today) {
+      params.delete("date");
+    } else {
+      params.set("date", date);
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, router, pathname, today]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -40,7 +54,7 @@ export default function DailyReportPage() {
           <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
           <DatePicker
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => setSelectedDate(e.target.value as string)}
             placeholder="Select date"
             className="flex-1 sm:w-48"
           />

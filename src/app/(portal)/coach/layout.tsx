@@ -6,7 +6,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   const currentUser = await getCurrentUser();
 
   if (!currentUser) redirect("/login");
-  if (currentUser.profile.role !== "coach" && currentUser.profile.role !== "admin") {
+  if (process.env.NODE_ENV !== "development" && currentUser.profile.role !== "coach" && currentUser.profile.role !== "admin") {
     redirect("/player/dashboard");
   }
 

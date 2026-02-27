@@ -157,6 +157,29 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
           })}
         </nav>
 
+        {/* Dev portal switcher */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="px-3 border-t border-slate-200 pt-3 mt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
+            <div className="flex gap-1">
+              {(["admin", "coach", "player"] as const).map((p) => (
+                <a
+                  key={p}
+                  href={`/${p}/dashboard`}
+                  className={cn(
+                    "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
+                    portal === p
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* User section */}
         <div className="px-3 pb-4 border-t border-slate-200 pt-3 mt-2">
           <div className="flex items-center gap-3 px-2 mb-3">
@@ -249,6 +272,29 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             );
           })}
         </nav>
+        {/* Dev portal switcher */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="px-3 border-t border-slate-200 pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
+            <div className="flex gap-1">
+              {(["admin", "coach", "player"] as const).map((p) => (
+                <a
+                  key={p}
+                  href={`/${p}/dashboard`}
+                  className={cn(
+                    "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
+                    portal === p
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="px-3 pb-4 border-t border-slate-200 pt-3">
           <div className="flex items-center gap-3 px-2 mb-3">
             <div

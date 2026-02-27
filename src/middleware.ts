@@ -75,8 +75,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // For portal routes, check role access
+    // For portal routes, check role access (skip in dev mode for portal switching)
     if (pathname.startsWith("/admin") || pathname.startsWith("/coach") || pathname.startsWith("/player")) {
+      if (process.env.NODE_ENV === "development") return supabaseResponse;
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")

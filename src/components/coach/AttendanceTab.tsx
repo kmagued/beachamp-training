@@ -14,6 +14,9 @@ import {
   UserCheck,
   UserX,
   Clock,
+  Search,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import type { AttendanceStatus } from "@/types/database";
 
@@ -66,6 +69,8 @@ export function AttendanceTab({
   const [result, setResult] = useState<{ success?: boolean; warnings?: string[] } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [existingAttendance, setExistingAttendance] = useState<Map<string, string>>(new Map());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [savedRecords, setSavedRecords] = useState<Map<string, AttendanceRecord>>(new Map());
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -148,6 +153,7 @@ export function AttendanceTab({
         });
       }
       setRecords(initialRecords);
+      setSavedRecords(new Map(Array.from(initialRecords.entries()).map(([k, v]) => [k, { ...v }])));
       setLoadingPlayers(false);
     }
 
@@ -160,7 +166,7 @@ export function AttendanceTab({
       const next = new Map(prev);
       const existing = next.get(playerId);
       if (existing) {
-        next.set(playerId, { ...existing, status });
+        next.set(playerId, { ...existing, status: existing.status === status ? null : status });
       }
       return next;
     });
@@ -187,6 +193,20 @@ export function AttendanceTab({
     });
   }
 
+  function resetAll() {
+    setRecords(new Map(Array.from(savedRecords.entries()).map(([k, v]) => [k, { ...v }])));
+  }
+
+  function clearAll() {
+    setRecords((prev) => {
+      const next = new Map(prev);
+      for (const [id, record] of next) {
+        next.set(id, { ...record, status: null, notes: "" });
+      }
+      return next;
+    });
+  }
+
   const markedRecords = Array.from(records.values()).filter((r) => r.status !== null);
   const presentCount = markedRecords.filter((r) => r.status === "present").length;
   const absentCount = markedRecords.filter((r) => r.status === "absent").length;
@@ -194,9 +214,20 @@ export function AttendanceTab({
   const unmarkedCount = players.length - markedRecords.length;
   const allMarked = unmarkedCount === 0 && players.length > 0;
   const hasExistingAttendance = existingAttendance.size > 0;
+  const hasChanges = (() => {
+    for (const [id, record] of records) {
+      const saved = savedRecords.get(id);
+      if (!saved) return true;
+      if ((record.status || null) !== (saved.status || null)) return true;
+    }
+    for (const id of savedRecords.keys()) {
+      if (!records.has(id)) return true;
+    }
+    return false;
+  })();
 
   function handleSubmit() {
-    if (!allMarked) return;
+    if (markedRecords.length === 0) return;
     setSubmitError(null);
 
     startTransition(async () => {
@@ -232,6 +263,7 @@ export function AttendanceTab({
         setResult({ success: true, warnings });
         setShowConfirm(false);
         setSubmitError(null);
+        setSavedRecords(new Map(Array.from(records.entries()).map(([k, v]) => [k, { ...v }])));
       }
     });
   }
@@ -239,18 +271,64 @@ export function AttendanceTab({
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
+        <div className="flex items-center gap-3">
           <p className="text-xs text-slate-400">
             {formatTime(startTime)} - {formatTime(endTime)} &middot; {sessionDate}
           </p>
+          {markedRecords.length > 0 && (
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="flex items-center gap-1 text-emerald-600">
+                <UserCheck className="w-3.5 h-3.5" /> {presentCount}
+              </span>
+              <span className="flex items-center gap-1 text-red-500">
+                <UserX className="w-3.5 h-3.5" /> {absentCount}
+              </span>
+              <span className="flex items-center gap-1 text-amber-500">
+                <Clock className="w-3.5 h-3.5" /> {excusedCount}
+              </span>
+            </div>
+          )}
         </div>
         {players.length > 0 && (
-          <Button size="sm" variant="secondary" onClick={selectAllPresent} fullWidth className="sm:w-auto">
-            <span className="flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              All Present
-            </span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={selectAllPresent} className="sm:w-auto">
+              <span className="flex items-center justify-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                All Present
+              </span>
+            </Button>
+            {hasChanges && (
+              <Button size="sm" variant="secondary" onClick={resetAll} className="sm:w-auto">
+                <span className="flex items-center justify-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset
+                </span>
+              </Button>
+            )}
+            {markedRecords.length > 0 && (
+              <Button size="sm" variant="secondary" onClick={clearAll} className="sm:w-auto">
+                <span className="flex items-center justify-center gap-1.5">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear
+                </span>
+              </Button>
+            )}
+            {result?.success ? (
+              <Badge variant="success">
+                <span className="flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Saved
+                </span>
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => setShowConfirm(true)}
+                disabled={markedRecords.length === 0 || isPending}
+              >
+                {isPending ? "Submitting..." : "Submit"}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -285,8 +363,29 @@ export function AttendanceTab({
           No players assigned to this group yet
         </div>
       ) : (
+        <div>
+          {players.length > 5 && (
+            <div className="relative mb-3">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search players..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400"
+              />
+            </div>
+          )}
         <div className="divide-y divide-slate-100">
-          {players.map((player) => {
+          {[...players].sort((a, b) => {
+            const aLogged = records.get(a.id)?.status !== null ? 0 : 1;
+            const bLogged = records.get(b.id)?.status !== null ? 0 : 1;
+            return aLogged - bLogged;
+          }).filter((p) => {
+            const q = searchQuery.toLowerCase().trim();
+            if (!q) return true;
+            return `${p.first_name} ${p.last_name}`.toLowerCase().includes(q);
+          }).map((player) => {
             const record = records.get(player.id);
             const isExpanded = expandedNotes.has(player.id);
             const hasLowBalance = player.sessions_remaining !== null && player.sessions_remaining <= 2;
@@ -432,35 +531,25 @@ export function AttendanceTab({
             );
           })}
         </div>
+        </div>
       )}
 
       {/* Summary Bar */}
-      {players.length > 0 && (
+      {players.length > 0 && markedRecords.length > 0 && (
         <div className="mt-4 pt-4 border-t border-slate-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-1 text-emerald-600">
-                <UserCheck className="w-4 h-4" /> {presentCount}
-              </span>
-              <span className="flex items-center gap-1 text-red-500">
-                <UserX className="w-4 h-4" /> {absentCount}
-              </span>
-              <span className="flex items-center gap-1 text-amber-500">
-                <Clock className="w-4 h-4" /> {excusedCount}
-              </span>
-              {unmarkedCount > 0 && (
-                <span className="text-slate-400">{unmarkedCount} unmarked</span>
-              )}
-            </div>
-            <Button
-              onClick={() => setShowConfirm(true)}
-              disabled={!allMarked || isPending}
-              size="sm"
-              fullWidth
-              className="sm:w-auto"
-            >
-              {isPending ? "Submitting..." : "Submit Attendance"}
-            </Button>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="flex items-center gap-1 text-emerald-600">
+              <UserCheck className="w-4 h-4" /> {presentCount}
+            </span>
+            <span className="flex items-center gap-1 text-red-500">
+              <UserX className="w-4 h-4" /> {absentCount}
+            </span>
+            <span className="flex items-center gap-1 text-amber-500">
+              <Clock className="w-4 h-4" /> {excusedCount}
+            </span>
+            {unmarkedCount > 0 && (
+              <span className="text-slate-400">{unmarkedCount} unmarked</span>
+            )}
           </div>
         </div>
       )}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button } from "@/components/ui";
-import { Loader2, Check, Clock, Users, X, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Check, Clock, Users, X, AlertTriangle, CheckCircle2, XCircle, Search, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { submitAttendance } from "@/app/_actions/training";
 
@@ -35,18 +35,20 @@ interface AttendanceRecord {
 }
 
 interface SessionAttendanceState {
-  [playerId: string]: "present" | "absent" | "excused";
+  [playerId: string]: "present" | "absent" | "excused" | undefined;
 }
 
 export function AttendanceTab({ date }: { date: string }) {
   const [sessions, setSessions] = useState<ScheduleSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionPlayers, setSessionPlayers] = useState<Record<string, GroupPlayer[]>>({});
-  const [existingAttendance, setExistingAttendance] = useState<Record<string, AttendanceRecord[]>>({});
   const [attendanceState, setAttendanceState] = useState<Record<string, SessionAttendanceState>>({});
   const [savedSessions, setSavedSessions] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
+  const [savedAttendanceState, setSavedAttendanceState] = useState<Record<string, SessionAttendanceState>>({});
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -110,18 +112,14 @@ export function AttendanceTab({ date }: { date: string }) {
         if (!attBySession[a.schedule_session_id]) attBySession[a.schedule_session_id] = [];
         attBySession[a.schedule_session_id].push(a);
       });
-      setExistingAttendance(attBySession);
-
-      // Initialize attendance state
+      // Initialize attendance state — only set status for players with existing records
       const initialState: Record<string, SessionAttendanceState> = {};
       sessionsData.forEach((session) => {
         const sessionState: SessionAttendanceState = {};
-        const players = playersByGroup[session.group_id] || [];
         const existing = attBySession[session.id] || [];
 
-        players.forEach((p) => {
-          const existingRecord = existing.find((a) => a.player_id === p.player_id);
-          sessionState[p.player_id] = existingRecord?.status || "absent";
+        existing.forEach((a) => {
+          sessionState[a.player_id] = a.status;
         });
 
         initialState[session.id] = sessionState;
@@ -132,6 +130,9 @@ export function AttendanceTab({ date }: { date: string }) {
         }
       });
       setAttendanceState(initialState);
+      setSavedAttendanceState(JSON.parse(JSON.stringify(initialState)));
+      // Collapse all sessions by default
+      setCollapsedSessions(new Set(sessionsData.map((s) => s.id)));
       setLoading(false);
     }
 
@@ -155,10 +156,12 @@ export function AttendanceTab({ date }: { date: string }) {
 
   function handleSaveSession(session: ScheduleSession) {
     const state = attendanceState[session.id] || {};
-    const records = Object.entries(state).map(([player_id, status]) => ({
-      player_id,
-      status,
-    }));
+    const records = Object.entries(state)
+      .filter(([, status]) => status !== undefined)
+      .map(([player_id, status]) => ({
+        player_id,
+        status: status!,
+      }));
 
     if (records.length === 0) return;
 
@@ -173,6 +176,10 @@ export function AttendanceTab({ date }: { date: string }) {
       setSavingSessionId(null);
       if ("success" in res && res.success) {
         setSavedSessions((prev) => new Set([...prev, session.id]));
+        setSavedAttendanceState((prev) => ({
+          ...prev,
+          [session.id]: { ...attendanceState[session.id] },
+        }));
       }
     });
   }
@@ -214,43 +221,89 @@ export function AttendanceTab({ date }: { date: string }) {
       {sessions.map((session) => {
         const players = sessionPlayers[session.group_id] || [];
         const state = attendanceState[session.id] || {};
+        const loggedCount = Object.values(state).filter((s) => s !== undefined).length;
         const presentCount = Object.values(state).filter((s) => s === "present").length;
+        const absentCount = Object.values(state).filter((s) => s === "absent").length;
+        const excusedCount = Object.values(state).filter((s) => s === "excused").length;
         const isSaved = savedSessions.has(session.id);
         const isSaving = savingSessionId === session.id;
+        const hasEntries = loggedCount > 0;
+        const hasChanges = (() => {
+          const saved = savedAttendanceState[session.id] || {};
+          const allKeys = new Set([...Object.keys(saved), ...Object.keys(state)]);
+          for (const key of allKeys) {
+            if ((saved[key] || undefined) !== (state[key] || undefined)) return true;
+          }
+          return false;
+        })();
+
+        const query = searchQuery.toLowerCase().trim();
+        const sortedPlayers = [...players].sort((a, b) => {
+          const aLogged = state[a.player_id] !== undefined ? 0 : 1;
+          const bLogged = state[b.player_id] !== undefined ? 0 : 1;
+          return aLogged - bLogged;
+        });
+        const filteredPlayers = query
+          ? sortedPlayers.filter((gp) =>
+              `${gp.profiles.first_name} ${gp.profiles.last_name}`.toLowerCase().includes(query)
+            )
+          : sortedPlayers;
+
+        const isCollapsed = collapsedSessions.has(session.id);
 
         return (
           <Card key={session.id} className="p-0">
-            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setCollapsedSessions((prev) => {
+                const next = new Set(prev);
+                if (next.has(session.id)) next.delete(session.id);
+                else next.add(session.id);
+                return next;
+              })}
+              className="w-full px-4 sm:px-5 py-3 sm:py-4 text-left"
+            >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      {session.groups.name}
-                    </h3>
-                    <Badge variant="neutral">{session.groups.level}</Badge>
+                <div className="flex items-start gap-2 min-w-0">
+                  {isCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        {session.groups.name}
+                      </h3>
+                      <Badge variant="neutral">{session.groups.level}</Badge>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
+                      {session.location && ` · ${session.location}`}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
-                    {session.location && ` · ${session.location}`}
-                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-slate-400 hidden sm:inline">
-                    {presentCount}/{players.length} present
-                  </span>
-                  <span className="text-xs text-slate-400 sm:hidden">
-                    {presentCount}/{players.length}
-                  </span>
+                <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {hasEntries ? (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-emerald-600 font-medium">{presentCount}</span>
+                      <span className="text-red-500 font-medium">{absentCount}</span>
+                      <span className="text-amber-500 font-medium">{excusedCount}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">Not logged</span>
+                  )}
                   {isSaved ? (
                     <Badge variant="success">
                       <span className="flex items-center gap-1">
                         <Check className="w-3 h-3" /> Saved
                       </span>
                     </Badge>
-                  ) : (
+                  ) : hasEntries ? (
                     <Button
+                      size="sm"
                       onClick={() => handleSaveSession(session)}
-                      disabled={isPending || players.length === 0}
+                      disabled={isPending}
                     >
                       {isSaving ? (
                         <span className="flex items-center gap-1.5">
@@ -260,32 +313,74 @@ export function AttendanceTab({ date }: { date: string }) {
                         "Save"
                       )}
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
-            </div>
+            </button>
 
-            <>
-              <div className="px-4 sm:px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Players</span>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {players.length > 0 && (
-                    <>
-                      <button
-                        onClick={() => markAll(session.id, session.group_id, "present")}
-                        className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                      >
-                        <CheckCircle2 className="w-3 h-3" /> All Present
-                      </button>
-                      <button
-                        onClick={() => markAll(session.id, session.group_id, "absent")}
-                        className="flex items-center gap-1 text-[11px] font-medium text-red-500 hover:text-red-600 transition-colors"
-                      >
-                        <XCircle className="w-3 h-3" /> All Absent
-                      </button>
-                    </>
-                  )}
+            {!isCollapsed && <>
+              <div className="px-4 sm:px-5 py-2 bg-slate-50/50 border-b border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Players</span>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {players.length > 0 && (
+                      <>
+                        <button
+                          onClick={() => markAll(session.id, session.group_id, "present")}
+                          className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> All Present
+                        </button>
+                        <button
+                          onClick={() => markAll(session.id, session.group_id, "absent")}
+                          className="flex items-center gap-1 text-[11px] font-medium text-red-500 hover:text-red-600 transition-colors"
+                        >
+                          <XCircle className="w-3 h-3" /> All Absent
+                        </button>
+                        {hasChanges && (
+                          <button
+                            onClick={() => {
+                              const saved = savedAttendanceState[session.id] || {};
+                              setAttendanceState((prev) => ({ ...prev, [session.id]: { ...saved } }));
+                              const hasSaved = Object.values(saved).some((s) => s !== undefined);
+                              if (hasSaved) {
+                                setSavedSessions((prev) => new Set([...prev, session.id]));
+                              } else {
+                                setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
+                              }
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Reset
+                          </button>
+                        )}
+                        {hasEntries && (
+                          <button
+                            onClick={() => {
+                              setAttendanceState((prev) => ({ ...prev, [session.id]: {} }));
+                              setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Clear
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
+                {players.length > 5 && (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search players..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400"
+                    />
+                  </div>
+                )}
               </div>
 
               {players.length === 0 ? (
@@ -295,8 +390,8 @@ export function AttendanceTab({ date }: { date: string }) {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {players.map((gp) => {
-                    const status = state[gp.player_id] || "absent";
+                  {filteredPlayers.map((gp) => {
+                    const status = state[gp.player_id];
                     return (
                       <div
                         key={gp.player_id}
@@ -315,7 +410,7 @@ export function AttendanceTab({ date }: { date: string }) {
                             onClick={() => {
                               setAttendanceState((prev) => ({
                                 ...prev,
-                                [session.id]: { ...prev[session.id], [gp.player_id]: "present" },
+                                [session.id]: { ...prev[session.id], [gp.player_id]: status === "present" ? undefined : "present" },
                               }));
                               setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
                             }}
@@ -333,7 +428,7 @@ export function AttendanceTab({ date }: { date: string }) {
                             onClick={() => {
                               setAttendanceState((prev) => ({
                                 ...prev,
-                                [session.id]: { ...prev[session.id], [gp.player_id]: "absent" },
+                                [session.id]: { ...prev[session.id], [gp.player_id]: status === "absent" ? undefined : "absent" },
                               }));
                               setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
                             }}
@@ -351,7 +446,7 @@ export function AttendanceTab({ date }: { date: string }) {
                             onClick={() => {
                               setAttendanceState((prev) => ({
                                 ...prev,
-                                [session.id]: { ...prev[session.id], [gp.player_id]: "excused" },
+                                [session.id]: { ...prev[session.id], [gp.player_id]: status === "excused" ? undefined : "excused" },
                               }));
                               setSavedSessions((prev) => { const n = new Set(prev); n.delete(session.id); return n; });
                             }}
@@ -369,9 +464,15 @@ export function AttendanceTab({ date }: { date: string }) {
                       </div>
                     );
                   })}
+                  {query && filteredPlayers.length === 0 && (
+                    <div className="px-4 sm:px-5 py-4 text-center">
+                      <p className="text-xs text-slate-400">No players match &ldquo;{searchQuery}&rdquo;</p>
+                    </div>
+                  )}
                 </div>
               )}
-            </>
+            </>}
+
           </Card>
         );
       })}
