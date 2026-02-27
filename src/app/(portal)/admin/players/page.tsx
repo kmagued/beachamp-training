@@ -199,7 +199,7 @@ function AdminPlayersContent() {
         const bTime = bEnd ? new Date(bEnd).getTime() : 0;
         cmp = aTime - bTime;
       } else if (sortField === "subscription") {
-        const subOrder: Record<string, number> = { active: 0, "expiring soon": 1, expiring: 2, attended: 3, completed: 4, expired: 5, pending: 6, none: 7 };
+        const subOrder: Record<string, number> = { active: 0, "expiring soon": 1, attended: 2, expired: 3, pending: 4, none: 5 };
         cmp = (subOrder[getSubscriptionStatus(a)] ?? 99) - (subOrder[getSubscriptionStatus(b)] ?? 99);
       }
       return sortDir === "asc" ? cmp : -cmp;

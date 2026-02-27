@@ -25,9 +25,7 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
   switch (status) {
     case "active": return <Badge variant="success">Subscribed</Badge>;
     case "attended": return <Badge variant="success">Attended</Badge>;
-    case "completed": return <Badge variant="neutral">Completed</Badge>;
     case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
-    case "expiring": return <Badge variant="danger">Expiring</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending</Badge>;
     case "none": return <Badge variant="neutral">No Sub</Badge>;

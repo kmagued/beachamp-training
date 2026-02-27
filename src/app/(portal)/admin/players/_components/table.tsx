@@ -46,9 +46,7 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
   switch (status) {
     case "active": return <Badge variant="success">Active</Badge>;
     case "attended": return <Badge variant="success">Attended</Badge>;
-    case "completed": return <Badge variant="neutral">Completed</Badge>;
     case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
-    case "expiring": return <Badge variant="danger">Expiring</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending</Badge>;
     case "none": return <Badge variant="neutral">No Sub</Badge>;
@@ -215,7 +213,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                 const selected = selectedIds.has(player.id);
                 const rowBg = selected ? "bg-primary-100" : highlighted ? "bg-cyan-50" : "bg-white";
                 const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
-                const showExpiryWarning = subStatus !== "completed" && daysLeft !== null;
+                const showExpiryWarning = daysLeft !== null;
                 return (
                   <tr
                     key={player.id}
@@ -325,7 +323,7 @@ export function PlayersTableView(props: PlayersTableProps) {
           const isSingleSession = latestSub?.sessions_total === 1;
           const selected = selectedIds.has(player.id);
           const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
-          const showExpiryWarning = subStatus !== "completed" && daysLeft !== null;
+          const showExpiryWarning = daysLeft !== null;
           return (
             <Card
               key={player.id}

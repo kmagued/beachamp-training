@@ -33,9 +33,7 @@ export type ActivityStatus = "active" | "inactive";
 export type SubscriptionStatus =
   | "active"
   | "expiring soon"
-  | "expiring"
   | "expired"
-  | "completed"
   | "attended"
   | "pending"
   | "none";
@@ -83,7 +81,7 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
     activeSubs[0] || null;
 
   if (activeSub) {
-    const { sessions_remaining, sessions_total, start_date, end_date } = activeSub;
+    const { sessions_remaining, sessions_total, end_date } = activeSub;
     const isSingleSession = sessions_total === 1;
 
     // Single-session: no expiry concept, just attended or active
@@ -94,26 +92,19 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
 
     // Time-based calculations
     let daysLeft: number | null = null;
-    let packageDays = 30;
     if (end_date) {
       daysLeft = Math.ceil(
         (new Date(end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
-      if (start_date) {
-        packageDays = Math.max(1, Math.ceil(
-          (new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24)
-        ));
-      }
     }
 
     if (daysLeft !== null && daysLeft <= 0) return "expired";
 
-    const timeRatio = daysLeft !== null ? daysLeft / packageDays : 1;
     const sessionsRatio = sessions_total > 0 ? sessions_remaining / sessions_total : 1;
 
-    if (sessions_remaining <= 0) return "completed";
-    if (daysLeft !== null && daysLeft <= 7) return "expiring";
-    if (timeRatio <= 0.3 || sessionsRatio <= 0.3) return "expiring soon";
+    if (sessions_remaining <= 0) return "expired";
+    if (daysLeft !== null && daysLeft <= 10) return "expiring soon";
+    if (sessionsRatio <= 0.3) return "expiring soon";
 
     return "active";
   }

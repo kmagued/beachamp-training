@@ -71,7 +71,7 @@ export function MultiSelect({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "w-full px-4 py-2.5 rounded-lg border bg-white text-left text-sm transition-colors",
+          "w-full px-4 py-2.5 rounded-lg border bg-white text-left text-sm transition-colors truncate pr-8",
           "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
           open ? "border-primary ring-2 ring-primary/20" : "border-slate-300",
         )}

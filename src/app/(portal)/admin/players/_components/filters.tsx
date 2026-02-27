@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
 
 const ACTIVITY_OPTIONS = ["Active", "Inactive"] as const;
-const SUBSCRIPTION_OPTIONS = ["Active", "Attended", "Completed", "Expiring Soon", "Expiring", "Expired", "Pending", "No Sub"] as const;
+const SUBSCRIPTION_OPTIONS = ["Active", "Attended", "Expiring Soon", "Expired", "Pending", "No Sub"] as const;
 const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -128,8 +128,8 @@ export function PlayersFilters({
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 sm:min-w-[200px]">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-6">
+        <div className="relative w-full sm:w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             value={search}

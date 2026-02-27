@@ -51,6 +51,7 @@ function AdminPaymentsContent() {
   );
   const [packageFilter, setPackageFilter] = useState(searchParams.get("package") || "");
   const [monthFilter, setMonthFilter] = useState(searchParams.get("month") || "");
+  const [methodFilter, setMethodFilter] = useState(searchParams.get("method") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
   const [sortField, setSortField] = useState<SortField>(
     VALID_PAY_SORT_FIELDS.includes(searchParams.get("sort") as SortField) ? (searchParams.get("sort") as SortField) : "date"
@@ -68,6 +69,7 @@ function AdminPaymentsContent() {
     if (statusFilter) params.set("statusFilter", statusFilter);
     if (packageFilter) params.set("package", packageFilter);
     if (monthFilter) params.set("month", monthFilter);
+    if (methodFilter) params.set("method", methodFilter);
     if (typeFilter) params.set("type", typeFilter);
     if (sortField !== "date") params.set("sort", sortField);
     if (sortDir !== "desc") params.set("dir", sortDir);
@@ -79,7 +81,7 @@ function AdminPaymentsContent() {
     const qs = params.toString();
     const url = qs ? `${pathname}?${qs}` : pathname;
     router.replace(url, { scroll: false });
-  }, [search, statusFilter, packageFilter, monthFilter, typeFilter, sortField, sortDir, currentPage, pageSize, pathname, router, searchParams]);
+  }, [search, statusFilter, methodFilter, packageFilter, monthFilter, typeFilter, sortField, sortDir, currentPage, pageSize, pathname, router, searchParams]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -161,6 +163,11 @@ function AdminPaymentsContent() {
       result = result.filter((p) => selected.includes(p.subscriptions?.packages?.name ?? ""));
     }
 
+    if (methodFilter) {
+      const selected = methodFilter.split(",").map((s) => s.toLowerCase());
+      result = result.filter((p) => selected.includes(p.method?.toLowerCase()));
+    }
+
     if (typeFilter) {
       if (typeFilter === "player") result = result.filter((p) => p.profiles !== null);
       if (typeFilter === "quick") result = result.filter((p) => p.profiles === null);
@@ -181,7 +188,7 @@ function AdminPaymentsContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [payments, search, monthFilter, statusFilter, packageFilter, typeFilter, sortField, sortDir]);
+  }, [payments, search, monthFilter, statusFilter, methodFilter, packageFilter, typeFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / pageSize);
@@ -192,7 +199,7 @@ function AdminPaymentsContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, monthFilter, statusFilter, packageFilter, typeFilter]);
+  }, [search, monthFilter, statusFilter, methodFilter, packageFilter, typeFilter]);
 
   // Selection helpers
   const pageIds = paginatedPayments.map((p) => p.id);
@@ -293,7 +300,7 @@ function AdminPaymentsContent() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
           <p className="text-slate-500 text-sm">
             {payments.length} total payments
-            {(!!search || !!monthFilter || !!statusFilter || !!packageFilter) && ` · ${filteredPayments.length} matching`}
+            {(!!search || !!monthFilter || !!statusFilter || !!methodFilter || !!packageFilter || !!typeFilter) && ` · ${filteredPayments.length} matching`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -324,6 +331,8 @@ function AdminPaymentsContent() {
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        methodFilter={methodFilter}
+        onMethodFilterChange={setMethodFilter}
         packageFilter={packageFilter}
         onPackageFilterChange={setPackageFilter}
         packageOptions={packageOptions}
@@ -335,8 +344,8 @@ function AdminPaymentsContent() {
         onSortChange={toggleSort}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
-        onReset={() => { setSearch(""); setMonthFilter(""); setStatusFilter(""); setPackageFilter(""); setTypeFilter(""); }}
-        hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!packageFilter || !!typeFilter}
+        onReset={() => { setSearch(""); setMonthFilter(""); setStatusFilter(""); setMethodFilter(""); setPackageFilter(""); setTypeFilter(""); }}
+        hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!methodFilter || !!packageFilter || !!typeFilter}
       />
 
       <SelectionBar count={selectedIds.size} onClear={() => { setSelectedIds(new Set()); setBulkDate(""); }}>

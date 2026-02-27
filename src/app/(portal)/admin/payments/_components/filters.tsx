@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
 
 const STATUS_OPTIONS = ["Pending", "Confirmed", "Rejected"] as const;
+const METHOD_OPTIONS = ["Cash", "InstaPay"] as const;
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "date", label: "Date" },
@@ -16,6 +17,8 @@ interface PaymentsFiltersProps {
   onSearchChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  methodFilter: string;
+  onMethodFilterChange: (value: string) => void;
   packageFilter: string;
   onPackageFilterChange: (value: string) => void;
   packageOptions: readonly string[];
@@ -36,6 +39,8 @@ export function PaymentsFilters({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  methodFilter,
+  onMethodFilterChange,
   packageFilter,
   onPackageFilterChange,
   packageOptions,
@@ -50,14 +55,14 @@ export function PaymentsFilters({
   onReset,
   hasActiveFilters,
 }: PaymentsFiltersProps) {
-  const activeFilterCount = [statusFilter, monthFilter, packageFilter, typeFilter].filter(Boolean).length;
+  const activeFilterCount = [statusFilter, methodFilter, monthFilter, packageFilter, typeFilter].filter(Boolean).length;
 
   const filterDropdowns = (
     <>
       <select
         value={monthFilter}
         onChange={(e) => onMonthFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-44"
+        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
       >
         <option value="">All Months</option>
         {monthOptions.map((m) => (
@@ -70,7 +75,15 @@ export function PaymentsFilters({
         onChange={onStatusFilterChange}
         placeholder="All Status"
         showChips={false}
-        className="sm:w-44"
+        className="sm:w-36"
+      />
+      <MultiSelect
+        options={METHOD_OPTIONS}
+        value={methodFilter}
+        onChange={onMethodFilterChange}
+        placeholder="All Methods"
+        showChips={false}
+        className="sm:w-36"
       />
       {packageOptions.length > 0 && (
         <MultiSelect
@@ -79,13 +92,13 @@ export function PaymentsFilters({
           onChange={onPackageFilterChange}
           placeholder="All Packages"
           showChips={false}
-          className="sm:w-48"
+          className="sm:w-40"
         />
       )}
       <select
         value={typeFilter}
         onChange={(e) => onTypeFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-40"
+        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
       >
         <option value="">All Types</option>
         <option value="player">Player Payments</option>
@@ -119,7 +132,7 @@ export function PaymentsFilters({
                   : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
               )}
             >
-              {opt.label} {isActive && (sortDir === "asc" ? "↑" : "↓")}
+              {opt.label} {isActive && (sortDir === "asc" ? "\u2191" : "\u2193")}
             </button>
           );
         })}
@@ -129,8 +142,8 @@ export function PaymentsFilters({
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 sm:min-w-[200px]">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-6">
+        <div className="relative w-full sm:w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             value={search}
