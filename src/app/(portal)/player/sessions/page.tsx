@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, Badge, EmptyState } from "@/components/ui";
 import { CalendarDays } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { Attendance } from "@/types/database";
 
 export default async function PlayerSessionsPage() {
@@ -79,7 +80,7 @@ export default async function PlayerSessionsPage() {
                     className={`border-b border-slate-100 ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}
                   >
                     <td className="px-4 py-3 text-sm text-slate-900">
-                      {new Date(record.session_date).toLocaleDateString("en-GB")}
+                      {formatDate(record.session_date)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
                       {record.session_time || "—"}

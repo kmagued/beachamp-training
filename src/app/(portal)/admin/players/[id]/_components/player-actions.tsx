@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect, useCallback } from "react";
-import { Card, Input, Select, Label, Button, DatePicker, Textarea, Badge } from "@/components/ui";
+import { Card, Input, Select, Label, Button, DatePicker, Textarea, Badge, Toast } from "@/components/ui";
 import { Pencil, KeyRound, MoreVertical, Loader2, Copy, Check, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
@@ -23,6 +23,8 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -40,6 +42,8 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
       const res = await resetPlayerPassword(player.id);
       if (res.password) {
         setPasswordResult(res.password);
+      } else {
+        setToast({ message: res.error ?? "Failed to reset password", variant: "error" });
       }
     });
   }
@@ -62,12 +66,16 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
       const res = await deletePlayer(player.id);
       if (res.success) {
         router.push("/admin/players");
+      } else {
+        setToast({ message: res.error ?? "Failed to delete player", variant: "error" });
+        setConfirmDelete(false);
       }
     });
   }
 
   return (
     <>
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={() => setEditing(true)}>
           <span className="flex items-center gap-1.5">

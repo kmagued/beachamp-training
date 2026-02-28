@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Card, Badge, Button, Drawer } from "@/components/ui";
+import { useState, useTransition, useCallback } from "react";
+import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
 import { UserCheck, Plus, X } from "lucide-react";
 import { assignCoachToGroup, removeCoachFromGroup, setPrimaryCoach } from "@/app/_actions/training";
 import type { CoachRow, AvailableCoach } from "./types";
@@ -19,6 +19,8 @@ export function CoachesSection({ groupId, coaches, onRefresh, supabase }: Coache
   const [error, setError] = useState<string | null>(null);
   const [showAddCoach, setShowAddCoach] = useState(false);
   const [availableCoaches, setAvailableCoaches] = useState<AvailableCoach[]>([]);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   async function loadAvailableCoaches() {
     const { data } = await supabase
@@ -40,6 +42,7 @@ export function CoachesSection({ groupId, coaches, onRefresh, supabase }: Coache
       if ("error" in result) setError(result.error);
       else {
         setShowAddCoach(false);
+        setToast({ message: "Coach assigned successfully", variant: "success" });
         onRefresh();
       }
     });
@@ -47,20 +50,31 @@ export function CoachesSection({ groupId, coaches, onRefresh, supabase }: Coache
 
   function handleRemoveCoach(coachId: string) {
     startTransition(async () => {
-      await removeCoachFromGroup(groupId, coachId);
+      const res = await removeCoachFromGroup(groupId, coachId);
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to remove coach", variant: "error" });
+      } else {
+        setToast({ message: "Coach removed", variant: "success" });
+      }
       onRefresh();
     });
   }
 
   function handleSetPrimary(coachId: string) {
     startTransition(async () => {
-      await setPrimaryCoach(groupId, coachId);
+      const res = await setPrimaryCoach(groupId, coachId);
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to set primary coach", variant: "error" });
+      } else {
+        setToast({ message: "Primary coach updated", variant: "success" });
+      }
       onRefresh();
     });
   }
 
   return (
     <Card className="mb-6">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-slate-900 flex items-center gap-2">
           <UserCheck className="w-4 h-4 text-slate-400" />

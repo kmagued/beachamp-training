@@ -4,6 +4,7 @@ import { useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui";
 import { X, Mail, Phone, MapPin, Calendar, Shield, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { UserRow } from "./types";
 import type { UserRole } from "@/types/database";
 
@@ -205,7 +206,7 @@ function DrawerContent({ user, onClose, onRoleChange, changingRoleId, isSelf }: 
               <div>
                 <p className="text-xs text-slate-400">Registered</p>
                 <p className="text-sm text-slate-700">
-                  {new Date(user.created_at).toLocaleDateString("en-GB")}
+                  {formatDate(user.created_at)}
                 </p>
               </div>
             </div>

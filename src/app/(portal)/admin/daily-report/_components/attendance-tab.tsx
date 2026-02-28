@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge, Button, Toast } from "@/components/ui";
 import { Loader2, Check, Clock, Users, X, AlertTriangle, CheckCircle2, XCircle, Search, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { submitAttendance } from "@/app/_actions/training";
+import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 
 interface ScheduleSession {
   id: string;
@@ -49,6 +49,7 @@ export function AttendanceTab({ date }: { date: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
   const [savedAttendanceState, setSavedAttendanceState] = useState<Record<string, SessionAttendanceState>>({});
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -156,6 +157,7 @@ export function AttendanceTab({ date }: { date: string }) {
 
   function handleSaveSession(session: ScheduleSession) {
     const state = attendanceState[session.id] || {};
+    const saved = savedAttendanceState[session.id] || {};
     const records = Object.entries(state)
       .filter(([, status]) => status !== undefined)
       .map(([player_id, status]) => ({
@@ -163,24 +165,52 @@ export function AttendanceTab({ date }: { date: string }) {
         status: status!,
       }));
 
-    if (records.length === 0) return;
+    // Detect players whose status was removed (previously saved but now undefined)
+    const removedPlayerIds = Object.keys(saved)
+      .filter((pid) => saved[pid] !== undefined && (state[pid] === undefined || !(pid in state)));
+
+    if (records.length === 0 && removedPlayerIds.length === 0) return;
 
     setSavingSessionId(session.id);
     startTransition(async () => {
-      const res = await submitAttendance({
-        group_id: session.group_id,
-        schedule_session_id: session.id,
-        session_date: date,
-        records,
-      });
-      setSavingSessionId(null);
-      if ("success" in res && res.success) {
-        setSavedSessions((prev) => new Set([...prev, session.id]));
-        setSavedAttendanceState((prev) => ({
-          ...prev,
-          [session.id]: { ...attendanceState[session.id] },
-        }));
+      // Remove attendance for deselected players
+      if (removedPlayerIds.length > 0) {
+        const removeRes = await removeAttendanceRecords({
+          group_id: session.group_id,
+          schedule_session_id: session.id,
+          session_date: date,
+          player_ids: removedPlayerIds,
+        });
+        if ("error" in removeRes) {
+          setSavingSessionId(null);
+          setToast({ message: removeRes.error as string, variant: "error" });
+          return;
+        }
       }
+
+      // Submit remaining records (if any)
+      if (records.length > 0) {
+        const res = await submitAttendance({
+          group_id: session.group_id,
+          schedule_session_id: session.id,
+          session_date: date,
+          records,
+        });
+        if (!("success" in res && res.success)) {
+          setSavingSessionId(null);
+          const errorMsg = "error" in res && typeof res.error === "string" ? res.error : "Failed to save attendance";
+          setToast({ message: errorMsg, variant: "error" });
+          return;
+        }
+      }
+
+      setSavingSessionId(null);
+      setSavedSessions((prev) => new Set([...prev, session.id]));
+      setSavedAttendanceState((prev) => ({
+        ...prev,
+        [session.id]: { ...attendanceState[session.id] },
+      }));
+      setToast({ message: "Attendance saved successfully", variant: "success" });
     });
   }
 
@@ -218,6 +248,11 @@ export function AttendanceTab({ date }: { date: string }) {
 
   return (
     <div className="space-y-4">
+      <Toast
+        message={toast?.message ?? null}
+        variant={toast?.variant}
+        onClose={() => setToast(null)}
+      />
       {sessions.map((session) => {
         const players = sessionPlayers[session.group_id] || [];
         const state = attendanceState[session.id] || {};
@@ -299,7 +334,7 @@ export function AttendanceTab({ date }: { date: string }) {
                         <Check className="w-3 h-3" /> Saved
                       </span>
                     </Badge>
-                  ) : hasEntries ? (
+                  ) : (hasEntries || hasChanges) ? (
                     <Button
                       size="sm"
                       onClick={() => handleSaveSession(session)}

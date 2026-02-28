@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { CalendarDays, ClipboardCheck, Receipt, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import { DatePicker } from "@/components/ui";
 import { AttendanceTab } from "./_components/attendance-tab";
 import { ExpensesTab } from "./_components/expenses-tab";
@@ -42,12 +43,7 @@ export default function DailyReportPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Daily Report</h1>
           <p className="text-slate-500 text-sm">
-            {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
+            {formatDate(selectedDate)}
           </p>
         </div>
         <div className="flex items-center gap-2">

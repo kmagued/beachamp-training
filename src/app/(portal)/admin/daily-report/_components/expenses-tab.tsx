@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge, Button, Toast } from "@/components/ui";
 import { Receipt, Plus, Trash2 } from "lucide-react";
 import { ExpenseDrawer, type CourtSession } from "../../expenses/_components/expense-drawer";
 import { deleteExpense } from "@/app/_actions/expenses";
@@ -15,6 +15,8 @@ export function ExpensesTab({ date }: { date: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
   const [courtSessions, setCourtSessions] = useState<CourtSession[]>([]);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,7 +83,12 @@ export function ExpensesTab({ date }: { date: string }) {
   }
 
   async function handleDelete(id: string) {
-    await deleteExpense(id);
+    const res = await deleteExpense(id);
+    if ("error" in res) {
+      setToast({ message: res.error ?? "Failed to delete expense", variant: "error" });
+    } else {
+      setToast({ message: "Expense deleted", variant: "success" });
+    }
     loadData();
   }
 
@@ -100,6 +107,7 @@ export function ExpensesTab({ date }: { date: string }) {
 
   return (
     <div className="space-y-4">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       {/* Summary */}
       <div className="flex items-center justify-between">
         <div>
@@ -163,7 +171,7 @@ export function ExpensesTab({ date }: { date: string }) {
         onClose={() => { setDrawerOpen(false); setEditingExpense(null); }}
         categories={categories}
         editingExpense={editingExpense}
-        onSuccess={() => { setDrawerOpen(false); setEditingExpense(null); loadData(); }}
+        onSuccess={() => { setDrawerOpen(false); setEditingExpense(null); setToast({ message: "Expense saved", variant: "success" }); loadData(); }}
         defaultDate={date}
         sessions={courtSessions}
       />

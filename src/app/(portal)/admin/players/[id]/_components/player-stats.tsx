@@ -1,5 +1,6 @@
 import { StatCard } from "@/components/ui";
 import { Package, Activity, CreditCard, ClipboardCheck, CalendarClock } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { SubscriptionRow } from "./types";
 
 interface PlayerStatsProps {
@@ -15,7 +16,7 @@ function getExpiryInfo(activeSub: SubscriptionRow | undefined) {
   if (daysLeft <= 0) return { label: "Expires", value: "Expired", color: "bg-red-500" };
   if (daysLeft <= 3) return { label: "Expires In", value: `${daysLeft} day${daysLeft === 1 ? "" : "s"}`, color: "bg-red-500" };
   if (daysLeft <= 7) return { label: "Expires In", value: `${daysLeft} days`, color: "bg-amber-500" };
-  return { label: "Expires", value: new Date(activeSub.end_date).toLocaleDateString("en-GB"), color: "bg-slate-400" };
+  return { label: "Expires", value: formatDate(activeSub.end_date), color: "bg-slate-400" };
 }
 
 export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: PlayerStatsProps) {

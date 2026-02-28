@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui";
+import { formatDate } from "@/lib/utils/format-date";
 import type { PlayerProfile } from "./types";
 
 interface PlayerHeaderProps {
@@ -24,7 +25,7 @@ export function PlayerHeader({ player, actions }: PlayerHeaderProps) {
               {player.is_active ? "Active" : "Inactive"}
             </Badge>
             <span className="text-xs text-slate-400">
-              Registered {new Date(player.created_at).toLocaleDateString("en-GB")}
+              Registered {formatDate(player.created_at)}
             </span>
           </div>
         </div>

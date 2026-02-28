@@ -281,6 +281,8 @@ export function FeedbackTab({
         setPlayers((prev) =>
           prev.map((p) => (p.id === player.id ? { ...p, existing_feedback: null } : p))
         );
+        setResult({ success: true, playerId: player.id });
+        setTimeout(() => setResult(null), 3000);
       }
     });
   }

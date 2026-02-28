@@ -12,6 +12,7 @@ import {
   Star,
   AlertTriangle,
 } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
 
 export default async function PlayerDashboard() {
@@ -105,7 +106,7 @@ export default async function PlayerDashboard() {
             value={
               isExpired ? "Expired" :
               subscription.end_date
-                ? new Date(subscription.end_date).toLocaleDateString("en-GB")
+                ? formatDate(subscription.end_date)
                 : "—"
             }
             subtitle={daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days remaining` : undefined}
@@ -167,7 +168,7 @@ export default async function PlayerDashboard() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-500">Started</span>
                   <span className="text-sm text-slate-700">
-                    {new Date(subscription.start_date).toLocaleDateString("en-GB")}
+                    {formatDate(subscription.start_date)}
                   </span>
                 </div>
               )}
@@ -220,7 +221,7 @@ export default async function PlayerDashboard() {
                     {latestFeedback.coach?.first_name} {latestFeedback.coach?.last_name}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {new Date(latestFeedback.session_date).toLocaleDateString("en-GB")}
+                    {formatDate(latestFeedback.session_date)}
                   </p>
                 </div>
               </div>

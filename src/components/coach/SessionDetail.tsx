@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
 import { FeedbackTab } from "./FeedbackTab";
 
@@ -29,8 +30,6 @@ interface SessionDetailProps {
   isAdmin: boolean;
   basePath: string; // "/admin" or "/coach"
 }
-
-const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
@@ -59,6 +58,16 @@ function getLevelVariant(level: string): "success" | "warning" | "danger" | "inf
 export function SessionDetail({ scheduleSessionId, coachId, isAdmin, basePath }: SessionDetailProps) {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date") || new Date().toISOString().split("T")[0];
+
+  // Compute the Saturday that starts the week containing dateParam
+  const scheduleWeekParam = (() => {
+    const d = new Date(dateParam + "T00:00:00");
+    const day = d.getDay();
+    const satOffset = day >= 6 ? 0 : -(day + 1);
+    const sat = new Date(d);
+    sat.setDate(d.getDate() + satOffset);
+    return `${sat.getFullYear()}-${String(sat.getMonth() + 1).padStart(2, "0")}-${String(sat.getDate()).padStart(2, "0")}`;
+  })();
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,7 +147,7 @@ export function SessionDetail({ scheduleSessionId, coachId, isAdmin, basePath }:
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link href={`${basePath}/schedule`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
+        <Link href={`${basePath}/schedule?week=${scheduleWeekParam}`} className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-2">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Schedule
         </Link>
         <div className="flex items-center gap-3 mb-1">
@@ -148,7 +157,7 @@ export function SessionDetail({ scheduleSessionId, coachId, isAdmin, basePath }:
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
           <span className="flex items-center gap-1">
             <Calendar className="w-4 h-4 text-slate-400" />
-            {DAY_NAMES_FULL[session.day_of_week]}, {dateParam}
+            {formatDate(dateParam)}
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-4 h-4 text-slate-400" />

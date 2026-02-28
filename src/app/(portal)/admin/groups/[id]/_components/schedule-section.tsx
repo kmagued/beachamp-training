@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Card, Button, Input, Select, Drawer } from "@/components/ui";
+import { useState, useTransition, useCallback } from "react";
+import { Card, Button, Input, Select, Drawer, Toast } from "@/components/ui";
 import { Calendar, Plus, Pencil, Trash2 } from "lucide-react";
 import { createScheduleSession, updateScheduleSession, deleteScheduleSession } from "@/app/_actions/training";
 import { formatTime } from "../../_components/types";
@@ -21,6 +21,8 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
   const [error, setError] = useState<string | null>(null);
   const [showSessionDrawer, setShowSessionDrawer] = useState(false);
   const [editingSession, setEditingSession] = useState<ScheduleRow | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   function handleCreateSession(formData: FormData) {
     setError(null);
@@ -30,6 +32,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
       if ("error" in result) setError(result.error);
       else {
         setShowSessionDrawer(false);
+        setToast({ message: "Session created", variant: "success" });
         onRefresh();
       }
     });
@@ -43,6 +46,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
       if ("error" in result) setError(result.error);
       else {
         setEditingSession(null);
+        setToast({ message: "Session updated", variant: "success" });
         onRefresh();
       }
     });
@@ -50,7 +54,12 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
 
   function handleDeleteSession(id: string) {
     startTransition(async () => {
-      await deleteScheduleSession(id);
+      const res = await deleteScheduleSession(id);
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to delete session", variant: "error" });
+      } else {
+        setToast({ message: "Session deleted", variant: "success" });
+      }
       onRefresh();
     });
   }
@@ -71,6 +80,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
 
   return (
     <Card>
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-slate-900 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-400" />

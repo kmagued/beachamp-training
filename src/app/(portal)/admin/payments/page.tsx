@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Badge, Pagination, SelectionBar, DatePicker } from "@/components/ui";
+import { Badge, Pagination, SelectionBar, DatePicker, Toast } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus, bulkUpdatePaymentDate } from "./actions";
@@ -37,6 +37,8 @@ function AdminPaymentsContent() {
   const [drawerPayment, setDrawerPayment] = useState<PaymentRow | null>(null);
   const [showNewPayment, setShowNewPayment] = useState(false);
   const [bulkDate, setBulkDate] = useState("");
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -242,8 +244,13 @@ function AdminPaymentsContent() {
     if (isPending) return;
     setActionId(id);
     startTransition(async () => {
-      await confirmPayment(id);
+      const res = await confirmPayment(id);
       setActionId(null);
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to confirm payment", variant: "error" });
+      } else {
+        setToast({ message: "Payment confirmed", variant: "success" });
+      }
       fetchPayments();
     });
   }
@@ -252,10 +259,15 @@ function AdminPaymentsContent() {
     if (!rejectReason.trim() || isPending) return;
     setActionId(id);
     startTransition(async () => {
-      await rejectPayment(id, rejectReason);
+      const res = await rejectPayment(id, rejectReason);
       setActionId(null);
       setRejectingId(null);
       setRejectReason("");
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to reject payment", variant: "error" });
+      } else {
+        setToast({ message: "Payment rejected", variant: "success" });
+      }
       fetchPayments();
     });
   }
@@ -264,8 +276,13 @@ function AdminPaymentsContent() {
     if (isPending || selectedIds.size === 0) return;
     const ids = [...selectedIds];
     startTransition(async () => {
-      await bulkUpdatePaymentStatus(ids, status);
+      const res = await bulkUpdatePaymentStatus(ids, status);
       setSelectedIds(new Set());
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to update payments", variant: "error" });
+      } else {
+        setToast({ message: `${ids.length} payment(s) updated to ${status}`, variant: "success" });
+      }
       fetchPayments();
     });
   }
@@ -274,8 +291,13 @@ function AdminPaymentsContent() {
     if (isPending || selectedIds.size === 0 || !date) return;
     const ids = [...selectedIds];
     startTransition(async () => {
-      await bulkUpdatePaymentDate(ids, date);
+      const res = await bulkUpdatePaymentDate(ids, date);
       setSelectedIds(new Set());
+      if ("error" in res) {
+        setToast({ message: res.error ?? "Failed to update dates", variant: "error" });
+      } else {
+        setToast({ message: `Date updated for ${ids.length} payment(s)`, variant: "success" });
+      }
       fetchPayments();
     });
   }
@@ -295,6 +317,7 @@ function AdminPaymentsContent() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Payments</h1>
@@ -440,7 +463,7 @@ function AdminPaymentsContent() {
         onConfirm={(id) => { setDrawerPayment(null); handleConfirm(id); }}
         onReject={(id) => { setDrawerPayment(null); setRejectingId(id); }}
         onViewScreenshot={handleViewScreenshot}
-        onDataChange={() => { setDrawerPayment(null); fetchPayments(); }}
+        onDataChange={() => { setDrawerPayment(null); setToast({ message: "Payment updated", variant: "success" }); fetchPayments(); }}
         isPending={isPending}
         actionId={actionId}
       />
@@ -448,7 +471,7 @@ function AdminPaymentsContent() {
       <NewPaymentDrawer
         open={showNewPayment}
         onClose={() => setShowNewPayment(false)}
-        onSuccess={fetchPayments}
+        onSuccess={() => { setToast({ message: "Payment created successfully", variant: "success" }); fetchPayments(); }}
       />
     </div>
   );

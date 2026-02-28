@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, StatCard, Skeleton, Drawer } from "@/components/ui";
+import { Card, Badge, Button, StatCard, Skeleton, Drawer, Toast } from "@/components/ui";
 import { toggleGroupActive, deleteGroup } from "@/app/_actions/training";
 import { UsersRound, Plus, Pencil, Calendar, Users, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +20,8 @@ export default function AdminGroupsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupData | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<GroupData | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,7 +84,12 @@ export default function AdminGroupsPage() {
 
   function handleToggleActive(id: string) {
     startTransition(async () => {
-      await toggleGroupActive(id);
+      const res = await toggleGroupActive(id);
+      if ("error" in res) {
+        setToast({ message: (res as { error: string }).error, variant: "error" });
+      } else {
+        setToast({ message: "Group status updated", variant: "success" });
+      }
       fetchGroups();
     });
   }
@@ -92,8 +99,9 @@ export default function AdminGroupsPage() {
     startTransition(async () => {
       const result = await deleteGroup(group.id);
       if ("error" in result) {
-        setError((result as { error: string }).error);
+        setToast({ message: (result as { error: string }).error, variant: "error" });
       } else {
+        setToast({ message: "Group deleted", variant: "success" });
         fetchGroups();
       }
       setDeletingGroup(null);
@@ -133,6 +141,7 @@ export default function AdminGroupsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="min-w-0">
@@ -185,13 +194,16 @@ export default function AdminGroupsPage() {
           setShowModal(false);
           setEditingGroup(null);
         }}
-        onSuccess={fetchGroups}
+        onSuccess={() => {
+          setToast({ message: editingGroup ? "Group updated" : "Group created", variant: "success" });
+          fetchGroups();
+        }}
         editingGroup={editingGroup}
       />
 
       {/* Groups Grid */}
       {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
               <Skeleton className="h-5 w-32 mb-2" />
@@ -221,7 +233,7 @@ export default function AdminGroupsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           {groups.map((group) => {
             const scheduleText =
               group.schedule.length > 0

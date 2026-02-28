@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, Badge, EmptyState } from "@/components/ui";
 import { Package, ArrowRight } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
 
 interface SubWithPackage extends Subscription {
@@ -124,10 +125,10 @@ export default async function PlayerSubscriptionsPage() {
                           {sub.packages?.price ? `${sub.packages.price.toLocaleString("en-US")} EGP` : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">
-                          {sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"}
+                          {sub.start_date ? formatDate(sub.start_date) : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">
-                          {sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}
+                          {sub.end_date ? formatDate(sub.end_date) : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={display.variant}>{display.label}</Badge>
@@ -178,8 +179,8 @@ export default async function PlayerSubscriptionsPage() {
                       <span className="text-slate-400">Date</span>
                       <p className="text-slate-700 font-medium">
                         {sub.start_date
-                          ? new Date(sub.start_date).toLocaleDateString("en-GB")
-                          : new Date(sub.created_at).toLocaleDateString("en-GB")}
+                          ? formatDate(sub.start_date)
+                          : formatDate(sub.created_at)}
                       </p>
                     </div>
                   </div>

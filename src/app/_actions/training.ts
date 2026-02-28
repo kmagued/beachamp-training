@@ -544,6 +544,58 @@ export async function submitAttendance(data: {
   return { success: true, results };
 }
 
+export async function removeAttendanceRecords(data: {
+  group_id: string;
+  schedule_session_id: string;
+  session_date: string;
+  player_ids: string[];
+}) {
+  const user = await getCurrentUserRole();
+  const authErr = requireCoachOrAdmin(user);
+  if (authErr) return authErr;
+
+  if (data.player_ids.length === 0) return { success: true };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Find existing attendance records for these players
+  const { data: existing, error: fetchErr } = await admin
+    .from("attendance")
+    .select("id, player_id, status")
+    .eq("group_id", data.group_id)
+    .eq("schedule_session_id", data.schedule_session_id)
+    .eq("session_date", data.session_date)
+    .in("player_id", data.player_ids);
+
+  if (fetchErr) return { error: fetchErr.message };
+  if (!existing || existing.length === 0) return { success: true };
+
+  // For players who were marked "present", re-credit their subscription
+  const presentPlayerIds = existing
+    .filter((r: { status: string }) => r.status === "present")
+    .map((r: { player_id: string }) => r.player_id);
+
+  for (const playerId of presentPlayerIds) {
+    await admin.rpc("increment_sessions_remaining", { p_player_id: playerId });
+  }
+
+  // Delete the attendance records
+  const ids = existing.map((r: { id: string }) => r.id);
+  const { error: delErr } = await admin
+    .from("attendance")
+    .delete()
+    .in("id", ids);
+
+  if (delErr) return { error: delErr.message };
+
+  revalidatePath("/admin/sessions");
+  revalidatePath("/coach/sessions");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/coach/dashboard");
+  return { success: true };
+}
+
 export async function updateAttendanceRecord(
   id: string,
   status: string,

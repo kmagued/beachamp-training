@@ -2,6 +2,7 @@ import { RefObject, useState } from "react";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { PlayerRow, SortField, SortDir, ActivityStatus, SubscriptionStatus } from "./types";
 import { getActivityStatus, getSubscriptionStatus, getLatestSubscription } from "./types";
 
@@ -177,6 +178,9 @@ export function PlayersTableView(props: PlayersTableProps) {
                   <span className="inline-flex items-center gap-1">Player <SortIcon field="name" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 {/* Scrollable middle */}
+                <th className={thSortable} onClick={() => toggleSort("group")}>
+                  <span className="inline-flex items-center gap-1">Group <SortIcon field="group" sortField={sortField} sortDir={sortDir} /></span>
+                </th>
                 <th className={thSortable} onClick={() => toggleSort("package")}>
                   <span className="inline-flex items-center gap-1">Package <SortIcon field="package" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
@@ -243,6 +247,11 @@ export function PlayersTableView(props: PlayersTableProps) {
                     </td>
                     {/* Scrollable middle */}
                     <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
+                      {player.groups?.length
+                        ? player.groups.map((g) => g.name).join(", ")
+                        : "—"}
+                    </td>
+                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
                       {latestSub?.packages?.name || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
@@ -256,7 +265,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                             showExpiryWarning && daysLeft! <= 7 ? "text-amber-600 font-medium" :
                             "text-slate-500"
                           )}>
-                            {new Date(latestSub.end_date).toLocaleDateString("en-GB")}
+                            {formatDate(latestSub.end_date)}
                           </span>
                           {showExpiryWarning && daysLeft! <= 7 && (
                             <p className={cn(
@@ -287,7 +296,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                       )}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500 whitespace-nowrap")}>
-                      {new Date(player.created_at).toLocaleDateString("en-GB")}
+                      {formatDate(player.created_at)}
                     </td>
                     {/* Sticky right group: activity + subscription + contact */}
                     <td className={cn(tdBase, "sticky right-[200px] z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
@@ -304,7 +313,7 @@ export function PlayersTableView(props: PlayersTableProps) {
               })}
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
+                  <td colSpan={12} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -357,6 +366,12 @@ export function PlayersTableView(props: PlayersTableProps) {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                 <div>
+                  <span className="text-slate-400">Group</span>
+                  <p className="text-slate-700 font-medium">
+                    {player.groups?.length ? player.groups.map((g) => g.name).join(", ") : "—"}
+                  </p>
+                </div>
+                <div>
                   <span className="text-slate-400">Package</span>
                   <p className="text-slate-700 font-medium">{latestSub?.packages?.name || "—"}</p>
                 </div>
@@ -374,7 +389,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                     showExpiryWarning && daysLeft! <= 7 ? "text-amber-600" :
                     "text-slate-700"
                   )}>
-                    {isSingleSession ? "—" : latestSub?.end_date ? new Date(latestSub.end_date).toLocaleDateString("en-GB") : "—"}
+                    {isSingleSession ? "—" : latestSub?.end_date ? formatDate(latestSub.end_date) : "—"}
                     {showExpiryWarning && daysLeft! <= 7 && (
                       <span className="ml-1">({daysLeft! <= 0 ? "Expired" : `${daysLeft}d`})</span>
                     )}
@@ -400,7 +415,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <div>
                   <span className="text-slate-400">Registered</span>
                   <p className="text-slate-700 font-medium">
-                    {new Date(player.created_at).toLocaleDateString("en-GB")}
+                    {formatDate(player.created_at)}
                   </p>
                 </div>
               </div>

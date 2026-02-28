@@ -1,6 +1,7 @@
 import { Card, Badge } from "@/components/ui";
 import { Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { ExpenseRow, SortField, SortDir } from "./types";
 
 interface ExpensesTableProps {
@@ -60,7 +61,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                   className="group hover:bg-primary-50 transition-colors"
                 >
                   <td className={cn(tdBase, "text-sm text-slate-700")}>
-                    {new Date(expense.expense_date).toLocaleDateString("en-GB")}
+                    {formatDate(expense.expense_date)}
                   </td>
                   <td className={cn(tdBase, "text-sm text-slate-700")}>
                     {expense.expense_categories?.name || "—"}
@@ -159,7 +160,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
               </div>
               <div>
                 <span className="text-slate-400">Date</span>
-                <p className="text-slate-700 font-medium">{new Date(expense.expense_date).toLocaleDateString("en-GB")}</p>
+                <p className="text-slate-700 font-medium">{formatDate(expense.expense_date)}</p>
               </div>
             </div>
             {expense.notes && (

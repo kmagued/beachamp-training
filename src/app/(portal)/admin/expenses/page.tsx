@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { StatCard, Pagination, Button } from "@/components/ui";
+import { StatCard, Pagination, Button, Toast } from "@/components/ui";
 import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { deleteExpense } from "@/app/_actions/expenses";
@@ -50,6 +50,7 @@ function AdminExpensesContent() {
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -207,8 +208,13 @@ function AdminExpensesContent() {
 
   async function confirmDelete() {
     if (!deletingId) return;
-    await deleteExpense(deletingId);
+    const res = await deleteExpense(deletingId);
     setDeletingId(null);
+    if ("error" in res) {
+      setToast({ message: res.error ?? "Failed to delete expense", variant: "error" });
+    } else {
+      setToast({ message: "Expense deleted", variant: "success" });
+    }
     fetchData();
   }
 
@@ -224,6 +230,7 @@ function AdminExpensesContent() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -364,7 +371,7 @@ function AdminExpensesContent() {
         }}
         categories={categories}
         editingExpense={editingExpense}
-        onSuccess={fetchData}
+        onSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
       />
 
       {/* Category drawer */}
@@ -372,7 +379,7 @@ function AdminExpensesContent() {
         open={categoryDrawerOpen}
         onClose={() => setCategoryDrawerOpen(false)}
         categories={categories}
-        onSuccess={fetchData}
+        onSuccess={() => { setToast({ message: "Category updated", variant: "success" }); fetchData(); }}
       />
 
       {/* Delete confirmation */}

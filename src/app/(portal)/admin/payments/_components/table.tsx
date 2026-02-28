@@ -2,6 +2,7 @@ import { RefObject } from "react";
 import { Card, Badge } from "@/components/ui";
 import { Check, X, Image as ImageIcon, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { PaymentRow, SortField, SortDir } from "./types";
 
 interface PaymentsTableProps {
@@ -147,9 +148,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {payment.subscriptions?.start_date
-                        ? new Date(payment.subscriptions.start_date + "T00:00:00").toLocaleDateString("en-GB")
+                        ? formatDate(payment.subscriptions.start_date)
                         : payment.confirmed_at
-                          ? new Date(payment.confirmed_at).toLocaleDateString("en-GB")
+                          ? formatDate(payment.confirmed_at)
                           : "—"}
                     </td>
                     <td className={tdBase}>
@@ -286,9 +287,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 <span className="text-slate-400">Date</span>
                 <p className="text-slate-700 font-medium">
                   {payment.subscriptions?.start_date
-                    ? new Date(payment.subscriptions.start_date + "T00:00:00").toLocaleDateString("en-GB")
+                    ? formatDate(payment.subscriptions.start_date)
                     : payment.confirmed_at
-                      ? new Date(payment.confirmed_at).toLocaleDateString("en-GB")
+                      ? formatDate(payment.confirmed_at)
                       : "—"}
                 </p>
               </div>

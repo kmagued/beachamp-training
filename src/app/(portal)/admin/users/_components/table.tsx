@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { UserRow, SortField, SortDir } from "./types";
 import type { UserRole } from "@/types/database";
 
@@ -273,7 +274,7 @@ export function UsersTableView(props: UsersTableProps) {
                       </Badge>
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {new Date(user.created_at).toLocaleDateString("en-GB")}
+                      {formatDate(user.created_at)}
                     </td>
                     <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 text-center transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex justify-center">
@@ -356,7 +357,7 @@ export function UsersTableView(props: UsersTableProps) {
               <div>
                 <span className="text-slate-400">Registered</span>
                 <p className="text-slate-700 font-medium">
-                  {new Date(user.created_at).toLocaleDateString("en-GB")}
+                  {formatDate(user.created_at)}
                 </p>
               </div>
             </div>

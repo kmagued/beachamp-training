@@ -1,5 +1,6 @@
 import { Card, Badge, EmptyState } from "@/components/ui";
 import { ClipboardCheck, Star, MessageSquare } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { AttendanceRow, FeedbackRow } from "./types";
 
 function StatusBadge({ status }: { status: string }) {
@@ -32,9 +33,6 @@ function formatTime(time: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-GB");
-}
 
 interface SessionEntry {
   attendance: AttendanceRow;

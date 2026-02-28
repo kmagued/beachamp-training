@@ -23,7 +23,7 @@ export default function AdminPlayersPage() {
   );
 }
 
-const VALID_SORT_FIELDS: SortField[] = ["name", "date", "level", "package", "sessions", "expires", "subscription"];
+const VALID_SORT_FIELDS: SortField[] = ["name", "date", "level", "group", "package", "sessions", "expires", "subscription"];
 const VALID_SORT_DIRS: SortDir[] = ["asc", "desc"];
 
 function AdminPlayersContent() {
@@ -38,9 +38,10 @@ function AdminPlayersContent() {
   const [subscriptionFilter, setSubscriptionFilter] = useState(searchParams.get("subscription") || "");
   const [levelFilter, setLevelFilter] = useState(searchParams.get("level") || "");
   const [packageFilter, setPackageFilter] = useState(searchParams.get("package") || "");
+  const [groupFilter, setGroupFilter] = useState(searchParams.get("group") || "");
   const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
   const [sortField, setSortField] = useState<SortField>(
-    VALID_SORT_FIELDS.includes(searchParams.get("sort") as SortField) ? (searchParams.get("sort") as SortField) : "expires"
+    VALID_SORT_FIELDS.includes(searchParams.get("sort") as SortField) ? (searchParams.get("sort") as SortField) : "date"
   );
   const [sortDir, setSortDir] = useState<SortDir>(
     VALID_SORT_DIRS.includes(searchParams.get("dir") as SortDir) ? (searchParams.get("dir") as SortDir) : "desc"
@@ -56,6 +57,7 @@ function AdminPlayersContent() {
     if (subscriptionFilter) params.set("subscription", subscriptionFilter);
     if (levelFilter) params.set("level", levelFilter);
     if (packageFilter) params.set("package", packageFilter);
+    if (groupFilter) params.set("group", groupFilter);
     if (sortField !== "expires") params.set("sort", sortField);
     if (sortDir !== "desc") params.set("dir", sortDir);
     if (currentPage > 1) params.set("page", String(currentPage));
@@ -63,7 +65,7 @@ function AdminPlayersContent() {
     const qs = params.toString();
     const url = qs ? `${pathname}?${qs}` : pathname;
     router.replace(url, { scroll: false });
-  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter, sortField, sortDir, currentPage, pageSize, pathname, router]);
+  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter, groupFilter, sortField, sortDir, currentPage, pageSize, pathname, router]);
 
   const { getRowId, isHighlighted } = useHighlightRow();
 
@@ -75,7 +77,7 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const [{ data: profileData }, { data: attendanceData }] = await Promise.all([
+    const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
@@ -87,6 +89,10 @@ function AdminPlayersContent() {
         .eq("status", "present")
         .gte("session_date", twoWeeksAgo)
         .order("session_date", { ascending: false }),
+      supabase
+        .from("group_players")
+        .select("player_id, groups(id, name)")
+        .eq("is_active", true),
     ]);
 
     const lastAttendedMap: Record<string, string> = {};
@@ -98,12 +104,24 @@ function AdminPlayersContent() {
       }
     }
 
+    const playerGroupsMap: Record<string, { id: string; name: string }[]> = {};
+    if (groupPlayerData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const row of groupPlayerData as any[]) {
+        if (row.groups) {
+          if (!playerGroupsMap[row.player_id]) playerGroupsMap[row.player_id] = [];
+          playerGroupsMap[row.player_id].push(row.groups);
+        }
+      }
+    }
+
     if (profileData) {
-      const playersWithAttendance = (profileData as unknown as PlayerRow[]).map((p) => ({
+      const playersWithData = (profileData as unknown as PlayerRow[]).map((p) => ({
         ...p,
         last_attended: lastAttendedMap[p.id] || null,
+        groups: playerGroupsMap[p.id] || [],
       }));
-      setPlayers(playersWithAttendance);
+      setPlayers(playersWithData);
     }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,6 +151,15 @@ function AdminPlayersContent() {
       p.subscriptions?.forEach((s) => {
         if (s.packages?.name) names.add(s.packages.name);
       });
+    });
+    return Array.from(names).sort();
+  }, [players]);
+
+  // Unique group names for filter dropdown
+  const groupNames = useMemo(() => {
+    const names = new Set<string>();
+    players.forEach((p) => {
+      p.groups?.forEach((g) => names.add(g.name));
     });
     return Array.from(names).sort();
   }, [players]);
@@ -171,6 +198,15 @@ function AdminPlayersContent() {
         const latestPackage = getLatestSubscription(p)?.packages?.name;
         if (!latestPackage || !selected.includes(latestPackage)) return false;
       }
+      if (groupFilter) {
+        const selected = groupFilter.split(",");
+        const playerGroupNames = p.groups?.map((g) => g.name) || [];
+        const hasNoGroup = !p.groups?.length;
+        const matchesGroup = selected.some((s) =>
+          s === "No Group" ? hasNoGroup : playerGroupNames.includes(s)
+        );
+        if (!matchesGroup) return false;
+      }
       return true;
     });
 
@@ -184,6 +220,10 @@ function AdminPlayersContent() {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       } else if (sortField === "level") {
         cmp = (levelOrder[a.playing_level ?? ""] ?? 99) - (levelOrder[b.playing_level ?? ""] ?? 99);
+      } else if (sortField === "group") {
+        const aGroup = a.groups?.[0]?.name ?? "";
+        const bGroup = b.groups?.[0]?.name ?? "";
+        cmp = aGroup.localeCompare(bGroup);
       } else if (sortField === "package") {
         const aName = getLatestSubscription(a)?.packages?.name ?? "";
         const bName = getLatestSubscription(b)?.packages?.name ?? "";
@@ -204,7 +244,7 @@ function AdminPlayersContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, search, activityFilter, subscriptionFilter, levelFilter, packageFilter, sortField, sortDir]);
+  }, [players, search, activityFilter, subscriptionFilter, levelFilter, packageFilter, groupFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPlayers.length / pageSize);
@@ -215,7 +255,7 @@ function AdminPlayersContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter]);
+  }, [search, activityFilter, subscriptionFilter, levelFilter, packageFilter, groupFilter]);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -257,7 +297,7 @@ function AdminPlayersContent() {
     }
   }
 
-  const hasActiveFilters = !!search || !!activityFilter || !!subscriptionFilter || !!levelFilter || !!packageFilter;
+  const hasActiveFilters = !!search || !!activityFilter || !!subscriptionFilter || !!levelFilter || !!packageFilter || !!groupFilter;
 
   // Add to Group
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -380,10 +420,13 @@ function AdminPlayersContent() {
         packageFilter={packageFilter}
         onPackageFilterChange={setPackageFilter}
         packageOptions={packageNames}
+        groupFilter={groupFilter}
+        onGroupFilterChange={setGroupFilter}
+        groupOptions={groupNames}
         sortField={sortField}
         sortDir={sortDir}
         onSortChange={toggleSort}
-        onReset={() => { setSearch(""); setActivityFilter(""); setSubscriptionFilter(""); setLevelFilter(""); setPackageFilter(""); }}
+        onReset={() => { setSearch(""); setActivityFilter(""); setSubscriptionFilter(""); setLevelFilter(""); setPackageFilter(""); setGroupFilter(""); }}
         hasActiveFilters={hasActiveFilters}
       />
 

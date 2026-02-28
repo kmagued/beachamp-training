@@ -1,5 +1,6 @@
 import { Card, EmptyState } from "@/components/ui";
 import { MessageSquare, Star } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { FeedbackRow } from "./types";
 
 function StarRating({ rating }: { rating: number }) {
@@ -43,7 +44,7 @@ export function FeedbackHistory({ feedback }: { feedback: FeedbackRow[] }) {
                 {feedback.map((f) => (
                   <tr key={f.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-3 font-medium text-slate-900">
-                      {new Date(f.session_date).toLocaleDateString("en-GB")}
+                      {formatDate(f.session_date)}
                     </td>
                     <td className="py-3 text-slate-700">
                       {f.coach ? `${f.coach.first_name} ${f.coach.last_name}` : "—"}
@@ -62,7 +63,7 @@ export function FeedbackHistory({ feedback }: { feedback: FeedbackRow[] }) {
               <div key={f.id} className="border border-slate-100 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-slate-900 text-sm">
-                    {new Date(f.session_date).toLocaleDateString("en-GB")}
+                    {formatDate(f.session_date)}
                   </span>
                   <StarRating rating={f.rating} />
                 </div>

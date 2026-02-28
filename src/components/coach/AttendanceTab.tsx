@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button, Badge, Skeleton, Drawer } from "@/components/ui";
-import { submitAttendance } from "@/app/_actions/training";
+import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import {
   Check,
   X,
@@ -226,29 +226,56 @@ export function AttendanceTab({
     return false;
   })();
 
+  // Detect players whose status was removed (previously saved but now null)
+  const removedPlayerIds = Array.from(savedRecords.entries())
+    .filter(([, saved]) => saved.status !== null)
+    .filter(([id]) => {
+      const current = records.get(id);
+      return !current || current.status === null;
+    })
+    .map(([id]) => id);
+
   function handleSubmit() {
-    if (markedRecords.length === 0) return;
+    if (markedRecords.length === 0 && removedPlayerIds.length === 0) return;
     setSubmitError(null);
 
     startTransition(async () => {
-      const attendanceRecords = Array.from(records.values())
-        .filter((r) => r.status !== null)
-        .map((r) => ({
-          player_id: r.player_id,
-          status: r.status as "present" | "absent" | "excused",
-          notes: r.notes || undefined,
-        }));
+      // Remove attendance for deselected players
+      if (removedPlayerIds.length > 0) {
+        const removeRes = await removeAttendanceRecords({
+          group_id: groupId,
+          schedule_session_id: scheduleSessionId,
+          session_date: sessionDate,
+          player_ids: removedPlayerIds,
+        });
+        if ("error" in removeRes) {
+          setSubmitError(removeRes.error as string);
+          return;
+        }
+      }
 
-      const res = await submitAttendance({
-        group_id: groupId,
-        schedule_session_id: scheduleSessionId,
-        session_date: sessionDate,
-        records: attendanceRecords,
-      });
+      // Submit remaining records (if any)
+      if (markedRecords.length > 0) {
+        const attendanceRecords = Array.from(records.values())
+          .filter((r) => r.status !== null)
+          .map((r) => ({
+            player_id: r.player_id,
+            status: r.status as "present" | "absent" | "excused",
+            notes: r.notes || undefined,
+          }));
 
-      if ("error" in res) {
-        setSubmitError((res as { error: string }).error);
-      } else {
+        const res = await submitAttendance({
+          group_id: groupId,
+          schedule_session_id: scheduleSessionId,
+          session_date: sessionDate,
+          records: attendanceRecords,
+        });
+
+        if ("error" in res) {
+          setSubmitError((res as { error: string }).error);
+          return;
+        }
+
         const warnings: string[] = [];
         if ("results" in res) {
           for (const r of (res as { results: { player_id: string; sessions_remaining: number | null }[] }).results) {
@@ -261,10 +288,13 @@ export function AttendanceTab({
           }
         }
         setResult({ success: true, warnings });
-        setShowConfirm(false);
-        setSubmitError(null);
-        setSavedRecords(new Map(Array.from(records.entries()).map(([k, v]) => [k, { ...v }])));
+      } else {
+        setResult({ success: true, warnings: [] });
       }
+
+      setShowConfirm(false);
+      setSubmitError(null);
+      setSavedRecords(new Map(Array.from(records.entries()).map(([k, v]) => [k, { ...v }])));
     });
   }
 
@@ -313,7 +343,7 @@ export function AttendanceTab({
                 </span>
               </Button>
             )}
-            {result?.success ? (
+            {result?.success && !hasChanges ? (
               <Badge variant="success">
                 <span className="flex items-center gap-1">
                   <Check className="w-3 h-3" /> Saved
@@ -323,7 +353,7 @@ export function AttendanceTab({
               <Button
                 size="sm"
                 onClick={() => setShowConfirm(true)}
-                disabled={markedRecords.length === 0 || isPending}
+                disabled={(markedRecords.length === 0 && removedPlayerIds.length === 0) || isPending}
               >
                 {isPending ? "Submitting..." : "Submit"}
               </Button>
@@ -569,6 +599,9 @@ export function AttendanceTab({
               <span className="text-emerald-600">{presentCount} present</span>
               <span className="text-red-500">{absentCount} absent</span>
               <span className="text-amber-500">{excusedCount} excused</span>
+              {removedPlayerIds.length > 0 && (
+                <span className="text-slate-400">{removedPlayerIds.length} removed</span>
+              )}
             </div>
             {hasExistingAttendance && (
               <p className="text-xs text-amber-600 mb-4">

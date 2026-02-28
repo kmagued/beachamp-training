@@ -18,6 +18,7 @@ export interface PlayerRow {
   is_active: boolean;
   created_at: string;
   last_attended: string | null;
+  groups: { id: string; name: string }[];
   subscriptions: {
     id: string;
     status: string;
@@ -38,7 +39,7 @@ export type SubscriptionStatus =
   | "pending"
   | "none";
 
-export type SortField = "name" | "date" | "level" | "package" | "sessions" | "expires" | "subscription";
+export type SortField = "name" | "date" | "level" | "group" | "package" | "sessions" | "expires" | "subscription";
 export type SortDir = "asc" | "desc";
 
 /** Pick the most recent subscription (by start_date, falling back to end_date). */

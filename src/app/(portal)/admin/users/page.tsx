@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Drawer } from "@/components/ui";
+import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
 import { ShieldCheck, Plus, Search, Loader2, Mail, Phone } from "lucide-react";
 import { updateUserRole } from "./actions";
 import type { UserRole } from "@/types/database";
@@ -61,6 +61,8 @@ function AdminUsersContent() {
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -116,9 +118,10 @@ function AdminUsersContent() {
     setPromotingId(userId);
     const result = await updateUserRole(userId, "admin");
     if (result.error) {
-      alert(result.error);
+      setToast({ message: result.error, variant: "error" });
     } else {
       setSearchResults((prev) => prev.filter((u) => u.id !== userId));
+      setToast({ message: "User promoted to admin", variant: "success" });
       fetchAdmins();
     }
     setPromotingId(null);
@@ -130,15 +133,17 @@ function AdminUsersContent() {
     setRemovingId(userId);
     const result = await updateUserRole(userId, "player");
     if (result.error) {
-      alert(result.error);
+      setToast({ message: result.error, variant: "error" });
     } else {
       setAdmins((prev) => prev.filter((u) => u.id !== userId));
+      setToast({ message: "Admin access removed", variant: "success" });
     }
     setRemovingId(null);
   }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admins</h1>

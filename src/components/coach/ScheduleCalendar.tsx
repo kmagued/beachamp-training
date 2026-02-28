@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Skeleton } from "@/components/ui";
 import { ChevronLeft, ChevronRight, Clock, ClipboardCheck } from "lucide-react";
@@ -48,14 +49,24 @@ function getLevelColor(level: string) {
   }
 }
 
-function getWeekDates(offset: number) {
+/** Format a Date as YYYY-MM-DD using local timezone (avoids UTC shift from toISOString) */
+function formatLocalDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Get the Saturday that starts the current week (Egypt locale: Sat-Fri) */
+function getCurrentWeekSaturday() {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const currentDay = today.getDay();
-  // Get Saturday of the current week
   const saturdayOffset = currentDay >= 6 ? 0 : -(currentDay + 1);
   const saturday = new Date(today);
-  saturday.setDate(today.getDate() + saturdayOffset + offset * 7);
+  saturday.setDate(today.getDate() + saturdayOffset);
+  return saturday;
+}
 
+/** Get 7 dates starting from a given Saturday */
+function getWeekDatesFromSaturday(saturday: Date) {
   const dates: Date[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(saturday);
@@ -66,9 +77,12 @@ function getWeekDates(offset: number) {
 }
 
 export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: ScheduleCalendarProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [sessions, setSessions] = useState<ScheduleBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekOffset, setWeekOffset] = useState(0);
   const [showAll, setShowAll] = useState(isAdmin);
 
   const supabase = createBrowserClient(
@@ -76,7 +90,42 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const weekDates = getWeekDates(weekOffset);
+  const currentSaturday = useMemo(() => getCurrentWeekSaturday(), []);
+  const currentSaturdayStr = formatLocalDate(currentSaturday);
+
+  const selectedSaturday = useMemo(() => {
+    const weekParam = searchParams.get("week");
+    if (weekParam) {
+      const [y, m, d] = weekParam.split("-").map(Number);
+      const parsed = new Date(y, m - 1, d);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return currentSaturday;
+  }, [searchParams, currentSaturday]);
+
+  const weekDates = useMemo(() => getWeekDatesFromSaturday(selectedSaturday), [selectedSaturday]);
+  const isThisWeek = formatLocalDate(selectedSaturday) === currentSaturdayStr;
+
+  const navigateWeek = useCallback((direction: number) => {
+    const newSaturday = new Date(selectedSaturday);
+    newSaturday.setDate(newSaturday.getDate() + direction * 7);
+    const params = new URLSearchParams(searchParams.toString());
+    if (formatLocalDate(newSaturday) === currentSaturdayStr) {
+      params.delete("week");
+    } else {
+      params.set("week", formatLocalDate(newSaturday));
+    }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [selectedSaturday, searchParams, currentSaturdayStr, router, pathname]);
+
+  const goToThisWeek = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("week");
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [searchParams, router, pathname]);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -127,8 +176,8 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
       }
 
       // Check attendance for this week
-      const weekStart = weekDates[0].toISOString().split("T")[0];
-      const weekEnd = weekDates[6].toISOString().split("T")[0];
+      const weekStart = formatLocalDate(weekDates[0]);
+      const weekEnd = formatLocalDate(weekDates[6]);
 
       const { data: attendanceRecords } = await supabase
         .from("attendance")
@@ -149,7 +198,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
       const blocks: ScheduleBlock[] = data.map((s: any) => {
         // Find the date for this session in the current week
         const dayDate = weekDates.find((d) => d.getDay() === s.day_of_week);
-        const dateStr = dayDate?.toISOString().split("T")[0] || "";
+        const dateStr = dayDate ? formatLocalDate(dayDate) : "";
 
         return {
           id: s.id,
@@ -172,7 +221,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coachId, showAll, weekOffset]);
+  }, [coachId, showAll, selectedSaturday]);
 
   // Group sessions by day
   const sessionsByDay = new Map<number, ScheduleBlock[]>();
@@ -188,19 +237,20 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setWeekOffset((w) => w - 1)}
+            onClick={() => navigateWeek(-1)}
             className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setWeekOffset(0)}
-            className="text-sm font-medium text-primary hover:underline px-2"
+            onClick={goToThisWeek}
+            className={`text-sm font-medium px-2 ${isThisWeek ? "text-slate-400 cursor-default" : "text-primary hover:underline"}`}
+            disabled={isThisWeek}
           >
             This Week
           </button>
           <button
-            onClick={() => setWeekOffset((w) => w + 1)}
+            onClick={() => navigateWeek(1)}
             className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
           >
             <ChevronRight className="w-4 h-4" />
@@ -273,7 +323,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                       <div className="text-center py-4 text-[10px] text-slate-300">—</div>
                     ) : (
                       daySessions.map((session) => {
-                        const sessionDate = dateForDay.toISOString().split("T")[0];
+                        const sessionDate = formatLocalDate(dateForDay);
                         return (
                           <Link
                             key={session.id}
@@ -336,7 +386,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                     ) : (
                       <div className="flex-1 space-y-1.5">
                         {daySessions.map((session) => {
-                          const sessionDate = dateForDay.toISOString().split("T")[0];
+                          const sessionDate = formatLocalDate(dateForDay);
                           return (
                             <Link
                               key={session.id}

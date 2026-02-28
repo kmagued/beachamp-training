@@ -5,6 +5,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Button, Input, Select, DatePicker } from "@/components/ui";
 import { X, Check, Image as ImageIcon, Loader2, Pencil, Search, Link2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDateTime } from "@/lib/utils/format-date";
 import { updatePayment, linkPaymentToPlayer, deletePayment } from "../actions";
 import type { PaymentRow } from "./types";
 
@@ -203,6 +204,7 @@ function DrawerContent({
   const [isUpdating, startUpdateTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Reset edit state when payment changes
   useEffect(() => {
@@ -318,24 +320,12 @@ function DrawerContent({
               />
               <DetailRow
                 label="Submitted"
-                value={new Date(payment.created_at).toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                value={formatDateTime(payment.created_at)}
               />
               {payment.confirmed_at && (
                 <DetailRow
                   label="Confirmed"
-                  value={new Date(payment.confirmed_at).toLocaleString("en-GB", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  value={formatDateTime(payment.confirmed_at)}
                 />
               )}
               {payment.status === "rejected" && payment.rejection_reason && (
@@ -501,8 +491,11 @@ function DrawerContent({
               <button
                 onClick={() => {
                   startDeleteTransition(async () => {
+                    setDeleteError(null);
                     const res = await deletePayment(payment.id);
-                    if (!("error" in res)) {
+                    if ("error" in res) {
+                      setDeleteError(res.error ?? "Failed to delete payment");
+                    } else {
                       onClose();
                       onDataChange();
                     }
@@ -521,6 +514,7 @@ function DrawerContent({
                 Cancel
               </button>
             </div>
+            {deleteError && <p className="text-xs text-red-600 mt-2">{deleteError}</p>}
           </div>
         </div>
       )}

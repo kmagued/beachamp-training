@@ -11,6 +11,7 @@ interface AddPlayerResult {
   error?: string;
   password?: string;
   playerName?: string;
+  playerId?: string;
 }
 
 export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResult> {
@@ -140,6 +141,7 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
     success: true,
     password,
     playerName: `${firstName} ${lastName}`,
+    playerId: userId,
   };
 }
 

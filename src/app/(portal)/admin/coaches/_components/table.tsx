@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import type { CoachRow, SortField, SortDir } from "./types";
 
 interface CoachesTableProps {
@@ -207,7 +208,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                       {coach.area || "—"}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {new Date(coach.created_at).toLocaleDateString("en-GB")}
+                      {formatDate(coach.created_at)}
                     </td>
                     <td className={cn(tdBase, "sticky right-0 z-10 border-l border-l-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
                       <div className="flex items-center gap-3 justify-between">
@@ -281,7 +282,7 @@ export function CoachesTableView(props: CoachesTableProps) {
               <div>
                 <span className="text-slate-400">Registered</span>
                 <p className="text-slate-700 font-medium">
-                  {new Date(coach.created_at).toLocaleDateString("en-GB")}
+                  {formatDate(coach.created_at)}
                 </p>
               </div>
             </div>

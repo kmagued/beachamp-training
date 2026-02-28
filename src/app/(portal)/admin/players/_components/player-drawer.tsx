@@ -9,6 +9,7 @@ import {
   Ruler, Hand, Shield, Users, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
 import { useRouter } from "next/navigation";
 import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance, deletePlayer } from "../[id]/actions";
@@ -123,8 +124,10 @@ function DrawerContent({
   const [editRemaining, setEditRemaining] = useState(0);
   const [editTotal, setEditTotal] = useState(0);
   const [isSavingSessions, startSessionsTransition] = useTransition();
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Reset to detail view when player changes
   useEffect(() => {
@@ -135,6 +138,8 @@ function DrawerContent({
     setShowAddPayment(false);
     setEditingSessions(false);
     setConfirmDelete(false);
+    setDeleteError(null);
+    setSessionError(null);
   }, [player.id]);
 
   function handleResetPassword() {
@@ -248,44 +253,50 @@ function DrawerContent({
                   <div className="flex-1">
                     <p className="text-xs text-slate-400">Sessions</p>
                     {editingSessions ? (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <input
-                          type="number"
-                          min={0}
-                          value={editRemaining}
-                          onChange={(e) => setEditRemaining(Math.max(0, Number(e.target.value)))}
-                          className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
-                        />
-                        <span className="text-sm text-slate-400">/</span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={editTotal}
-                          onChange={(e) => setEditTotal(Math.max(1, Number(e.target.value)))}
-                          className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
-                        />
-                        <button
-                          onClick={() => {
-                            startSessionsTransition(async () => {
-                              const res = await updateSubscriptionBalance(activeSub.id, editRemaining, editTotal);
-                              if (!("error" in res)) {
-                                setEditingSessions(false);
-                                onDataChange();
-                              }
-                            });
-                          }}
-                          disabled={isSavingSessions}
-                          className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
-                        >
-                          {isSavingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => setEditingSessions(false)}
-                          className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <input
+                            type="number"
+                            min={0}
+                            value={editRemaining}
+                            onChange={(e) => setEditRemaining(Math.max(0, Number(e.target.value)))}
+                            className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                          />
+                          <span className="text-sm text-slate-400">/</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={editTotal}
+                            onChange={(e) => setEditTotal(Math.max(1, Number(e.target.value)))}
+                            className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                          />
+                          <button
+                            onClick={() => {
+                              startSessionsTransition(async () => {
+                                setSessionError(null);
+                                const res = await updateSubscriptionBalance(activeSub.id, editRemaining, editTotal);
+                                if ("error" in res) {
+                                  setSessionError(res.error ?? "Failed to update balance");
+                                } else {
+                                  setEditingSessions(false);
+                                  onDataChange();
+                                }
+                              });
+                            }}
+                            disabled={isSavingSessions}
+                            className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
+                          >
+                            {isSavingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => setEditingSessions(false)}
+                            className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {sessionError && <p className="text-xs text-red-600 mt-1">{sessionError}</p>}
+                      </>
                     ) : (
                       <div className="flex items-center gap-1.5">
                         <p className={cn(
@@ -316,7 +327,7 @@ function DrawerContent({
                       isExpiringSoon ? "text-amber-600 font-medium" : "text-slate-700"
                     )}>
                       {activeSub.end_date
-                        ? new Date(activeSub.end_date).toLocaleDateString("en-GB")
+                        ? formatDate(activeSub.end_date)
                         : "—"}
                     </p>
                   </div>
@@ -370,7 +381,7 @@ function DrawerContent({
                   <p className="text-xs text-slate-400">Starts</p>
                   <p className="text-sm text-primary font-medium">
                     {upcomingSub.start_date
-                      ? new Date(upcomingSub.start_date).toLocaleDateString("en-GB")
+                      ? formatDate(upcomingSub.start_date)
                       : "—"}
                   </p>
                 </div>
@@ -440,7 +451,7 @@ function DrawerContent({
                 <p className="text-xs text-slate-400">Date of Birth</p>
                 <p className="text-sm text-slate-700">
                   {player.date_of_birth
-                    ? new Date(player.date_of_birth).toLocaleDateString("en-GB")
+                    ? formatDate(player.date_of_birth)
                     : "—"}
                 </p>
               </div>
@@ -513,7 +524,7 @@ function DrawerContent({
         {/* Registered */}
         <div className="flex items-center gap-3 px-1 text-xs text-slate-400">
           <Calendar className="w-3.5 h-3.5" />
-          Registered {new Date(player.created_at).toLocaleDateString("en-GB")}
+          Registered {formatDate(player.created_at)}
         </div>
       </div>
 
@@ -640,11 +651,14 @@ function DrawerContent({
               <button
                 onClick={() => {
                   startDeleteTransition(async () => {
+                    setDeleteError(null);
                     const res = await deletePlayer(player.id);
                     if (res.success) {
                       setConfirmDelete(false);
                       onClose();
                       onDataChange();
+                    } else {
+                      setDeleteError(res.error ?? "Failed to delete player");
                     }
                   });
                 }}
@@ -660,6 +674,7 @@ function DrawerContent({
                 )}
               </button>
             </div>
+            {deleteError && <p className="text-xs text-red-600 mt-2">{deleteError}</p>}
           </Card>
         </div>
       )}

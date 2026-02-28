@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Card, Input, Select, Label, Button, DatePicker, Textarea } from "@/components/ui";
-import { Loader2, Copy, Check } from "lucide-react";
+import { useState, useTransition, useCallback } from "react";
+import { Card, Input, Select, Label, Button, DatePicker, Textarea, Toast } from "@/components/ui";
+import { Loader2, Copy, Check, UserPlus, Eye } from "lucide-react";
+import Link from "next/link";
 import { addSinglePlayer } from "../actions";
 import { branding } from "@/lib/config/branding";
 import type { PackageOption } from "./types";
@@ -40,8 +41,10 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
   // Success modal
-  const [result, setResult] = useState<{ playerName: string; password: string } | null>(null);
+  const [result, setResult] = useState<{ playerName: string; password: string; playerId: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   function handlePackageChange(id: string) {
     setPackageId(id);
@@ -103,8 +106,10 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
       const res = await addSinglePlayer(formData);
       if (res.error) {
         setError(res.error);
-      } else if (res.success && res.password && res.playerName) {
-        setResult({ playerName: res.playerName, password: res.password });
+        setToast({ message: res.error, variant: "error" });
+      } else if (res.success && res.password && res.playerName && res.playerId) {
+        setResult({ playerName: res.playerName, password: res.password, playerId: res.playerId });
+        setToast({ message: `${res.playerName} has been created successfully`, variant: "success" });
         // Reset form
         setFirstName("");
         setLastName("");
@@ -144,6 +149,11 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
 
   return (
     <>
+      <Toast
+        message={toast?.message ?? null}
+        variant={toast?.variant}
+        onClose={handleToastClose}
+      />
       <Card>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -381,12 +391,24 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
               </p>
             </div>
 
-            <Button
-              fullWidth
-              onClick={() => { setResult(null); setCopied(false); }}
-            >
-              Done
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                fullWidth
+                variant="secondary"
+                onClick={() => { setResult(null); setCopied(false); }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <UserPlus className="w-4 h-4" /> Add Another Player
+                </span>
+              </Button>
+              <Link href={`/admin/players/${result.playerId}`} className="w-full">
+                <Button fullWidth>
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="w-4 h-4" /> View Player
+                  </span>
+                </Button>
+              </Link>
+            </div>
           </Card>
         </div>
       )}

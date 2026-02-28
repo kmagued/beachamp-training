@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Alert, Select, Textarea, MultiSelect, Skeleton } from "@/components/ui";
 import { Check, Upload, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
 import { submitSubscription } from "./actions";
 import type { Package, Subscription, Profile } from "@/types/database";
@@ -248,12 +249,12 @@ function PlayerSubscribeContent() {
               <p className="text-xs text-slate-500">
                 {activeSubscription.sessions_remaining} sessions remaining
                 {activeSubscription.end_date &&
-                  ` · Expires ${new Date(activeSubscription.end_date).toLocaleDateString("en-GB")}`}
+                  ` · Expires ${formatDate(activeSubscription.end_date)}`}
               </p>
               {activeSubscription.end_date && (
                 <p className="text-xs text-primary font-medium mt-0.5">
                   Your new subscription will start after your current one ends on{" "}
-                  {new Date(activeSubscription.end_date).toLocaleDateString("en-GB")}
+                  {formatDate(activeSubscription.end_date)}
                 </p>
               )}
             </div>

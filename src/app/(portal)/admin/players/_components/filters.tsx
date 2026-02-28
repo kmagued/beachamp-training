@@ -11,6 +11,7 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "name", label: "Name" },
   { value: "date", label: "Joined" },
   { value: "level", label: "Level" },
+  { value: "group", label: "Group" },
   { value: "package", label: "Package" },
   { value: "sessions", label: "Sessions" },
   { value: "expires", label: "Expires" },
@@ -29,6 +30,9 @@ interface PlayersFiltersProps {
   packageFilter: string;
   onPackageFilterChange: (value: string) => void;
   packageOptions: string[];
+  groupFilter: string;
+  onGroupFilterChange: (value: string) => void;
+  groupOptions: string[];
   sortField: SortField;
   sortDir: SortDir;
   onSortChange: (field: SortField) => void;
@@ -48,13 +52,16 @@ export function PlayersFilters({
   packageFilter,
   onPackageFilterChange,
   packageOptions,
+  groupFilter,
+  onGroupFilterChange,
+  groupOptions,
   sortField,
   sortDir,
   onSortChange,
   onReset,
   hasActiveFilters,
 }: PlayersFiltersProps) {
-  const activeFilterCount = [activityFilter, subscriptionFilter, levelFilter, packageFilter].filter(Boolean).length;
+  const activeFilterCount = [activityFilter, subscriptionFilter, levelFilter, packageFilter, groupFilter].filter(Boolean).length;
 
   const filterDropdowns = (
     <>
@@ -87,6 +94,14 @@ export function PlayersFilters({
         value={packageFilter}
         onChange={onPackageFilterChange}
         placeholder="All Packages"
+        showChips={false}
+        className="sm:w-40"
+      />
+      <MultiSelect
+        options={["No Group", ...groupOptions]}
+        value={groupFilter}
+        onChange={onGroupFilterChange}
+        placeholder="All Groups"
         showChips={false}
         className="sm:w-40"
       />

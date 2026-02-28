@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
-import { Card, Badge, Button, Drawer } from "@/components/ui";
+import { useState, useMemo, useTransition, useCallback } from "react";
+import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
 import { Users, Plus, X, Search, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { addPlayersToGroup, removePlayersFromGroup } from "@/app/_actions/training";
 import type { GroupPlayerRow, AvailablePlayer } from "./types";
@@ -35,6 +35,8 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const handleToastClose = useCallback(() => setToast(null), []);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -85,6 +87,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
       else {
         setShowAddPlayer(false);
         setSelectedPlayerIds(new Set());
+        setToast({ message: `${selectedPlayerIds.size} player(s) added`, variant: "success" });
         onRefresh();
       }
     });
@@ -97,6 +100,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
       const result = await removePlayersFromGroup(groupId, Array.from(selectedForRemoval));
       if ("error" in result) setError(result.error);
       else {
+        setToast({ message: `${selectedForRemoval.size} player(s) removed`, variant: "success" });
         setSelectedForRemoval(new Set());
         onRefresh();
       }
@@ -140,6 +144,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
 
   return (
     <Card className="mb-6 overflow-hidden">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="mb-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-slate-900 flex items-center gap-2">

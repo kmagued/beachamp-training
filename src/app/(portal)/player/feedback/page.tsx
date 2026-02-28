@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, EmptyState } from "@/components/ui";
 import { MessageSquare, Star, Users, Calendar } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 
 interface FeedbackRow {
   id: string;
@@ -54,7 +55,7 @@ export default async function PlayerFeedbackPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mb-2">
                     <span className="inline-flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {new Date(fb.session_date).toLocaleDateString("en-GB")}
+                      {formatDate(fb.session_date)}
                     </span>
                     {fb.group && (
                       <span className="inline-flex items-center gap-1">

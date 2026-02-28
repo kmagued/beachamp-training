@@ -1,5 +1,6 @@
 import { Card, Badge, EmptyState } from "@/components/ui";
 import { Package } from "lucide-react";
+import { formatDate } from "@/lib/utils/format-date";
 import type { SubscriptionRow, PaymentRow } from "./types";
 
 function SubStatusBadge({ status }: { status: string }) {
@@ -60,8 +61,8 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub }: Subscripti
                     <tr key={sub.id} className="border-b border-slate-100 last:border-0">
                       <td className="py-3 font-medium text-slate-900">{sub.packages?.name || "—"}</td>
                       <td className="py-3 text-slate-700">{sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`}</td>
-                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"}</td>
-                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}</td>
+                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.start_date ? formatDate(sub.start_date) : "—"}</td>
+                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.end_date ? formatDate(sub.end_date) : "—"}</td>
                       <td className="py-3"><SubStatusBadge status={sub.status} /></td>
                       <td className="py-3">
                         {displayPayment ? (
@@ -103,7 +104,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub }: Subscripti
                     <div>
                       <span className="text-slate-400">Period</span>
                       <p className="text-slate-700 font-medium">
-                        {sub.start_date ? new Date(sub.start_date).toLocaleDateString("en-GB") : "—"} — {sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-GB") : "—"}
+                        {sub.start_date ? formatDate(sub.start_date) : "—"} — {sub.end_date ? formatDate(sub.end_date) : "—"}
                       </p>
                     </div>
                     {displayPayment && (
