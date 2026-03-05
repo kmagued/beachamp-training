@@ -563,6 +563,66 @@ export async function deletePayment(paymentId: string) {
   return { success: true };
 }
 
+export async function createPendingPaymentForSession(data: {
+  player_id: string;
+  package_id: string;
+  amount: number;
+  session_date: string;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: pkg, error: pkgError } = await admin
+    .from("packages")
+    .select("id, session_count, validity_days")
+    .eq("id", data.package_id)
+    .single();
+
+  if (pkgError || !pkg) return { error: "Package not found" };
+
+  const startDate = new Date(data.session_date);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+  // Create pending subscription
+  const { data: subscription, error: subError } = await admin
+    .from("subscriptions")
+    .insert({
+      player_id: data.player_id,
+      package_id: data.package_id,
+      sessions_remaining: pkg.session_count,
+      sessions_total: pkg.session_count,
+      start_date: startDate.toISOString().split("T")[0],
+      end_date: endDate.toISOString().split("T")[0],
+      status: "pending",
+    })
+    .select("id")
+    .single();
+
+  if (subError) return { error: subError.message };
+
+  // Create pending payment
+  const { error: payError } = await admin.from("payments").insert({
+    player_id: data.player_id,
+    subscription_id: subscription.id,
+    amount: data.amount,
+    method: "cash",
+    status: "pending",
+  });
+
+  if (payError) return { error: payError.message };
+
+  return { success: true, player_id: data.player_id };
+}
+
 export async function getScreenshotUrl(path: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
