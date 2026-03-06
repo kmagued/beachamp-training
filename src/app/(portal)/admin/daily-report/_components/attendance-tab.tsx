@@ -400,7 +400,8 @@ export function AttendanceTab({ date }: { date: string }) {
         const sortedPlayers = [...players].sort((a, b) => {
           const aLogged = state[a.player_id] !== undefined ? 0 : 1;
           const bLogged = state[b.player_id] !== undefined ? 0 : 1;
-          return aLogged - bLogged;
+          if (aLogged !== bLogged) return aLogged - bLogged;
+          return `${a.profiles.first_name} ${a.profiles.last_name}`.localeCompare(`${b.profiles.first_name} ${b.profiles.last_name}`);
         });
         const filteredPlayers = query
           ? sortedPlayers.filter((gp) =>

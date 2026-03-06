@@ -39,41 +39,51 @@ export async function confirmPayment(paymentId: string) {
   // Activate subscription (only if payment has one)
   if (payment.subscription_id && payment.subscriptions?.packages) {
     const pkg = payment.subscriptions.packages;
+    const subStatus = payment.subscriptions.status;
 
-    const { data: existingActiveSub } = await supabase
-      .from("subscriptions")
-      .select("end_date")
-      .eq("player_id", payment.player_id)
-      .eq("status", "active")
-      .neq("id", payment.subscription_id)
-      .order("end_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // For pending_payment subs (auto-created after attendance), keep existing dates
+    if (subStatus === "pending_payment") {
+      const { error: subError } = await supabase
+        .from("subscriptions")
+        .update({ status: "active" })
+        .eq("id", payment.subscription_id);
+      if (subError) return { error: subError.message };
+    } else {
+      const { data: existingActiveSub } = await supabase
+        .from("subscriptions")
+        .select("end_date")
+        .eq("player_id", payment.player_id)
+        .eq("status", "active")
+        .neq("id", payment.subscription_id)
+        .order("end_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const today = new Date();
-    let startDate = today;
+      const today = new Date();
+      let startDate = today;
 
-    if (existingActiveSub?.end_date) {
-      const activeEndDate = new Date(existingActiveSub.end_date);
-      if (activeEndDate > today) {
-        startDate = new Date(activeEndDate);
-        startDate.setDate(startDate.getDate() + 1);
+      if (existingActiveSub?.end_date) {
+        const activeEndDate = new Date(existingActiveSub.end_date);
+        if (activeEndDate > today) {
+          startDate = new Date(activeEndDate);
+          startDate.setDate(startDate.getDate() + 1);
+        }
       }
+
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + pkg.validity_days);
+
+      const { error: subError } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          start_date: startDate.toISOString().split("T")[0],
+          end_date: endDate.toISOString().split("T")[0],
+        })
+        .eq("id", payment.subscription_id);
+
+      if (subError) return { error: subError.message };
     }
-
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + pkg.validity_days);
-
-    const { error: subError } = await supabase
-      .from("subscriptions")
-      .update({
-        status: "active",
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-      })
-      .eq("id", payment.subscription_id);
-
-    if (subError) return { error: subError.message };
   }
 
   revalidatePath("/admin/payments");
@@ -161,37 +171,46 @@ export async function updatePayment(
       // Activate subscription with proper dates (only if payment has one)
       if (payment.subscription_id) {
         const pkg = payment.subscriptions?.packages;
+        const subStatus = payment.subscriptions?.status;
         if (pkg) {
-          const { data: existingActiveSub } = await supabase
-            .from("subscriptions")
-            .select("end_date")
-            .eq("player_id", payment.player_id)
-            .eq("status", "active")
-            .neq("id", payment.subscription_id)
-            .order("end_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // For pending_payment subs (auto-created after attendance), keep existing dates
+          if (subStatus === "pending_payment") {
+            await supabase
+              .from("subscriptions")
+              .update({ status: "active" })
+              .eq("id", payment.subscription_id);
+          } else {
+            const { data: existingActiveSub } = await supabase
+              .from("subscriptions")
+              .select("end_date")
+              .eq("player_id", payment.player_id)
+              .eq("status", "active")
+              .neq("id", payment.subscription_id)
+              .order("end_date", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          const today = new Date();
-          let startDate = today;
-          if (existingActiveSub?.end_date) {
-            const activeEndDate = new Date(existingActiveSub.end_date);
-            if (activeEndDate > today) {
-              startDate = new Date(activeEndDate);
-              startDate.setDate(startDate.getDate() + 1);
+            const today = new Date();
+            let startDate = today;
+            if (existingActiveSub?.end_date) {
+              const activeEndDate = new Date(existingActiveSub.end_date);
+              if (activeEndDate > today) {
+                startDate = new Date(activeEndDate);
+                startDate.setDate(startDate.getDate() + 1);
+              }
             }
-          }
-          const endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + pkg.validity_days);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + pkg.validity_days);
 
-          await supabase
-            .from("subscriptions")
-            .update({
-              status: "active",
-              start_date: startDate.toISOString().split("T")[0],
-              end_date: endDate.toISOString().split("T")[0],
-            })
-            .eq("id", payment.subscription_id);
+            await supabase
+              .from("subscriptions")
+              .update({
+                status: "active",
+                start_date: startDate.toISOString().split("T")[0],
+                end_date: endDate.toISOString().split("T")[0],
+              })
+              .eq("id", payment.subscription_id);
+          }
         }
       }
     } else if (updates.status === "pending") {
@@ -451,7 +470,7 @@ export async function createStandalonePayment(data: {
   return { success: true };
 }
 
-export async function bulkUpdatePaymentDate(paymentIds: string[], date: string) {
+export async function bulkDeletePayments(paymentIds: string[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
@@ -460,15 +479,23 @@ export async function bulkUpdatePaymentDate(paymentIds: string[], date: string) 
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || profile.role !== "admin") return { error: "Unauthorized" };
+
   const results = { success: 0, failed: 0 };
 
   for (const id of paymentIds) {
-    const res = await updatePayment(id, { payment_date: date });
+    const res = await deletePayment(id);
     if ("error" in res) results.failed++;
     else results.success++;
   }
 
   revalidatePath("/admin/payments");
+  revalidatePath("/admin/players");
   revalidatePath("/admin/dashboard");
   return { success: true, results };
 }
@@ -588,21 +615,25 @@ export async function createPendingPaymentForSession(data: {
 
   if (pkgError || !pkg) return { error: "Package not found" };
 
-  const startDate = new Date(data.session_date);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + pkg.validity_days);
+  // Parse date parts to avoid timezone shift
+  const [y, m, d] = data.session_date.split("-").map(Number);
+  const startDate = new Date(y, m - 1, d);
+  const endDate = new Date(y, m - 1, d + pkg.validity_days);
 
-  // Create pending subscription
+  const startStr = data.session_date;
+  const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+
+  // Create pending subscription (subtract 1 for the session already attended)
   const { data: subscription, error: subError } = await admin
     .from("subscriptions")
     .insert({
       player_id: data.player_id,
       package_id: data.package_id,
-      sessions_remaining: pkg.session_count,
+      sessions_remaining: Math.max(pkg.session_count - 1, 0),
       sessions_total: pkg.session_count,
-      start_date: startDate.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
-      status: "pending",
+      start_date: startStr,
+      end_date: endStr,
+      status: "pending_payment",
     })
     .select("id")
     .single();

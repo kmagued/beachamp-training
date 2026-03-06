@@ -40,7 +40,9 @@ export default async function PlayerSubscriptionsPage() {
       case "active":
         return { label: "Active", variant: "success" as const, reason: null };
       case "pending":
-        return { label: "Pending", variant: "warning" as const, reason: null };
+        return { label: "Pending Confirmation", variant: "warning" as const, reason: null };
+      case "pending_payment":
+        return { label: "Pending Payment", variant: "warning" as const, reason: null };
       case "expired":
         return { label: "Expired", variant: "neutral" as const, reason: null };
       case "cancelled":
@@ -136,8 +138,10 @@ export default async function PlayerSubscriptionsPage() {
                         <td className="px-4 py-3 text-sm text-slate-500">
                           {display.reason ? (
                             <span className="text-red-500">{display.reason}</span>
-                          ) : display.label === "Pending" ? (
+                          ) : display.label === "Pending Confirmation" ? (
                             <span className="text-amber-500">Awaiting confirmation</span>
+                          ) : display.label === "Pending Payment" ? (
+                            <span className="text-amber-500">Payment required</span>
                           ) : (
                             "—"
                           )}
@@ -184,11 +188,13 @@ export default async function PlayerSubscriptionsPage() {
                       </p>
                     </div>
                   </div>
-                  {(display.reason || display.label === "Pending") && (
+                  {(display.reason || display.label === "Pending Confirmation" || display.label === "Pending Payment") && (
                     <div className="mt-2 pt-2 border-t border-slate-100 text-xs">
                       <span className="text-slate-400">Message: </span>
                       {display.reason ? (
                         <span className="text-red-500">{display.reason}</span>
+                      ) : display.label === "Pending Payment" ? (
+                        <span className="text-amber-500">Payment required</span>
                       ) : (
                         <span className="text-amber-500">Awaiting confirmation</span>
                       )}

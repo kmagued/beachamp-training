@@ -6,7 +6,8 @@ import type { SubscriptionRow, PaymentRow } from "./types";
 function SubStatusBadge({ status }: { status: string }) {
   switch (status) {
     case "active": return <Badge variant="success">Active</Badge>;
-    case "pending": return <Badge variant="warning">Pending</Badge>;
+    case "pending": return <Badge variant="warning">Pending Confirmation</Badge>;
+    case "pending_payment": return <Badge variant="warning">Pending Payment</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "cancelled": return <Badge variant="neutral">Cancelled</Badge>;
     default: return <Badge variant="neutral">{status}</Badge>;

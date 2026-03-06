@@ -37,6 +37,7 @@ export type SubscriptionStatus =
   | "expired"
   | "attended"
   | "pending"
+  | "pending_payment"
   | "none";
 
 export type SortField = "name" | "date" | "level" | "group" | "package" | "sessions" | "expires" | "subscription";
@@ -117,6 +118,8 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
     if (expiredSub.sessions_total === 1) return "attended";
     return "expired";
   }
+  const pendingPaymentSub = player.subscriptions?.find((s) => s.status === "pending_payment");
+  if (pendingPaymentSub) return "pending_payment";
   const pendingSub = player.subscriptions?.find((s) => s.status === "pending");
   if (pendingSub) return "pending";
   return "none";

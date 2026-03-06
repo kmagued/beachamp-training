@@ -49,7 +49,8 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
     case "attended": return <Badge variant="success">Attended</Badge>;
     case "expiring soon": return <Badge variant="warning">Expiring Soon</Badge>;
     case "expired": return <Badge variant="danger">Expired</Badge>;
-    case "pending": return <Badge variant="warning">Pending</Badge>;
+    case "pending": return <Badge variant="warning">Pending Confirmation</Badge>;
+    case "pending_payment": return <Badge variant="warning">Pending Payment</Badge>;
     case "none": return <Badge variant="neutral">No Sub</Badge>;
   }
 }

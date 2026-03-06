@@ -32,12 +32,12 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string; session_count: number } }) | null };
 
-  // Check for pending subscription
+  // Check for pending subscription (admin confirmation or payment needed)
   const { data: pendingSubscription } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
-    .eq("status", "pending")
+    .in("status", ["pending", "pending_payment"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
@@ -181,10 +181,22 @@ export default async function PlayerDashboard() {
             </div>
           ) : pendingSubscription ? (
             <div className="text-center py-4">
-              <Badge variant="warning" className="mb-2">Pending Confirmation</Badge>
+              <Badge variant="warning" className="mb-2">
+                {pendingSubscription.status === "pending_payment" ? "Payment Required" : "Pending Confirmation"}
+              </Badge>
               <p className="text-sm text-slate-500 mt-2">
-                Your payment for {pendingSubscription.packages?.name} is being reviewed.
+                {pendingSubscription.status === "pending_payment"
+                  ? `You have an unpaid session for ${pendingSubscription.packages?.name}. Please make your payment.`
+                  : `Your payment for ${pendingSubscription.packages?.name} is being reviewed.`}
               </p>
+              {pendingSubscription.status === "pending_payment" && (
+                <Link
+                  href="/player/subscribe"
+                  className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+                >
+                  Pay Now
+                </Link>
+              )}
             </div>
           ) : (
             <EmptyState

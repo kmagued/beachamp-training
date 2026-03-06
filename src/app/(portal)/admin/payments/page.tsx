@@ -2,15 +2,15 @@
 
 import { Suspense, useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Badge, Pagination, SelectionBar, DatePicker, Toast } from "@/components/ui";
+import { Badge, Pagination, SelectionBar, Toast } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus, bulkUpdatePaymentDate } from "./actions";
+import { confirmPayment, rejectPayment, getScreenshotUrl, bulkUpdatePaymentStatus, bulkDeletePayments } from "./actions";
 import type { PaymentRow, SortField, SortDir } from "./_components/types";
 import { PaymentsPageSkeleton, PaymentsInlineSkeleton } from "./_components/skeleton";
 import { PaymentsFilters } from "./_components/filters";
 import { PaymentsTableView } from "./_components/table";
-import { RejectModal, ScreenshotLightbox } from "./_components/modals";
+import { RejectModal, ConfirmDeleteDrawer, ScreenshotLightbox } from "./_components/modals";
 import { PaymentDrawer } from "./_components/payment-drawer";
 import { NewPaymentDrawer } from "./_components/new-payment-drawer";
 import Link from "next/link";
@@ -36,7 +36,7 @@ function AdminPaymentsContent() {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [drawerPayment, setDrawerPayment] = useState<PaymentRow | null>(null);
   const [showNewPayment, setShowNewPayment] = useState(false);
-  const [bulkDate, setBulkDate] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const handleToastClose = useCallback(() => setToast(null), []);
 
@@ -287,16 +287,17 @@ function AdminPaymentsContent() {
     });
   }
 
-  function handleBulkDate(date: string) {
-    if (isPending || selectedIds.size === 0 || !date) return;
+  function handleBulkDelete() {
+    if (isPending || selectedIds.size === 0) return;
     const ids = [...selectedIds];
     startTransition(async () => {
-      const res = await bulkUpdatePaymentDate(ids, date);
+      const res = await bulkDeletePayments(ids);
       setSelectedIds(new Set());
+      setConfirmDelete(false);
       if ("error" in res) {
-        setToast({ message: res.error ?? "Failed to update dates", variant: "error" });
+        setToast({ message: res.error ?? "Failed to delete payments", variant: "error" });
       } else {
-        setToast({ message: `Date updated for ${ids.length} payment(s)`, variant: "success" });
+        setToast({ message: `${ids.length} payment(s) deleted`, variant: "success" });
       }
       fetchPayments();
     });
@@ -371,7 +372,7 @@ function AdminPaymentsContent() {
         hasActiveFilters={!!search || !!monthFilter || !!statusFilter || !!methodFilter || !!packageFilter || !!typeFilter}
       />
 
-      <SelectionBar count={selectedIds.size} onClear={() => { setSelectedIds(new Set()); setBulkDate(""); }}>
+      <SelectionBar count={selectedIds.size} onClear={() => { setSelectedIds(new Set()); setConfirmDelete(false); }}>
         <button
           onClick={() => handleBulkStatus("confirmed")}
           disabled={isPending}
@@ -382,27 +383,17 @@ function AdminPaymentsContent() {
         <button
           onClick={() => handleBulkStatus("rejected")}
           disabled={isPending}
-          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+          className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-xs font-medium hover:bg-amber-100 transition-colors disabled:opacity-50"
         >
           Reject All
         </button>
-        <div className="inline-flex items-center gap-1.5">
-          <DatePicker
-            value={bulkDate}
-            onChange={(e) => setBulkDate(e.target.value)}
-            placeholder="Set date..."
-            className="w-40"
-          />
-          {bulkDate && (
-            <button
-              onClick={() => { handleBulkDate(bulkDate); setBulkDate(""); }}
-              disabled={isPending}
-              className="px-2.5 py-1 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {isPending ? "Updating..." : "Set Date"}
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          disabled={isPending}
+          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+        >
+          Delete All
+        </button>
       </SelectionBar>
 
       <div className="flex-1">
@@ -450,6 +441,14 @@ function AdminPaymentsContent() {
         onCancel={() => { setRejectingId(null); setRejectReason(""); }}
         isPending={isPending}
         actionId={actionId}
+      />
+
+      <ConfirmDeleteDrawer
+        open={confirmDelete}
+        payments={payments.filter((p) => selectedIds.has(p.id))}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setConfirmDelete(false)}
+        isPending={isPending}
       />
 
       <ScreenshotLightbox

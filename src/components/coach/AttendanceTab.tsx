@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button, Badge, Skeleton, Drawer } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
+import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import {
   Check,
   X,
@@ -71,6 +72,8 @@ export function AttendanceTab({
   const [existingAttendance, setExistingAttendance] = useState<Map<string, string>>(new Map());
   const [searchQuery, setSearchQuery] = useState("");
   const [savedRecords, setSavedRecords] = useState<Map<string, AttendanceRecord>>(new Map());
+  const [packages, setPackages] = useState<{ id: string; price: number; name: string; session_count: number }[]>([]);
+  const [paymentDialog, setPaymentDialog] = useState<{ players: PlayerRow[]; playerPackages: Record<string, string> } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -154,6 +157,15 @@ export function AttendanceTab({
       }
       setRecords(initialRecords);
       setSavedRecords(new Map(Array.from(initialRecords.entries()).map(([k, v]) => [k, { ...v }])));
+
+      // Fetch packages for payment creation
+      const { data: pkgs } = await supabase
+        .from("packages")
+        .select("id, price, name, session_count")
+        .eq("is_active", true)
+        .order("session_count", { ascending: true });
+      if (pkgs) setPackages(pkgs);
+
       setLoadingPlayers(false);
     }
 
@@ -235,10 +247,39 @@ export function AttendanceTab({
     })
     .map(([id]) => id);
 
-  function handleSubmit() {
+  function getZeroBalancePresentPlayers() {
+    return players.filter((p) => {
+      const record = records.get(p.id);
+      const savedRecord = savedRecords.get(p.id);
+      // Only flag newly marked present players
+      if (record?.status !== "present" || savedRecord?.status === "present") return false;
+      return p.sessions_remaining === null || p.sessions_remaining <= 0;
+    });
+  }
+
+  function handleOpenConfirm() {
     if (markedRecords.length === 0 && removedPlayerIds.length === 0) return;
     setSubmitError(null);
 
+    // Pre-compute zero-balance players so they show in the confirm drawer
+    const zeroBalancePlayers = getZeroBalancePresentPlayers();
+    const defaultPkg = packages.find((p) => p.session_count === 1) || packages[0];
+    if (zeroBalancePlayers.length > 0 && defaultPkg) {
+      const playerPackages: Record<string, string> = {};
+      zeroBalancePlayers.forEach((p) => { playerPackages[p.id] = defaultPkg.id; });
+      setPaymentDialog({ players: zeroBalancePlayers, playerPackages });
+    } else {
+      setPaymentDialog(null);
+    }
+
+    setShowConfirm(true);
+  }
+
+  function handleConfirmSubmit() {
+    executeSubmit(paymentDialog?.playerPackages || {});
+  }
+
+  function executeSubmit(playerPackages: Record<string, string> = {}) {
     startTransition(async () => {
       // Remove attendance for deselected players
       if (removedPlayerIds.length > 0) {
@@ -292,9 +333,33 @@ export function AttendanceTab({
         setResult({ success: true, warnings: [] });
       }
 
+      // Create pending payments for zero-balance players
+      let paymentsCreated = 0;
+      const playerIds = Object.keys(playerPackages);
+      if (playerIds.length > 0) {
+        for (const playerId of playerIds) {
+          const pkg = packages.find((p) => p.id === playerPackages[playerId]);
+          if (!pkg) continue;
+          const payRes = await createPendingPaymentForSession({
+            player_id: playerId,
+            package_id: pkg.id,
+            amount: pkg.price,
+            session_date: sessionDate,
+          });
+          if ("success" in payRes) paymentsCreated++;
+        }
+      }
+
       setShowConfirm(false);
       setSubmitError(null);
       setSavedRecords(new Map(Array.from(records.entries()).map(([k, v]) => [k, { ...v }])));
+
+      if (paymentsCreated > 0) {
+        setResult({
+          success: true,
+          warnings: [`${paymentsCreated} pending payment${paymentsCreated > 1 ? "s" : ""} created`],
+        });
+      }
     });
   }
 
@@ -352,7 +417,7 @@ export function AttendanceTab({
             ) : (
               <Button
                 size="sm"
-                onClick={() => setShowConfirm(true)}
+                onClick={handleOpenConfirm}
                 disabled={(markedRecords.length === 0 && removedPlayerIds.length === 0) || isPending}
               >
                 {isPending ? "Submitting..." : "Submit"}
@@ -410,7 +475,8 @@ export function AttendanceTab({
           {[...players].sort((a, b) => {
             const aLogged = records.get(a.id)?.status !== null ? 0 : 1;
             const bLogged = records.get(b.id)?.status !== null ? 0 : 1;
-            return aLogged - bLogged;
+            if (aLogged !== bLogged) return aLogged - bLogged;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
           }).filter((p) => {
             const q = searchQuery.toLowerCase().trim();
             if (!q) return true;
@@ -589,28 +655,8 @@ export function AttendanceTab({
         open={showConfirm}
         onClose={() => { setShowConfirm(false); setSubmitError(null); }}
         title="Confirm Attendance"
-      >
-        <div className="flex flex-col h-full -mb-5 sm:-mb-6">
-          <div className="flex-1">
-            <p className="text-sm text-slate-500 mb-4">
-              You&apos;re marking attendance for <span className="font-medium text-slate-900">{groupName}</span> — {formatTime(startTime)} session on {sessionDate}
-            </p>
-            <div className="flex items-center gap-4 text-sm mb-4 bg-slate-50 rounded-lg p-3">
-              <span className="text-emerald-600">{presentCount} present</span>
-              <span className="text-red-500">{absentCount} absent</span>
-              <span className="text-amber-500">{excusedCount} excused</span>
-              {removedPlayerIds.length > 0 && (
-                <span className="text-slate-400">{removedPlayerIds.length} removed</span>
-              )}
-            </div>
-            {hasExistingAttendance && (
-              <p className="text-xs text-amber-600 mb-4">
-                This will update existing attendance records.
-              </p>
-            )}
-          </div>
-
-          <div className="sticky bottom-0 pt-3 pb-5 sm:pb-6 border-t border-slate-200 bg-white -mx-5 px-5 sm:-mx-6 sm:px-6">
+        footer={
+          <div>
             {submitError && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
                 <X className="w-4 h-4 mt-0.5 shrink-0" />
@@ -618,14 +664,89 @@ export function AttendanceTab({
               </div>
             )}
             <div className="flex gap-2">
-              <Button onClick={handleSubmit} disabled={isPending} fullWidth>
-                {isPending ? "Submitting..." : "Confirm"}
+              <Button onClick={handleConfirmSubmit} disabled={isPending} fullWidth>
+                {isPending ? "Submitting..." : paymentDialog ? "Confirm & Create Payments" : "Confirm"}
               </Button>
               <Button variant="secondary" onClick={() => { setShowConfirm(false); setSubmitError(null); }} disabled={isPending} fullWidth>
                 Cancel
               </Button>
             </div>
           </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            You&apos;re marking attendance for <span className="font-medium text-slate-900">{groupName}</span> — {formatTime(startTime)} session on {sessionDate}
+          </p>
+          <div className="flex items-center gap-4 text-sm bg-slate-50 rounded-lg p-3">
+            <span className="text-emerald-600">{presentCount} present</span>
+            <span className="text-red-500">{absentCount} absent</span>
+            <span className="text-amber-500">{excusedCount} excused</span>
+            {removedPlayerIds.length > 0 && (
+              <span className="text-slate-400">{removedPlayerIds.length} removed</span>
+            )}
+          </div>
+          {hasExistingAttendance && (
+            <p className="text-xs text-amber-600">
+              This will update existing attendance records.
+            </p>
+          )}
+
+          {/* Zero-balance players inline */}
+          {paymentDialog && paymentDialog.players.length > 0 && (() => {
+            const total = paymentDialog.players.reduce((sum, p) => {
+              const pkg = packages.find((pk) => pk.id === paymentDialog.playerPackages[p.id]);
+              return sum + (pkg?.price ?? 0);
+            }, 0);
+            return (
+              <div className="border-t border-slate-200 pt-4 space-y-3">
+                <p className="text-xs font-medium text-slate-700">
+                  Players with no remaining sessions — a pending payment will be created:
+                </p>
+                <div className="space-y-2">
+                  {paymentDialog.players.map((p) => {
+                    const pkgId = paymentDialog.playerPackages[p.id];
+                    const playerPkg = packages.find((pk) => pk.id === pkgId);
+                    return (
+                      <div key={p.id} className="bg-red-50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-red-600 shrink-0">
+                            {p.first_name[0]}{p.last_name[0]}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {p.first_name} {p.last_name}
+                          </span>
+                          {playerPkg && (
+                            <span className="ml-auto text-[11px] font-medium text-slate-500">{playerPkg.price} EGP</span>
+                          )}
+                        </div>
+                        <select
+                          value={pkgId}
+                          onChange={(e) => setPaymentDialog((prev) => prev ? {
+                            ...prev,
+                            playerPackages: { ...prev.playerPackages, [p.id]: e.target.value }
+                          } : null)}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        >
+                          {packages.map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {pkg.name} — {pkg.price} EGP
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+                {paymentDialog.players.length > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-xs font-medium text-slate-500">Total</span>
+                    <span className="text-sm font-semibold text-slate-900">{total} EGP</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </Drawer>
 
