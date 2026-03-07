@@ -28,6 +28,7 @@ interface PlayerRow {
   avatar_url: string | null;
   sessions_remaining: number | null;
   subscription_status: string | null;
+  subscription_end_date: string | null;
 }
 
 interface AttendanceRecord {
@@ -103,14 +104,14 @@ export function AttendanceTab({
 
       const { data: subscriptions } = await supabase
         .from("subscriptions")
-        .select("player_id, sessions_remaining, status")
+        .select("player_id, sessions_remaining, status, end_date")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
         .eq("status", "active");
 
-      const subMap = new Map<string, { remaining: number; status: string }>();
+      const subMap = new Map<string, { remaining: number; status: string; end_date: string | null }>();
       if (subscriptions) {
         for (const sub of subscriptions) {
-          subMap.set(sub.player_id, { remaining: sub.sessions_remaining, status: sub.status });
+          subMap.set(sub.player_id, { remaining: sub.sessions_remaining, status: sub.status, end_date: sub.end_date });
         }
       }
 
@@ -140,6 +141,7 @@ export function AttendanceTab({
           avatar_url: gp.profiles?.avatar_url,
           sessions_remaining: sub?.remaining ?? null,
           subscription_status: sub?.status ?? null,
+          subscription_end_date: sub?.end_date ?? null,
         };
       }).filter((p: PlayerRow) => p.id);
 
@@ -502,6 +504,7 @@ export function AttendanceTab({
                       {player.sessions_remaining !== null ? (
                         <span className={`text-xs ${hasNoBalance ? "text-red-500 font-medium" : hasLowBalance ? "text-amber-500" : "text-slate-400"}`}>
                           {player.sessions_remaining} sessions left
+                          {player.subscription_end_date && ` · Expires ${new Date(player.subscription_end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                         </span>
                       ) : (
                         <span className="text-xs text-slate-400">No active subscription</span>

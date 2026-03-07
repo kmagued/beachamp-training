@@ -577,12 +577,7 @@ export function AttendanceTab({ date }: { date: string }) {
                               {sub.status === "expired"
                                 ? `Expired · ${sub.remaining}/${sub.total} sessions left`
                                 : `${sub.remaining}/${sub.total} sessions left`}
-                              {sub.status === "active" && sub.end_date && (() => {
-                                const days = Math.ceil((new Date(sub.end_date).getTime() - Date.now()) / 86400000);
-                                if (days <= 0) return " · Expires today";
-                                if (days <= 3) return ` · Expires in ${days}d`;
-                                return null;
-                              })()}
+                              {sub.end_date && ` · Expires ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                             </p>
                           ) : (
                             <p className="text-[11px] text-red-400">No active subscription</p>

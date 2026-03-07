@@ -6,7 +6,7 @@ import { BarChart3 } from "lucide-react";
 
 interface MetricsTableProps {
   attendanceRecords: { status: string; session_date: string; group_id: string }[];
-  subscriptions: { player_id: string; status: string; end_date: string | null; created_at: string }[];
+  subscriptions: { player_id: string; status: string; start_date: string | null; end_date: string | null; created_at: string }[];
   profiles: { id: string; created_at: string }[];
   groupPlayers: { group_id: string; player_id: string; joined_at: string; is_active: boolean }[];
   groups: { id: string; max_players: number }[];
@@ -47,22 +47,25 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
     const monthAttendance = attendanceRecords.filter((a) => a.session_date >= monthStartISO && a.session_date <= monthEndISO);
     const presentAtt = monthAttendance.filter((a) => a.status === "present").length;
 
-    // Group player counts for expected attendance (only players who had joined by that month)
-    const gpCountByGroup: Record<string, number> = {};
-    groupPlayers.forEach((gp) => {
-      if (gp.joined_at <= monthEndISO) {
-        gpCountByGroup[gp.group_id] = (gpCountByGroup[gp.group_id] || 0) + 1;
-      }
-    });
-
-    // Find unique sessions (date + group) and sum expected players
+    // For each unique session (date + group), count active subscribed players in that group on that date
     const sessionKeys = new Set<string>();
     let expectedAtt = 0;
     monthAttendance.forEach((a) => {
       const key = `${a.session_date}|${a.group_id}`;
       if (!sessionKeys.has(key)) {
         sessionKeys.add(key);
-        expectedAtt += gpCountByGroup[a.group_id] || 0;
+        // Count players in this group who had an active subscription on this session date
+        const activeInGroup = groupPlayers.filter((gp) => {
+          if (gp.group_id !== a.group_id || !gp.is_active) return false;
+          // Check if player had a subscription covering this session date
+          return subscriptions.some((s) => {
+            if (s.player_id !== gp.player_id) return false;
+            const start = s.start_date || s.created_at.split("T")[0];
+            const end = s.end_date || "9999-12-31";
+            return start <= a.session_date && end >= a.session_date;
+          });
+        });
+        expectedAtt += activeInGroup.length;
       }
     });
     const attendanceRate = expectedAtt > 0 ? Math.round((presentAtt / expectedAtt) * 100) : 0;

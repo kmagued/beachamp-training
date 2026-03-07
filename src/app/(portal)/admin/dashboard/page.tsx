@@ -114,7 +114,7 @@ export default async function AdminDashboard() {
     // All subscriptions for metrics table (churn/retention)
     supabase
       .from("subscriptions")
-      .select("player_id, status, end_date, created_at"),
+      .select("player_id, status, start_date, end_date, created_at"),
     // All player profiles (for new member counting)
     supabase
       .from("profiles")
@@ -309,7 +309,7 @@ export default async function AdminDashboard() {
       <div className="mb-6">
         <MetricsTable
           attendanceRecords={(attendanceAll || []) as { status: string; session_date: string; group_id: string }[]}
-          subscriptions={(allSubscriptions || []) as { player_id: string; status: string; end_date: string | null; created_at: string }[]}
+          subscriptions={(allSubscriptions || []) as { player_id: string; status: string; start_date: string | null; end_date: string | null; created_at: string }[]}
           profiles={(allPlayerProfiles || []) as { id: string; created_at: string }[]}
           groupPlayers={allGpRows}
           groups={groups.map((g) => ({ id: g.id, max_players: g.max_players }))}
