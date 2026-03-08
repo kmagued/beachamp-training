@@ -87,16 +87,19 @@ export default function AdminPromoCodesPage() {
     });
   }
 
-  function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this promo code?")) return;
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  function handleDelete() {
+    if (!deleteTarget) return;
     setError(null);
     startTransition(async () => {
-      const result = await deletePromoCode(id);
+      const result = await deletePromoCode(deleteTarget);
       if (result.error) {
         setError(result.error);
       } else {
         fetchData();
       }
+      setDeleteTarget(null);
     });
   }
 
@@ -287,7 +290,7 @@ export default function AdminPromoCodesPage() {
                     </button>
                     {code.use_count === 0 && (
                       <button
-                        onClick={() => handleDelete(code.id)}
+                        onClick={() => setDeleteTarget(code.id)}
                         className="text-slate-400 hover:text-red-500 p-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -346,6 +349,58 @@ export default function AdminPromoCodesPage() {
           ))}
         </div>
       )}
+
+      <Drawer
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Promo Code"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)} disabled={isPending} fullWidth>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleDelete} disabled={isPending} fullWidth>
+              {isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        }
+      >
+        {(() => {
+          const code = promoCodes.find((c) => c.id === deleteTarget);
+          if (!code) return null;
+          return (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Are you sure you want to delete this promo code? This action cannot be undone.
+              </p>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Code</span>
+                  <span className="font-semibold font-mono text-slate-900">{code.code}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Discount</span>
+                  <span className="font-medium text-slate-900">{formatDiscount(code)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Expiry</span>
+                  <span className="font-medium text-slate-900">
+                    {code.expiry_date ? formatDate(code.expiry_date) : "No expiry"}
+                  </span>
+                </div>
+                {code.package_ids && code.package_ids.length > 0 && (
+                  <div className="flex justify-between items-start">
+                    <span className="text-slate-500">Packages</span>
+                    <span className="font-medium text-slate-900 text-right">
+                      {code.package_ids.map(getPackageName).join(", ")}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Drawer>
     </div>
   );
 }

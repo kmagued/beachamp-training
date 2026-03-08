@@ -81,7 +81,7 @@ function PlayerSubscribeContent() {
         .from("packages")
         .select("*")
         .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+        .order("session_count", { ascending: true });
       if (pkgs) setPackages(pkgs as Package[]);
 
       const { data: { user } } = await supabase.auth.getUser();

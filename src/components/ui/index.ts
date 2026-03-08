@@ -21,3 +21,4 @@ export { Pagination } from "./pagination";
 export { SelectionBar } from "./selection-bar";
 export { Drawer } from "./drawer";
 export { MobileFilterSheet } from "./mobile-filter-sheet";
+export { ConfirmDialog } from "./confirm-dialog";
