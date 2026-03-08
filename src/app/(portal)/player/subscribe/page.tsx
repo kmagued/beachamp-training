@@ -3,12 +3,13 @@
 import { Suspense, useState, useEffect, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Alert, Select, Textarea, MultiSelect, Skeleton } from "@/components/ui";
-import { Check, Upload, CreditCard } from "lucide-react";
+import { Card, Badge, Button, Alert, Input, Select, Textarea, MultiSelect, Skeleton } from "@/components/ui";
+import { Check, Upload, CreditCard, Tag } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
 import { submitSubscription } from "./actions";
+import { validatePromoCode } from "@/app/(portal)/admin/promo-codes/actions";
 import type { Package, Subscription, Profile } from "@/types/database";
 
 const paymentMethods = [
@@ -56,8 +57,18 @@ function PlayerSubscribeContent() {
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoResult, setPromoResult] = useState<{
+    valid: boolean;
+    discount_type?: string;
+    discount_value?: number;
+    promo_code_id?: string;
+    error?: string;
+  } | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,6 +86,7 @@ function PlayerSubscribeContent() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setUserId(user.id);
         // Check active subscription
         const { data: sub } = await supabase
           .from("subscriptions")
@@ -105,6 +117,22 @@ function PlayerSubscribeContent() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function getDiscountedPrice(originalPrice: number) {
+    if (!promoResult?.valid) return originalPrice;
+    if (promoResult.discount_type === "percentage") {
+      return Math.max(0, Math.round(originalPrice * (1 - promoResult.discount_value! / 100) * 100) / 100);
+    }
+    return Math.max(0, originalPrice - promoResult.discount_value!);
+  }
+
+  async function handleApplyPromo() {
+    if (!promoCode.trim() || !selectedPackage || !userId) return;
+    setPromoLoading(true);
+    const res = await validatePromoCode(promoCode, selectedPackage, userId);
+    setPromoResult(res);
+    setPromoLoading(false);
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -141,6 +169,9 @@ function PlayerSubscribeContent() {
     formData.set("package_id", selectedPackage);
     formData.set("method", selectedMethod);
     if (screenshot) formData.set("screenshot", screenshot);
+    if (promoResult?.valid && promoResult.promo_code_id) {
+      formData.set("promo_code_id", promoResult.promo_code_id);
+    }
 
     // Include training info if needed
     if (needsTrainingInfo) {
@@ -213,9 +244,10 @@ function PlayerSubscribeContent() {
   }
 
   // Step numbering adjusts based on whether training info is shown
-  const trainingStep = 2;
-  const methodStep = needsTrainingInfo ? 3 : 2;
-  const screenshotStep = needsTrainingInfo ? 4 : 3;
+  const promoStep = 2;
+  const trainingStep = 3;
+  const methodStep = needsTrainingInfo ? 4 : 3;
+  const screenshotStep = needsTrainingInfo ? 5 : 4;
   const showScreenshot = selectedMethod === "instapay";
 
   return (
@@ -268,7 +300,10 @@ function PlayerSubscribeContent() {
         {packages.map((pkg) => (
           <button
             key={pkg.id}
-            onClick={() => setSelectedPackage(pkg.id)}
+            onClick={() => {
+              setSelectedPackage(pkg.id);
+              setPromoResult(null);
+            }}
             className={cn(
               "border rounded-xl p-4 text-left transition-all",
               selectedPackage === pkg.id
@@ -276,14 +311,13 @@ function PlayerSubscribeContent() {
                 : "border-slate-200 bg-white hover:border-slate-300"
             )}
           >
+            <p className="text-sm font-semibold text-slate-900 mb-1">{pkg.name}</p>
             <p className="text-lg font-bold text-slate-900">{pkg.session_count}</p>
             <p className="text-xs text-slate-500 mb-2">
               {pkg.session_count === 1 ? "session" : "sessions"}
             </p>
-            <p className="text-base font-bold text-slate-900">{pkg.price.toLocaleString("en-US")} EGP</p>
-            {pkg.validity_days > 1 && (
-              <p className="text-[11px] text-slate-400">{pkg.validity_days} days validity</p>
-            )}
+            <p className="text-sm font-bold text-slate-900">{pkg.price.toLocaleString("en-US")} EGP</p>
+            <p className="text-[11px] text-slate-400">{pkg.validity_days} days validity</p>
             {selectedPackage === pkg.id && (
               <div className="mt-2">
                 <Badge variant="info">Selected</Badge>
@@ -292,6 +326,47 @@ function PlayerSubscribeContent() {
           </button>
         ))}
       </div>
+
+      {/* Promo Code */}
+      {selectedPackage && (
+        <>
+          <h2 className="font-semibold text-slate-900 mb-3">{promoStep}. Promo Code <span className="text-slate-400 font-normal text-sm">(Optional)</span></h2>
+          <div className="mb-8">
+            <div className="flex gap-2">
+              <Input
+                value={promoCode}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setPromoCode(e.target.value);
+                  if (promoResult) setPromoResult(null);
+                }}
+                placeholder="Enter promo code"
+                className="uppercase flex-1"
+              />
+              <Button
+                onClick={handleApplyPromo}
+                variant="secondary"
+                size="sm"
+                disabled={!promoCode.trim() || promoLoading}
+              >
+                {promoLoading ? "Checking..." : "Apply"}
+              </Button>
+            </div>
+            {promoResult?.valid && (
+              <div className="flex items-center gap-2 mt-2 text-sm text-emerald-600">
+                <Tag className="w-3.5 h-3.5" />
+                <span className="font-medium">
+                  Code applied! {promoResult.discount_type === "percentage"
+                    ? `${promoResult.discount_value}% off`
+                    : `${promoResult.discount_value?.toLocaleString()} EGP off`}
+                </span>
+              </div>
+            )}
+            {promoResult && !promoResult.valid && (
+              <p className="text-xs text-red-500 mt-2">{promoResult.error}</p>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Training info — shown only for first-time subscribers */}
       {needsTrainingInfo && (
@@ -337,101 +412,151 @@ function PlayerSubscribeContent() {
         </>
       )}
 
-      {/* Payment method */}
-      <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method <span className="text-red-400">*</span></h2>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {paymentMethods.map((m) => (
-          <button
-            key={m.value}
-            onClick={() => {
-              setSelectedMethod(m.value);
-              if (m.value !== "instapay") {
-                setScreenshot(null);
-                if (previewUrl) URL.revokeObjectURL(previewUrl);
-                setPreviewUrl(null);
-                setFileError(null);
-              }
-            }}
-            className={cn(
-              "px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
-              selectedMethod === m.value
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-slate-200 text-slate-600 hover:border-slate-300"
-            )}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Instapay account info */}
-      {selectedMethod === "instapay" && (
-        <Card className="mb-8 bg-primary-50/50 border-primary-200">
-          <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
-          <p className="text-base font-bold text-primary select-all">ahmed1.fahmy1@instapay</p>
-          <a
-            href="https://ipn.eg/S/ahmed1.fahmy1/instapay/7jMlOQ"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
-          >
-            Open Instapay Link
-            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
-            </svg>
-          </a>
-        </Card>
-      )}
-
-      {!selectedMethod && <div className="mb-8" />}
-
-      {/* Screenshot upload — instapay only */}
-      {showScreenshot && (
+      {/* Payment method — only show after package is selected */}
+      {selectedPackage && (
         <>
-          <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot <span className="text-red-400">*</span></h2>
-          <div className="mb-8">
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
-              {previewUrl ? (
-                <div className="flex flex-col items-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={previewUrl}
-                    alt="Payment screenshot preview"
-                    className="max-h-32 rounded-lg object-contain mb-2"
-                  />
-                  <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
-                  <p className="text-xs text-slate-400 mt-1">Click to change</p>
-                </div>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-slate-300 mb-2" />
-                  <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
-                  <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
-                </>
-              )}
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </label>
-            {fileError && (
-              <p className="text-xs text-red-500 mt-2">{fileError}</p>
-            )}
+          <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method <span className="text-red-400">*</span></h2>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {paymentMethods.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => {
+                  setSelectedMethod(m.value);
+                  if (m.value !== "instapay") {
+                    setScreenshot(null);
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                    setPreviewUrl(null);
+                    setFileError(null);
+                  }
+                }}
+                className={cn(
+                  "px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                  selectedMethod === m.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
+
+          {/* Instapay account info */}
+          {selectedMethod === "instapay" && (
+            <Card className="mb-8 bg-primary-50/50 border-primary-200">
+              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
+              <p className="text-base font-bold text-primary select-all">ahmed1.fahmy1@instapay</p>
+              <a
+                href="https://ipn.eg/S/ahmed1.fahmy1/instapay/7jMlOQ"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
+              >
+                Open Instapay Link
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
+                </svg>
+              </a>
+            </Card>
+          )}
+
+          {!selectedMethod && <div className="mb-8" />}
+
+          {/* Screenshot upload — instapay only */}
+          {showScreenshot && (
+            <>
+              <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot <span className="text-red-400">*</span></h2>
+              <div className="mb-8">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
+                  {previewUrl ? (
+                    <div className="flex flex-col items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt="Payment screenshot preview"
+                        className="max-h-32 rounded-lg object-contain mb-2"
+                      />
+                      <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
+                      <p className="text-xs text-slate-400 mt-1">Click to change</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
+                      <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+                {fileError && (
+                  <p className="text-xs text-red-500 mt-2">{fileError}</p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Total */}
+          {(() => {
+            const selectedPkg = packages.find((p) => p.id === selectedPackage);
+            if (!selectedPkg) return null;
+            const original = selectedPkg.price;
+            const final = getDiscountedPrice(original);
+            const hasDiscount = promoResult?.valid && final < original;
+            return (
+              <Card className="mb-4 bg-slate-50 border-slate-200">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Package</span>
+                    <span className="font-medium text-slate-900">{selectedPkg.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Sessions</span>
+                    <span className="font-medium text-slate-900">{selectedPkg.session_count}</span>
+                  </div>
+                  {hasDiscount && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="font-medium text-slate-400 line-through">{original.toLocaleString("en-US")} EGP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">
+                          Discount
+                          {promoResult.discount_type === "percentage" && ` (${promoResult.discount_value}%)`}
+                        </span>
+                        <span className="font-medium text-emerald-600">
+                          -{(original - final).toLocaleString("en-US")} EGP
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className="border-t border-slate-200 pt-2 flex justify-between">
+                    <span className="font-semibold text-slate-900">Total</span>
+                    <span className={cn("font-bold", hasDiscount ? "text-emerald-600" : "text-slate-900")}>
+                      {final.toLocaleString("en-US")} EGP
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
+
+          {/* Submit */}
+          <Button
+            onClick={handleSubmit}
+            disabled={!selectedMethod || (selectedMethod === "instapay" && !screenshot) || isPending}
+            fullWidth
+            size="md"
+          >
+            {isPending ? "Submitting..." : activeSubscription ? "Submit Renewal" : "Submit Subscription"}
+          </Button>
         </>
       )}
-
-      {/* Submit */}
-      <Button
-        onClick={handleSubmit}
-        disabled={!selectedPackage || !selectedMethod || (selectedMethod === "instapay" && !screenshot) || isPending}
-        fullWidth
-        size="md"
-      >
-        {isPending ? "Submitting..." : activeSubscription ? "Submit Renewal" : "Submit Subscription"}
-      </Button>
     </div>
   );
 }

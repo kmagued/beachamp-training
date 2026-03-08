@@ -23,6 +23,7 @@ import {
   UsersRound,
   Receipt,
   ClipboardList,
+  Ticket,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 
@@ -61,6 +62,7 @@ const iconMap = {
   "my-groups": Users,
   schedule: Calendar,
   expenses: Receipt,
+  "promo-codes": Ticket,
   "daily-report": ClipboardList,
 } as const;
 
@@ -88,6 +90,7 @@ const adminNav: NavItem[] = [
   { key: "payments", label: "Payments", href: "/admin/payments" },
   { key: "expenses", label: "Expenses", href: "/admin/expenses" },
   { key: "packages", label: "Packages", href: "/admin/packages" },
+  { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes" },
   { key: "users", label: "Admins", href: "/admin/users" },
   // Training Operations
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
@@ -111,7 +114,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
   // Match the most specific route first (longer href = more specific)
   const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
-  const activeKey = sortedNav.find((item) => pathname.startsWith(item.href))?.key || "dashboard";
+  const matched = sortedNav.find((item) => pathname.startsWith(item.href))?.key;
+  // /player/subscribe should highlight the subscriptions tab
+  const activeKey = matched || (pathname.startsWith(`/${portal}/subscribe`) ? "subscriptions" : "dashboard");
 
   return (
     <div className="min-h-screen flex bg-surface-bg">

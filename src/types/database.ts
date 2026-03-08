@@ -11,6 +11,7 @@ export type PaymentMethod = "instapay" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";
 export type RecurrenceType = "monthly" | "weekly";
+export type DiscountType = "percentage" | "fixed_amount";
 export type PreferredHand = "left" | "right";
 export type PreferredPosition = "defender" | "blocker";
 
@@ -144,6 +145,7 @@ export interface Database {
           start_date: string | null;
           end_date: string | null;
           status: SubscriptionStatus;
+          promo_code_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -156,6 +158,7 @@ export interface Database {
           start_date?: string | null;
           end_date?: string | null;
           status: SubscriptionStatus;
+          promo_code_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -168,6 +171,7 @@ export interface Database {
           start_date?: string | null;
           end_date?: string | null;
           status?: SubscriptionStatus;
+          promo_code_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -186,6 +190,7 @@ export interface Database {
           rejection_reason: string | null;
           confirmed_at: string | null;
           note: string | null;
+          promo_code_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -200,6 +205,7 @@ export interface Database {
           rejection_reason?: string | null;
           confirmed_at?: string | null;
           note?: string | null;
+          promo_code_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -214,6 +220,7 @@ export interface Database {
           rejection_reason?: string | null;
           confirmed_at?: string | null;
           note?: string | null;
+          promo_code_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -494,6 +501,78 @@ export interface Database {
         };
         Relationships: [];
       };
+      promo_codes: {
+        Row: {
+          id: string;
+          code: string;
+          discount_type: DiscountType;
+          discount_value: number;
+          expiry_date: string | null;
+          max_uses: number | null;
+          per_player_limit: number;
+          package_ids: string[] | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          discount_type: DiscountType;
+          discount_value: number;
+          expiry_date?: string | null;
+          max_uses?: number | null;
+          per_player_limit?: number;
+          package_ids?: string[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          discount_type?: DiscountType;
+          discount_value?: number;
+          expiry_date?: string | null;
+          max_uses?: number | null;
+          per_player_limit?: number;
+          package_ids?: string[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      promo_code_uses: {
+        Row: {
+          id: string;
+          promo_code_id: string;
+          player_id: string;
+          subscription_id: string | null;
+          payment_id: string | null;
+          discount_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          promo_code_id: string;
+          player_id: string;
+          subscription_id?: string | null;
+          payment_id?: string | null;
+          discount_amount: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          promo_code_id?: string;
+          player_id?: string;
+          subscription_id?: string | null;
+          payment_id?: string | null;
+          discount_amount?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -535,6 +614,8 @@ export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
 export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
 export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+export type PromoCode = Database["public"]["Tables"]["promo_codes"]["Row"];
+export type PromoCodeUse = Database["public"]["Tables"]["promo_code_uses"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
