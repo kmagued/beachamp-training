@@ -396,6 +396,9 @@ export async function createScheduleSession(formData: FormData) {
   const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
   if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
 
+  const endDate = (formData.get("end_date") as string)?.trim() || null;
+  if (!endDate) return { error: "An end date is required." };
+
   const { error } = await supabase.from("schedule_sessions").insert({
     group_id: groupId,
     coach_id: coachId,
@@ -403,6 +406,7 @@ export async function createScheduleSession(formData: FormData) {
     start_time: startTime,
     end_time: endTime,
     location: (formData.get("location") as string)?.trim() || null,
+    end_date: endDate,
     is_active: true,
   });
 
@@ -431,6 +435,9 @@ export async function updateScheduleSession(id: string, formData: FormData) {
   const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
   if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
 
+  const endDate = (formData.get("end_date") as string)?.trim() || null;
+  if (!endDate) return { error: "An end date is required." };
+
   const { error } = await supabase
     .from("schedule_sessions")
     .update({
@@ -439,6 +446,7 @@ export async function updateScheduleSession(id: string, formData: FormData) {
       start_time: startTime,
       end_time: endTime,
       location: (formData.get("location") as string)?.trim() || null,
+      end_date: endDate,
     })
     .eq("id", id);
 

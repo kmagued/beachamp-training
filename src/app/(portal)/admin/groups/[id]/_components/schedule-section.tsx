@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useMemo } from "react";
 import { Card, Button, Input, Select, Drawer, Toast } from "@/components/ui";
-import { Calendar, Plus, Pencil, Trash2 } from "lucide-react";
+import { Calendar, Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { createScheduleSession, updateScheduleSession, deleteScheduleSession } from "@/app/_actions/training";
 import { formatTime } from "../../_components/types";
 import type { ScheduleRow, CoachRow } from "./types";
@@ -23,10 +23,28 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
   const [editingSession, setEditingSession] = useState<ScheduleRow | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const handleToastClose = useCallback(() => setToast(null), []);
+  const [endMode, setEndMode] = useState<"date" | "weeks">("date");
+  const [numWeeks, setNumWeeks] = useState<string>("12");
+
+  const expiredSchedules = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return new Set(schedule.filter((s) => s.end_date && s.end_date < today).map((s) => s.id));
+  }, [schedule]);
+
+  function resolveEndDate(formData: FormData) {
+    if (endMode === "weeks") {
+      const weeks = parseInt(numWeeks) || 12;
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + weeks * 7);
+      formData.set("end_date", endDate.toISOString().split("T")[0]);
+    }
+    // If mode is "date", the form input already sets end_date
+  }
 
   function handleCreateSession(formData: FormData) {
     setError(null);
     formData.set("group_id", groupId);
+    resolveEndDate(formData);
     startTransition(async () => {
       const result = await createScheduleSession(formData);
       if ("error" in result) setError(result.error);
@@ -41,6 +59,7 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
   function handleUpdateSession(formData: FormData) {
     if (!editingSession) return;
     setError(null);
+    resolveEndDate(formData);
     startTransition(async () => {
       const result = await updateScheduleSession(editingSession.id, formData);
       if ("error" in result) setError(result.error);
@@ -67,12 +86,16 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
   function openAdd() {
     setEditingSession(null);
     setError(null);
+    setEndMode("date");
+    setNumWeeks("12");
     setShowSessionDrawer(true);
   }
 
   function openEdit(session: ScheduleRow) {
     setEditingSession(session);
     setError(null);
+    setEndMode("date");
+    setNumWeeks("12");
     setShowSessionDrawer(false);
   }
 
@@ -105,16 +128,31 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                   <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Time</th>
                   <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Coach</th>
                   <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Location</th>
+                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Ends</th>
                   <th className="py-2 w-20"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedule.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/50">
+                {schedule.map((s) => {
+                  const isExpired = expiredSchedules.has(s.id);
+                  return (
+                  <tr key={s.id} className={isExpired ? "opacity-50 bg-slate-50/50" : "hover:bg-slate-50/50"}>
                     <td className="py-2.5 font-medium text-slate-900">{DAY_NAMES_FULL[s.day_of_week]}</td>
                     <td className="py-2.5 text-slate-600">{formatTime(s.start_time)} — {formatTime(s.end_time)}</td>
                     <td className="py-2.5 text-slate-600">{s.coach_name || "—"}</td>
                     <td className="py-2.5 text-slate-500">{s.location || "—"}</td>
+                    <td className="py-2.5 text-slate-500">
+                      {s.end_date ? (
+                        <span className={isExpired ? "text-red-500 font-medium" : ""}>
+                          {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {isExpired && <span className="text-[10px] ml-1">(ended)</span>}
+                        </span>
+                      ) : (
+                        <span className="text-amber-500 flex items-center gap-1 text-xs">
+                          <AlertCircle className="w-3 h-3" /> No end date
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2.5">
                       <div className="flex gap-1">
                         <button
@@ -133,15 +171,18 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2">
-            {schedule.map((s) => (
-              <div key={s.id} className="border border-slate-100 rounded-lg p-3">
+            {schedule.map((s) => {
+              const isExpired = expiredSchedules.has(s.id);
+              return (
+              <div key={s.id} className={`border border-slate-100 rounded-lg p-3 ${isExpired ? "opacity-50" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-slate-900 text-sm">{DAY_NAMES_FULL[s.day_of_week]}</span>
                   <div className="flex gap-1">
@@ -172,9 +213,23 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                       <p className="text-slate-700 font-medium">{s.location}</p>
                     </div>
                   )}
+                  <div className="col-span-2">
+                    <span className="text-slate-400">Ends</span>
+                    {s.end_date ? (
+                      <p className={isExpired ? "text-red-500 font-medium" : "text-slate-700 font-medium"}>
+                        {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {isExpired && " (ended)"}
+                      </p>
+                    ) : (
+                      <p className="text-amber-500 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> No end date
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -221,6 +276,54 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
           <div>
             <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
             <Input name="location" placeholder="e.g. Court 1" defaultValue={editingSession?.location || ""} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">Ends</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setEndMode("date")}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  endMode === "date"
+                    ? "bg-primary-50 border-primary text-primary font-medium"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                }`}
+              >
+                End Date
+              </button>
+              <button
+                type="button"
+                onClick={() => setEndMode("weeks")}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  endMode === "weeks"
+                    ? "bg-primary-50 border-primary text-primary font-medium"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                }`}
+              >
+                Number of Weeks
+              </button>
+            </div>
+            {endMode === "date" ? (
+              <Input
+                name="end_date"
+                type="date"
+                required
+                defaultValue={editingSession?.end_date || ""}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={104}
+                  value={numWeeks}
+                  onChange={(e) => setNumWeeks(e.target.value)}
+                  className="w-24"
+                />
+                <span className="text-xs text-slate-500">weeks from today</span>
+              </div>
+            )}
           </div>
           <Button type="submit" fullWidth disabled={isPending}>
             {isPending ? "Saving..." : editingSession ? "Update Session" : "Add Session"}

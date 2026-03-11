@@ -390,6 +390,7 @@ export interface Database {
           start_time: string;
           end_time: string;
           location: string | null;
+          end_date: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -402,6 +403,7 @@ export interface Database {
           start_time: string;
           end_time: string;
           location?: string | null;
+          end_date?: string | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -414,6 +416,7 @@ export interface Database {
           start_time?: string;
           end_time?: string;
           location?: string | null;
+          end_date?: string | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;

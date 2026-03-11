@@ -22,6 +22,7 @@ interface ScheduleBlock {
   start_time: string;
   end_time: string;
   location: string | null;
+  end_date: string | null;
   player_count: number;
   has_attendance: boolean; // for the current week
 }
@@ -135,7 +136,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
 
       let query = supabase
         .from("schedule_sessions")
-        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, end_date, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
         .eq("is_active", true);
 
       if (!showAll) {
@@ -211,6 +212,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           start_time: s.start_time,
           end_time: s.end_time,
           location: s.location,
+          end_date: s.end_date,
           player_count: playerCounts.get(s.group_id) || 0,
           has_attendance: attendanceSet.has(`${s.id}_${dateStr}`),
         };
@@ -223,9 +225,15 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coachId, showAll, selectedSaturday]);
 
-  // Group sessions by day
+  // Group sessions by day, filtering out sessions past their end_date
   const sessionsByDay = new Map<number, ScheduleBlock[]>();
   for (const s of sessions) {
+    // Find the actual date for this day_of_week in the current week view
+    const dayDate = weekDates.find((d) => d.getDay() === s.day_of_week);
+    if (dayDate && s.end_date) {
+      const endDate = new Date(s.end_date + "T23:59:59");
+      if (dayDate > endDate) continue; // skip expired sessions
+    }
     const existing = sessionsByDay.get(s.day_of_week) || [];
     existing.push(s);
     sessionsByDay.set(s.day_of_week, existing);

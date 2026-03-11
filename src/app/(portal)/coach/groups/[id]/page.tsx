@@ -93,7 +93,7 @@ export default function CoachGroupDetailPage() {
   const fetchSchedule = useCallback(async () => {
     const { data } = await supabase
       .from("schedule_sessions")
-      .select("id, day_of_week, start_time, end_time, location, coach_id, profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+      .select("id, day_of_week, start_time, end_time, location, end_date, coach_id, profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
       .eq("group_id", groupId)
       .eq("is_active", true)
       .order("day_of_week")
@@ -107,6 +107,7 @@ export default function CoachGroupDetailPage() {
         start_time: s.start_time,
         end_time: s.end_time,
         location: s.location,
+        end_date: s.end_date,
         coach_id: s.coach_id,
         coach_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : null,
       })));

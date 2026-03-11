@@ -31,6 +31,7 @@ export interface ScheduleRow {
   start_time: string;
   end_time: string;
   location: string | null;
+  end_date: string | null;
   coach_id: string | null;
   coach_name: string | null;
 }
