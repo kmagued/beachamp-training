@@ -1,6 +1,6 @@
 import { RefObject, useState } from "react";
 import { Card, Badge } from "@/components/ui";
-import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2 } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2, Check, X, Users, Package, CalendarDays, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import type { PlayerRow, SortField, SortDir, ActivityStatus, SubscriptionStatus } from "./types";
@@ -38,9 +38,9 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
   return sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
 }
 
-function ActivityBadge({ status }: { status: ActivityStatus }) {
-  if (status === "active") return <Badge variant="success">Active</Badge>;
-  return <Badge variant="neutral">Inactive</Badge>;
+function ActivityIcon({ status }: { status: ActivityStatus }) {
+  if (status === "active") return <Check className="w-4 h-4 text-emerald-500" />;
+  return <X className="w-4 h-4 text-slate-300" />;
 }
 
 function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
@@ -159,7 +159,7 @@ export function PlayersTableView(props: PlayersTableProps) {
       {/* Desktop Table */}
       <Card className="hidden sm:block overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-0">
+          <table className="w-max min-w-full border-separate border-spacing-0">
             <thead>
               <tr>
                 {/* Sticky left */}
@@ -199,9 +199,11 @@ export function PlayersTableView(props: PlayersTableProps) {
                   <span className="inline-flex items-center gap-1">Registered <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 {/* Sticky right group */}
-                <th className={cn(thBase, "sticky right-[200px] z-20 bg-white border-l border-l-slate-200")}>Activity</th>
-                <th className={cn(thSortable, "sticky right-[72px] z-20 bg-white")} onClick={() => toggleSort("subscription")}>
+                <th className={cn(thSortable, "sticky right-[128px] z-20 bg-white border-l border-l-slate-200")} onClick={() => toggleSort("subscription")}>
                   <span className="inline-flex items-center gap-1">Subscription <SortIcon field="subscription" sortField={sortField} sortDir={sortDir} /></span>
+                </th>
+                <th className={cn(thSortable, "sticky right-[72px] z-20 bg-white !px-2 w-14 text-center")} onClick={() => toggleSort("activity")}>
+                  <span className="inline-flex items-center gap-1">Active <SortIcon field="activity" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 <th className={cn(thBase, "sticky right-0 z-20 bg-white")}>
                   Contact
@@ -299,12 +301,12 @@ export function PlayersTableView(props: PlayersTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-500 whitespace-nowrap")}>
                       {formatDate(player.created_at)}
                     </td>
-                    {/* Sticky right group: activity + subscription + contact */}
-                    <td className={cn(tdBase, "sticky right-[200px] z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
-                      <ActivityBadge status={activity} />
-                    </td>
-                    <td className={cn(tdBase, "sticky right-[72px] z-10 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
+                    {/* Sticky right group: subscription + activity + contact */}
+                    <td className={cn(tdBase, "sticky right-[128px] z-10 border-l border-l-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
                       <SubscriptionBadge status={subStatus} />
+                    </td>
+                    <td className={cn(tdBase, "sticky right-[72px] z-10 !px-2 w-14 text-center transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
+                      <ActivityIcon status={activity} />
                     </td>
                     <td className={cn(tdBase, "sticky right-0 z-10 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
                       <ContactIcons phone={player.phone} email={player.email} />
@@ -325,7 +327,7 @@ export function PlayersTableView(props: PlayersTableProps) {
       </Card>
 
       {/* Mobile Cards */}
-      <div className="sm:hidden space-y-3">
+      <div className="sm:hidden space-y-2">
         {players.map((player) => {
           const latestSub = getLatestSubscription(player);
           const activity = getActivityStatus(player);
@@ -334,93 +336,97 @@ export function PlayersTableView(props: PlayersTableProps) {
           const selected = selectedIds.has(player.id);
           const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
           const showExpiryWarning = daysLeft !== null;
+          const isInactive = activity === "inactive";
           return (
-            <Card
+            <div
               key={player.id}
               id={getRowId(player.id)}
               onClick={(e: React.MouseEvent) => handleRowClick(e, player)}
               className={cn(
-                "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
-                selected && "bg-primary-100 border-primary-200",
-                isHighlighted(player.id) && "row-highlight"
+                "rounded-xl border bg-white p-3.5 cursor-pointer transition-all",
+                selected ? "border-primary-300 bg-primary-50 shadow-sm" : "border-slate-150 hover:border-primary-200 hover:shadow-sm",
+                isHighlighted(player.id) && "row-highlight",
+                isInactive && "opacity-60"
               )}
             >
-              <div className="flex items-start gap-3 mb-2">
+              {/* Header: checkbox + avatar + name + badges */}
+              <div className="flex items-center gap-2.5">
                 <input
                   type="checkbox"
-                  checked={selectedIds.has(player.id)}
+                  checked={selected}
                   onChange={() => toggleSelect(player.id)}
-                  className="table-checkbox mt-0.5"
+                  className="table-checkbox shrink-0"
                 />
-                <div className="flex items-start justify-between flex-1 min-w-0">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
+                <div className={cn(
+                  "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                  isInactive ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary"
+                )}>
+                  {player.first_name[0]}{player.last_name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
                       {player.first_name} {player.last_name}
                     </p>
-                    <p className="text-xs text-slate-400">{player.email}</p>
+                    <ActivityIcon status={activity} />
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                    <ActivityBadge status={activity} />
-                    <SubscriptionBadge status={subStatus} />
-                  </div>
+                  <p className="text-[11px] text-slate-400 truncate">{player.email}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ContactIcons phone={player.phone} email={player.email} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                <div>
-                  <span className="text-slate-400">Group</span>
-                  <p className="text-slate-700 font-medium">
-                    {player.groups?.length ? player.groups.map((g) => g.name).join(", ") : "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Package</span>
-                  <p className="text-slate-700 font-medium">{latestSub?.packages?.name || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Sessions</span>
-                  <p className="font-medium text-slate-700">
-                    {latestSub ? (latestSub.sessions_total === 1 ? latestSub.sessions_remaining : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Expires</span>
-                  <p className={cn(
-                    "font-medium",
-                    showExpiryWarning && daysLeft! <= 3 ? "text-red-600" :
-                    showExpiryWarning && daysLeft! <= 7 ? "text-amber-600" :
-                    "text-slate-700"
-                  )}>
-                    {isSingleSession ? "—" : latestSub?.end_date ? formatDate(latestSub.end_date) : "—"}
-                    {showExpiryWarning && daysLeft! <= 7 && (
-                      <span className="ml-1">({daysLeft! <= 0 ? "Expired" : `${daysLeft}d`})</span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Level</span>
-                  <div className="mt-0.5">
-                    <LevelSelect
-                      playerId={player.id}
-                      currentLevel={player.playing_level}
-                      onLevelChange={onLevelChange}
-                      isChanging={changingLevelId === player.id}
-                    />
-                  </div>
-                </div>
-                {player.health_conditions && (
-                  <div className="col-span-2">
-                    <span className="text-slate-400">Health Conditions</span>
-                    <p className="text-slate-700 font-medium">{player.health_conditions}</p>
-                  </div>
+
+              {/* Info row */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
+                {player.groups?.length ? (
+                  <span className="inline-flex items-center gap-1 text-slate-500">
+                    <Users className="w-3 h-3 text-slate-400" />
+                    {player.groups.map((g) => g.name).join(", ")}
+                  </span>
+                ) : null}
+                {latestSub?.packages?.name && (
+                  <span className="inline-flex items-center gap-1 text-slate-500">
+                    <Package className="w-3 h-3 text-slate-400" />
+                    {latestSub.packages.name}
+                  </span>
                 )}
-                <div>
-                  <span className="text-slate-400">Registered</span>
-                  <p className="text-slate-700 font-medium">
-                    {formatDate(player.created_at)}
-                  </p>
+                {player.playing_level && (
+                  <span className="inline-flex items-center gap-1 text-slate-500">
+                    <Dumbbell className="w-3 h-3 text-slate-400" />
+                    {player.playing_level.charAt(0).toUpperCase() + player.playing_level.slice(1)}
+                  </span>
+                )}
+              </div>
+
+              {/* Bottom row: subscription + sessions + expiry */}
+              <div className="mt-2.5 flex items-center justify-between">
+                <SubscriptionBadge status={subStatus} />
+                <div className="flex items-center gap-3 text-[11px]">
+                  {latestSub && (
+                    <span className="text-slate-600 font-medium">
+                      {latestSub.sessions_total === 1
+                        ? `${latestSub.sessions_remaining} session`
+                        : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`}
+                    </span>
+                  )}
+                  {!isSingleSession && latestSub?.end_date && (
+                    <span className={cn(
+                      "inline-flex items-center gap-0.5",
+                      showExpiryWarning && daysLeft! <= 3 ? "text-red-500 font-medium" :
+                      showExpiryWarning && daysLeft! <= 7 ? "text-amber-500 font-medium" :
+                      "text-slate-400"
+                    )}>
+                      <CalendarDays className="w-3 h-3" />
+                      {formatDate(latestSub.end_date)}
+                      {showExpiryWarning && daysLeft! <= 7 && (
+                        <span className="ml-0.5">({daysLeft! <= 0 ? "Exp" : `${daysLeft}d`})</span>
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
-            </Card>
+            </div>
           );
         })}
         {players.length === 0 && (

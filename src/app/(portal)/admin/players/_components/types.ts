@@ -40,7 +40,7 @@ export type SubscriptionStatus =
   | "pending_payment"
   | "none";
 
-export type SortField = "name" | "date" | "level" | "group" | "package" | "sessions" | "expires" | "subscription";
+export type SortField = "name" | "date" | "level" | "group" | "package" | "sessions" | "expires" | "subscription" | "activity";
 export type SortDir = "asc" | "desc";
 
 /** Pick the most recent subscription (by start_date, falling back to end_date). */

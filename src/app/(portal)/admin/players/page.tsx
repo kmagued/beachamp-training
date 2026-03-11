@@ -241,6 +241,10 @@ function AdminPlayersContent() {
       } else if (sortField === "subscription") {
         const subOrder: Record<string, number> = { active: 0, "expiring soon": 1, attended: 2, expired: 3, pending: 4, none: 5 };
         cmp = (subOrder[getSubscriptionStatus(a)] ?? 99) - (subOrder[getSubscriptionStatus(b)] ?? 99);
+      } else if (sortField === "activity") {
+        const aActive = getActivityStatus(a) === "active" ? 0 : 1;
+        const bActive = getActivityStatus(b) === "active" ? 0 : 1;
+        cmp = aActive - bActive;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -435,14 +439,14 @@ function AdminPlayersContent() {
           <button
             onClick={() => setGroupDropdownOpen((o) => !o)}
             disabled={addingToGroup}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 sm:gap-1.5 text-xs font-medium px-2 sm:px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             <Users className="w-3.5 h-3.5" />
-            Add to Group
+            <span className="hidden sm:inline">Add to</span> Group
             <ChevronDown className="w-3 h-3" />
           </button>
           {groupDropdownOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[200px]">
+            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[200px]">
               {groups.length > 0 ? (
                 groups.map((group) => (
                   <button
@@ -465,14 +469,14 @@ function AdminPlayersContent() {
           <button
             onClick={() => setLevelDropdownOpen((o) => !o)}
             disabled={bulkLevelUpdating}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 sm:gap-1.5 text-xs font-medium px-2 sm:px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
           >
             <GraduationCap className="w-3.5 h-3.5" />
-            Set Level
+            Level
             <ChevronDown className="w-3 h-3" />
           </button>
           {levelDropdownOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
               {[
                 { value: "beginner", label: "Beginner" },
                 { value: "intermediate", label: "Intermediate" },
