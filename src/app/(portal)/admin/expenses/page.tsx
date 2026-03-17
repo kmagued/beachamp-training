@@ -40,6 +40,7 @@ function AdminExpensesContent() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -167,6 +168,10 @@ function AdminExpensesContent() {
       result = result.filter((e) => e.expense_categories?.name === categoryFilter);
     }
 
+    if (paymentStatusFilter) {
+      result = result.filter((e) => e.payment_status === paymentStatusFilter);
+    }
+
     return [...result].sort((a, b) => {
       let cmp = 0;
       if (sortField === "date") {
@@ -178,7 +183,7 @@ function AdminExpensesContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [expenses, tab, typeFilter, search, monthFilter, categoryFilter, sortField, sortDir]);
+  }, [expenses, tab, typeFilter, paymentStatusFilter, search, monthFilter, categoryFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredExpenses.length / pageSize);
@@ -189,7 +194,7 @@ function AdminExpensesContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, monthFilter, categoryFilter, typeFilter, tab]);
+  }, [search, monthFilter, categoryFilter, typeFilter, paymentStatusFilter, tab]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -225,9 +230,10 @@ function AdminExpensesContent() {
     setMonthFilter("");
     setCategoryFilter("");
     setTypeFilter("");
+    setPaymentStatusFilter("");
   }
 
-  const hasActiveFilters = !!search || !!monthFilter || !!categoryFilter || !!typeFilter;
+  const hasActiveFilters = !!search || !!monthFilter || !!categoryFilter || !!typeFilter || !!paymentStatusFilter;
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
   return (
@@ -330,6 +336,8 @@ function AdminExpensesContent() {
             monthOptions={monthOptions}
             typeFilter={typeFilter}
             onTypeFilterChange={setTypeFilter}
+            paymentStatusFilter={paymentStatusFilter}
+            onPaymentStatusFilterChange={setPaymentStatusFilter}
             sortField={sortField}
             sortDir={sortDir}
             onSortChange={toggleSort}

@@ -20,6 +20,8 @@ interface ExpensesFiltersProps {
   monthOptions: readonly string[];
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
+  paymentStatusFilter: string;
+  onPaymentStatusFilterChange: (value: string) => void;
   sortField: SortField;
   sortDir: SortDir;
   onSortChange: (field: SortField) => void;
@@ -38,13 +40,15 @@ export function ExpensesFilters({
   monthOptions,
   typeFilter,
   onTypeFilterChange,
+  paymentStatusFilter,
+  onPaymentStatusFilterChange,
   sortField,
   sortDir,
   onSortChange,
   onReset,
   hasActiveFilters,
 }: ExpensesFiltersProps) {
-  const activeFilterCount = [categoryFilter, monthFilter, typeFilter].filter(Boolean).length;
+  const activeFilterCount = [categoryFilter, monthFilter, typeFilter, paymentStatusFilter].filter(Boolean).length;
 
   const filterDropdowns = (
     <>
@@ -76,6 +80,16 @@ export function ExpensesFilters({
         <option value="">All Types</option>
         <option value="one-time">One-time</option>
         <option value="recurring">Recurring</option>
+      </select>
+      <select
+        value={paymentStatusFilter}
+        onChange={(e) => onPaymentStatusFilterChange(e.target.value)}
+        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
+      >
+        <option value="">All Payment</option>
+        <option value="paid_full">Paid</option>
+        <option value="partially_paid">Partial</option>
+        <option value="payment_due">Due</option>
       </select>
       {hasActiveFilters && (
         <button

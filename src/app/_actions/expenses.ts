@@ -45,8 +45,7 @@ export async function createExpense(formData: FormData) {
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };
 
-  const expenseDate = formData.get("expense_date") as string;
-  if (!expenseDate) return { error: "Date is required" };
+  const expenseDate = (formData.get("expense_date") as string) || new Date().toISOString().split("T")[0];
 
   const isRecurring = formData.get("is_recurring") === "true";
   const recurrenceType = isRecurring ? (formData.get("recurrence_type") as string) : null;
@@ -95,8 +94,7 @@ export async function updateExpense(id: string, formData: FormData) {
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };
 
-  const expenseDate = formData.get("expense_date") as string;
-  if (!expenseDate) return { error: "Date is required" };
+  const expenseDate = (formData.get("expense_date") as string) || new Date().toISOString().split("T")[0];
 
   const isRecurring = formData.get("is_recurring") === "true";
   const recurrenceType = isRecurring ? (formData.get("recurrence_type") as string) : null;

@@ -111,7 +111,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setCategoryId(editingExpense.category_id);
         setDescription(editingExpense.description);
         setAmount(String(editingExpense.amount));
-        setExpenseDate(editingExpense.expense_date);
+        setExpenseDate(editingExpense.expense_date || new Date().toISOString().split("T")[0]);
         setIsRecurring(editingExpense.is_recurring);
         setRecurrenceType(editingExpense.recurrence_type || "monthly");
         setNotes(editingExpense.notes || "");
@@ -155,11 +155,11 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     formData.set("category_id", categoryId);
     formData.set("description", description);
     formData.set("amount", amount);
-    formData.set("expense_date", expenseDate);
+    formData.set("payment_status", paymentStatus);
+    formData.set("expense_date", paymentStatus === "payment_due" ? new Date().toISOString().split("T")[0] : expenseDate);
     formData.set("is_recurring", String(isRecurring));
     if (isRecurring) formData.set("recurrence_type", recurrenceType);
     formData.set("notes", notes);
-    formData.set("payment_status", paymentStatus);
     if (paymentStatus === "partially_paid" && paidAmount) formData.set("paid_amount", paidAmount);
     if (paymentStatus === "payment_due" && dueDate) formData.set("due_date", dueDate);
     if (isCourtReservation && useCourtCalculator) {
@@ -428,41 +428,6 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
           />
         </div>
 
-        <div>
-          <Label required>Date</Label>
-          <DatePicker
-            value={expenseDate}
-            onChange={(e) => setExpenseDate(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="is_recurring"
-            checked={isRecurring}
-            onChange={(e) => setIsRecurring(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20"
-          />
-          <label htmlFor="is_recurring" className="text-sm font-medium text-slate-700">
-            Recurring expense
-          </label>
-        </div>
-
-        {isRecurring && (
-          <div>
-            <Label required>Recurrence</Label>
-            <select
-              value={recurrenceType}
-              onChange={(e) => setRecurrenceType(e.target.value)}
-              className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              <option value="monthly">Monthly</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </div>
-        )}
-
         {/* Payment status */}
         <div>
           <Label>Payment Status</Label>
@@ -498,6 +463,43 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
+          </div>
+        )}
+
+        {paymentStatus !== "payment_due" && (
+          <div>
+            <Label required>Date</Label>
+            <DatePicker
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="is_recurring"
+            checked={isRecurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20"
+          />
+          <label htmlFor="is_recurring" className="text-sm font-medium text-slate-700">
+            Recurring expense
+          </label>
+        </div>
+
+        {isRecurring && (
+          <div>
+            <Label required>Recurrence</Label>
+            <select
+              value={recurrenceType}
+              onChange={(e) => setRecurrenceType(e.target.value)}
+              className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            >
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+            </select>
           </div>
         )}
 
