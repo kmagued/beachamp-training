@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
 import { useRouter } from "next/navigation";
-import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance, deletePlayer } from "../[id]/actions";
+import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import type { PlayerRow, ActivityStatus, SubscriptionStatus } from "./types";
 import { getActivityStatus, getSubscriptionStatus } from "./types";
@@ -121,9 +121,11 @@ function DrawerContent({
   const [isResetting, startResetTransition] = useTransition();
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [editingSessions, setEditingSessions] = useState(false);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editRemaining, setEditRemaining] = useState(0);
   const [editTotal, setEditTotal] = useState(0);
   const [isSavingSessions, startSessionsTransition] = useTransition();
+  const [isFreezing, startFreezeTransition] = useTransition();
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
@@ -176,13 +178,21 @@ function DrawerContent({
   const activity = getActivityStatus(player);
   const subStatus = getSubscriptionStatus(player);
   const now = Date.now();
-  const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
-  // Current subscription: covers today's date
-  const activeSub = activeSubs.find((s) => {
+  const activeSubs = player.subscriptions?.filter((s) => (s.status === "active" || s.status === "pending") && s.sessions_remaining > 0 && (!s.end_date || new Date(s.end_date).getTime() >= Date.now())) || [];
+  const pendingPaymentSub = player.subscriptions?.find((s) => s.status === "pending_payment") || null;
+  const frozenSub = player.subscriptions?.find((s) => s.status === "frozen") || null;
+  // Current subscriptions: cover today's date (or have no date bounds)
+  const currentActiveSubs = activeSubs.filter((s) => {
     const start = s.start_date ? new Date(s.start_date).getTime() : 0;
     const end = s.end_date ? new Date(s.end_date).getTime() : Infinity;
     return start <= now && now <= end;
-  }) || activeSubs.find((s) => !s.start_date || !s.end_date || new Date(s.end_date).getTime() < now) || null;
+  });
+  // If none match date range, include ones without proper dates
+  if (currentActiveSubs.length === 0) {
+    const fallback = activeSubs.find((s) => !s.start_date || !s.end_date || new Date(s.end_date).getTime() < now);
+    if (fallback) currentActiveSubs.push(fallback);
+  }
+  const activeSub = currentActiveSubs[0] || null;
   // Upcoming subscription: start_date in the future
   const upcomingSub = activeSubs.find((s) => s.start_date && new Date(s.start_date).getTime() > now) || null;
   const initials = `${player.first_name?.[0] ?? ""}${player.last_name?.[0] ?? ""}`.toUpperCase();
@@ -219,20 +229,21 @@ function DrawerContent({
           </div>
         </div>
 
-        {/* Active subscription card */}
-        {activeSub && (() => {
-          const isSingleSession = activeSub.sessions_total === 1;
-          const daysLeft = activeSub.end_date
-            ? Math.ceil((new Date(activeSub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        {/* Active subscription cards */}
+        {currentActiveSubs.map((sub) => {
+          const isSingleSession = sub.sessions_total === 1;
+          const daysLeft = sub.end_date
+            ? Math.ceil((new Date(sub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : null;
           const isExpiringSoon = !isSingleSession && daysLeft !== null && daysLeft <= 7;
           const isExpired = !isSingleSession && daysLeft !== null && daysLeft <= 0;
-          const sessionsLow = !isSingleSession && activeSub.sessions_remaining <= 2;
-          const sessionsOut = !isSingleSession && activeSub.sessions_remaining <= 0;
-          const isAttended = isSingleSession && activeSub.sessions_remaining <= 0;
+          const sessionsLow = !isSingleSession && sub.sessions_remaining <= 2;
+          const sessionsOut = !isSingleSession && sub.sessions_remaining <= 0;
+          const isAttended = isSingleSession && sub.sessions_remaining <= 0;
+          const isBeingEdited = editingSessions && editingSubId === sub.id;
 
           return (
-            <div className={cn(
+            <div key={sub.id} className={cn(
               "rounded-xl border bg-white",
               isAttended ? "border-emerald-200" :
               isExpired || sessionsOut ? "border-red-200" :
@@ -246,13 +257,13 @@ function DrawerContent({
                   <Dumbbell className="w-4 h-4 text-slate-400 shrink-0" />
                   <div>
                     <p className="text-xs text-slate-400">Package</p>
-                    <p className="text-sm text-slate-700 font-medium">{activeSub.packages?.name || "—"}</p>
+                    <p className="text-sm text-slate-700 font-medium">{sub.packages?.name || "—"}</p>
                   </div>
                 </div>
                 <div className="flex items-start justify-between px-4 py-3">
                   <div className="flex-1">
                     <p className="text-xs text-slate-400">Sessions</p>
-                    {editingSessions ? (
+                    {isBeingEdited ? (
                       <>
                         <div className="flex items-center gap-1.5 mt-1">
                           <input
@@ -274,11 +285,12 @@ function DrawerContent({
                             onClick={() => {
                               startSessionsTransition(async () => {
                                 setSessionError(null);
-                                const res = await updateSubscriptionBalance(activeSub.id, editRemaining, editTotal);
+                                const res = await updateSubscriptionBalance(sub.id, editRemaining, editTotal);
                                 if ("error" in res) {
                                   setSessionError(res.error ?? "Failed to update balance");
                                 } else {
                                   setEditingSessions(false);
+                                  setEditingSubId(null);
                                   onDataChange();
                                 }
                               });
@@ -289,7 +301,7 @@ function DrawerContent({
                             {isSavingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                           </button>
                           <button
-                            onClick={() => setEditingSessions(false)}
+                            onClick={() => { setEditingSessions(false); setEditingSubId(null); }}
                             className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -303,12 +315,13 @@ function DrawerContent({
                           "text-sm font-medium",
                           sessionsOut ? "text-red-600" : sessionsLow ? "text-amber-600" : "text-slate-700"
                         )}>
-                          {activeSub.sessions_total === 1 ? activeSub.sessions_remaining : `${activeSub.sessions_remaining}/${activeSub.sessions_total}`} remaining
+                          {sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`} remaining
                         </p>
                         <button
                           onClick={() => {
-                            setEditRemaining(activeSub.sessions_remaining);
-                            setEditTotal(activeSub.sessions_total);
+                            setEditRemaining(sub.sessions_remaining);
+                            setEditTotal(sub.sessions_total);
+                            setEditingSubId(sub.id);
                             setEditingSessions(true);
                           }}
                           className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
@@ -326,8 +339,8 @@ function DrawerContent({
                       isExpired ? "text-red-600 font-medium" :
                       isExpiringSoon ? "text-amber-600 font-medium" : "text-slate-700"
                     )}>
-                      {activeSub.end_date
-                        ? formatDate(activeSub.end_date)
+                      {sub.end_date
+                        ? formatDate(sub.end_date)
                         : "—"}
                     </p>
                   </div>
@@ -346,15 +359,81 @@ function DrawerContent({
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {isExpired ? "Subscription expired" :
                      sessionsOut ? "No sessions remaining" :
-                     isExpiringSoon && sessionsLow ? `${daysLeft}d left, ${activeSub.sessions_remaining} sessions remaining` :
+                     isExpiringSoon && sessionsLow ? `${daysLeft}d left, ${sub.sessions_remaining} sessions remaining` :
                      isExpiringSoon ? `Expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}` :
-                     `Only ${activeSub.sessions_remaining} session${activeSub.sessions_remaining === 1 ? "" : "s"} remaining`}
+                     `Only ${sub.sessions_remaining} session${sub.sessions_remaining === 1 ? "" : "s"} remaining`}
+                  </div>
+                )}
+                {!isSingleSession && !isAttended && !isExpired && !sessionsOut && (
+                  <div className="px-4 py-2 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        startFreezeTransition(async () => {
+                          const res = await freezeSubscription(sub.id);
+                          if ("error" in res) setSessionError(res.error ?? "Failed to freeze");
+                          else onDataChange();
+                        });
+                      }}
+                      disabled={isFreezing}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      {isFreezing ? "Freezing..." : "Freeze Membership"}
+                    </button>
                   </div>
                 )}
               </div>
             </div>
           );
-        })()}
+        })}
+
+        {/* Frozen subscription card */}
+        {frozenSub && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/30">
+            <div className="px-4 py-3 border-b border-blue-100">
+              <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Frozen Membership</p>
+            </div>
+            <div className="divide-y divide-blue-100">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Dumbbell className="w-4 h-4 text-blue-400 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400">Package</p>
+                  <p className="text-sm text-slate-700 font-medium">{frozenSub.packages?.name || "—"}</p>
+                </div>
+              </div>
+              <div className="flex items-start justify-between px-4 py-3">
+                <div>
+                  <p className="text-xs text-slate-400">Sessions</p>
+                  <p className="text-sm text-slate-700 font-medium">
+                    {frozenSub.sessions_total === 1 ? frozenSub.sessions_remaining : `${frozenSub.sessions_remaining}/${frozenSub.sessions_total}`} remaining
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">Days Left</p>
+                  <p className="text-sm text-blue-600 font-medium">
+                    {frozenSub.end_date
+                      ? Math.max(0, Math.ceil((new Date(frozenSub.end_date).getTime() - new Date(frozenSub.start_date || Date.now()).getTime()) / (1000 * 60 * 60 * 24)))
+                      : "—"} days paused
+                  </p>
+                </div>
+              </div>
+              <div className="px-4 py-2">
+                <button
+                  onClick={() => {
+                    startFreezeTransition(async () => {
+                      const res = await unfreezeSubscription(frozenSub.id);
+                      if ("error" in res) setSessionError(res.error ?? "Failed to unfreeze");
+                      else onDataChange();
+                    });
+                  }}
+                  disabled={isFreezing}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  {isFreezing ? "Unfreezing..." : "Unfreeze Membership"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Upcoming subscription card */}
         {upcomingSub && (
@@ -385,6 +464,27 @@ function DrawerContent({
                       : "—"}
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending payment subscription card */}
+        {pendingPaymentSub && (
+          <div className="rounded-xl border border-red-200 bg-red-50/30">
+            <div className="px-4 py-3 border-b border-red-100">
+              <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Unpaid Sessions</p>
+            </div>
+            <div className="flex items-start justify-between px-4 py-3">
+              <div>
+                <p className="text-xs text-slate-400">Package</p>
+                <p className="text-sm text-slate-700 font-medium">{pendingPaymentSub.packages?.name || "—"}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-400">Sessions Owed</p>
+                <p className="text-sm text-red-600 font-bold">
+                  -{pendingPaymentSub.sessions_total - pendingPaymentSub.sessions_remaining}
+                </p>
               </div>
             </div>
           </div>

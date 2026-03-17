@@ -8,7 +8,7 @@ import { Pagination, SelectionBar, Button } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { Plus, Users, ChevronDown, Loader2, Check, GraduationCap } from "lucide-react";
 import type { PlayerRow, SortField, SortDir } from "./_components/types";
-import { getActivityStatus, getSubscriptionStatus, getLatestSubscription } from "./_components/types";
+import { getActivityStatus, getSubscriptionStatus, getLatestSubscription, isEffectivelyActive } from "./_components/types";
 import { updatePlayerLevel, bulkUpdatePlayerLevel } from "./[id]/actions";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
 import { PlayersFilters } from "./_components/filters";
@@ -75,7 +75,7 @@ function AdminPlayersContent() {
   );
 
   const fetchPlayers = useCallback(async () => {
-    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
     const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }] = await Promise.all([
       supabase
@@ -87,7 +87,7 @@ function AdminPlayersContent() {
         .from("attendance")
         .select("player_id, session_date")
         .eq("status", "present")
-        .gte("session_date", twoWeeksAgo)
+        .gte("session_date", thirtyDaysAgo)
         .order("session_date", { ascending: false }),
       supabase
         .from("group_players")
@@ -122,6 +122,11 @@ function AdminPlayersContent() {
         groups: playerGroupsMap[p.id] || [],
       }));
       setPlayers(playersWithData);
+      // Keep drawer player in sync with refreshed data
+      setDrawerPlayer((prev) => {
+        if (!prev) return null;
+        return playersWithData.find((p) => p.id === prev.id) || null;
+      });
     }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,7 +154,7 @@ function AdminPlayersContent() {
     const names = new Set<string>();
     players.forEach((p) => {
       p.subscriptions?.forEach((s) => {
-        if (s.packages?.name) names.add(s.packages.name);
+        if (s.packages?.name && s.sessions_total > 1 && isEffectivelyActive(s)) names.add(s.packages.name);
       });
     });
     return Array.from(names).sort();
@@ -195,8 +200,8 @@ function AdminPlayersContent() {
       }
       if (packageFilter) {
         const selected = packageFilter.split(",");
-        const latestPackage = getLatestSubscription(p)?.packages?.name;
-        if (!latestPackage || !selected.includes(latestPackage)) return false;
+        const activePackages = p.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1).map((s) => s.packages?.name) || [];
+        if (!activePackages.some((name) => name && selected.includes(name))) return false;
       }
       if (groupFilter) {
         const selected = groupFilter.split(",");
@@ -225,12 +230,16 @@ function AdminPlayersContent() {
         const bGroup = b.groups?.[0]?.name ?? "";
         cmp = aGroup.localeCompare(bGroup);
       } else if (sortField === "package") {
-        const aName = getLatestSubscription(a)?.packages?.name ?? "";
-        const bName = getLatestSubscription(b)?.packages?.name ?? "";
+        const aActiveSubs = a.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+        const bActiveSubs = b.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+        const aName = aActiveSubs[0]?.packages?.name ?? "";
+        const bName = bActiveSubs[0]?.packages?.name ?? "";
         cmp = aName.localeCompare(bName);
       } else if (sortField === "sessions") {
-        const aSess = getLatestSubscription(a)?.sessions_remaining ?? -1;
-        const bSess = getLatestSubscription(b)?.sessions_remaining ?? -1;
+        const aActiveSubs = a.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+        const bActiveSubs = b.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+        const aSess = aActiveSubs.reduce((sum, s) => sum + s.sessions_remaining, 0) || -1;
+        const bSess = bActiveSubs.reduce((sum, s) => sum + s.sessions_remaining, 0) || -1;
         cmp = aSess - bSess;
       } else if (sortField === "expires") {
         const aEnd = getLatestSubscription(a)?.end_date;

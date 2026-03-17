@@ -6,6 +6,7 @@ import { Card, Badge, EmptyState } from "@/components/ui";
 import { Package, ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
+import { FreezeButton } from "./freeze-button";
 
 interface SubWithPackage extends Subscription {
   packages: { name: string; session_count: number; price: number } | null;
@@ -47,6 +48,8 @@ export default async function PlayerSubscriptionsPage() {
         return { label: "Expired", variant: "neutral" as const, reason: null };
       case "cancelled":
         return { label: "Cancelled", variant: "danger" as const, reason: null };
+      case "frozen":
+        return { label: "Frozen", variant: "info" as const, reason: null };
       default:
         return { label: sub.status, variant: "neutral" as const, reason: null };
     }
@@ -110,6 +113,8 @@ export default async function PlayerSubscriptionsPage() {
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
                       Message
                     </th>
+                    <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,6 +149,15 @@ export default async function PlayerSubscriptionsPage() {
                             <span className="text-amber-500">Payment required</span>
                           ) : (
                             "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {(sub.status === "active" || sub.status === "frozen") && sub.sessions_total > 1 && (
+                            <FreezeButton
+                              subscriptionId={sub.id}
+                              status={sub.status}
+                              packageName={sub.packages?.name || "Package"}
+                            />
                           )}
                         </td>
                       </tr>
@@ -198,6 +212,15 @@ export default async function PlayerSubscriptionsPage() {
                       ) : (
                         <span className="text-amber-500">Awaiting confirmation</span>
                       )}
+                    </div>
+                  )}
+                  {(sub.status === "active" || sub.status === "frozen") && sub.sessions_total > 1 && (
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      <FreezeButton
+                        subscriptionId={sub.id}
+                        status={sub.status}
+                        packageName={sub.packages?.name || "Package"}
+                      />
                     </div>
                   )}
                 </Card>

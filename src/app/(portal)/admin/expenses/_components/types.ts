@@ -14,6 +14,9 @@ export interface ExpenseRow {
   court_count: number | null;
   court_hours: number | null;
   court_hourly_rate: number | null;
+  payment_status: "paid_full" | "partially_paid" | "payment_due";
+  paid_amount: number | null;
+  due_date: string | null;
   expense_categories: { id: string; name: string; icon: string | null };
 }
 
@@ -28,4 +31,4 @@ export interface CategoryRow {
 
 export type SortField = "date" | "amount" | "category";
 export type SortDir = "asc" | "desc";
-export type ExpenseTab = "all" | "one-time" | "recurring" | "categories";
+export type ExpenseTab = "all" | "one-time" | "recurring" | "by-category" | "categories";

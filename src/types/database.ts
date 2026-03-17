@@ -6,7 +6,7 @@
 export type UserRole = "player" | "coach" | "admin";
 export type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
 export type GroupLevel = "beginner" | "intermediate" | "advanced" | "mixed";
-export type SubscriptionStatus = "pending" | "pending_payment" | "active" | "expired" | "cancelled";
+export type SubscriptionStatus = "pending" | "pending_payment" | "active" | "expired" | "cancelled" | "frozen";
 export type PaymentMethod = "instapay" | "cash";
 export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";

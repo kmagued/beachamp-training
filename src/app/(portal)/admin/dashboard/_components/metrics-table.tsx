@@ -34,14 +34,12 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
     return [...months].filter((m) => m <= currentMonth).sort((a, b) => b.localeCompare(a));
   }, [attendanceRecords, subscriptions]);
 
-  const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState("all");
 
   const metrics = useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const monthStart = new Date(y, m - 1, 1);
-    const monthEnd = new Date(y, m, 0); // last day of month
-    const monthStartISO = monthStart.toISOString().split("T")[0];
-    const monthEndISO = monthEnd.toISOString().split("T")[0];
+    const isAllTime = selectedMonth === "all";
+    const monthStartISO = isAllTime ? "0000-01-01" : (() => { const [y, m] = selectedMonth.split("-").map(Number); return new Date(y, m - 1, 1).toISOString().split("T")[0]; })();
+    const monthEndISO = isAllTime ? "9999-12-31" : (() => { const [y, m] = selectedMonth.split("-").map(Number); return new Date(y, m, 0).toISOString().split("T")[0]; })();
 
     // Attendance rate: present players / expected players per session
     const monthAttendance = attendanceRecords.filter((a) => a.session_date >= monthStartISO && a.session_date <= monthEndISO);
@@ -70,17 +68,15 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
     });
     const attendanceRate = expectedAtt > 0 ? Math.round((presentAtt / expectedAtt) * 100) : 0;
 
-    // Active players at end of month: those with active subscriptions overlapping the month
+    // Active players: those with active subscriptions overlapping the period
     const activePlayers = new Set<string>();
     subscriptions.forEach((s) => {
       if (s.status === "active" || s.status === "expired" || s.status === "cancelled") {
-        // Was active during this month?
         const created = s.created_at.split("T")[0];
         const ended = s.end_date || "9999-12-31";
         if (created <= monthEndISO && ended >= monthStartISO && s.status !== "cancelled") {
           activePlayers.add(s.player_id);
         }
-        // For expired/cancelled, check if they were active during the month
         if ((s.status === "expired" || s.status === "cancelled") && ended >= monthStartISO && ended <= monthEndISO) {
           activePlayers.add(s.player_id);
         }
@@ -90,7 +86,7 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
       }
     });
 
-    // Churned this month: subscriptions that expired/cancelled in this month
+    // Churned: subscriptions that expired/cancelled in the period
     const churnedPlayers = new Set<string>();
     subscriptions.forEach((s) => {
       if ((s.status === "expired" || s.status === "cancelled") && s.end_date) {
@@ -112,22 +108,18 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
       ? Math.round((churnedCount / (activeCount + churnedCount)) * 100)
       : 0;
 
-    // Capacity for selected month: players who joined on or before month end and were still active (or joined during the month)
+    // Capacity: players who joined on or before period end
     const monthGroupPlayers = groupPlayers.filter((gp) => {
       const joined = gp.joined_at;
-      // Player must have joined on or before the end of the month
       if (joined > monthEndISO) return false;
-      // If still active, they were in the group during this month
       if (gp.is_active) return true;
-      // If inactive, they were in the group if they joined before month end
-      // (we don't have a left_at date, so assume they were present if joined before month end)
       return true;
     });
     const totalGroupPlayers = monthGroupPlayers.length;
     const totalCapacity = groups.reduce((s, g) => s + g.max_players, 0);
     const capacityRate = totalCapacity > 0 ? Math.round((totalGroupPlayers / totalCapacity) * 100) : 0;
 
-    // New members this month
+    // New members in the period
     const newMembers = profiles.filter((p) => {
       const created = p.created_at.split("T")[0];
       return created >= monthStartISO && created <= monthEndISO;
@@ -154,6 +146,7 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
           onChange={(e) => setSelectedMonth(e.target.value)}
           className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
+          <option value="all">All Time</option>
           {monthOptions.map((key) => (
             <option key={key} value={key}>{monthLabel(key)}</option>
           ))}

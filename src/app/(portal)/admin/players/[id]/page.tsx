@@ -82,7 +82,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
     paymentsBySub[p.subscription_id].push(p);
   }
 
-  const activeSub = subs.find((s) => s.status === "active");
+  const activeSubs = subs.filter((s) => (s.status === "active" || s.status === "pending") && s.sessions_remaining > 0 && (!s.end_date || new Date(s.end_date).getTime() >= Date.now()));
   const totalPaid = pays.filter((p) => p.status === "confirmed").reduce((sum, p) => sum + p.amount, 0);
 
   return (
@@ -97,8 +97,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
 
       <PlayerHeader player={player} actions={<PlayerActionsMenu player={player} />} />
       <ProfileCard player={player} />
-      <PlayerStats subsCount={subs.length} activeSub={activeSub} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
-      <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} />
+      <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
+      <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />
       <SessionHistory attendance={attendanceRows} feedback={feedbackRows} />
     </div>
   );

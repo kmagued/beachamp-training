@@ -4,7 +4,7 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2, Check, X, Users, Packag
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import type { PlayerRow, SortField, SortDir, ActivityStatus, SubscriptionStatus } from "./types";
-import { getActivityStatus, getSubscriptionStatus, getLatestSubscription } from "./types";
+import { getActivityStatus, getSubscriptionStatus, getLatestSubscription, isEffectivelyActive } from "./types";
 
 function getDaysLeft(endDate: string | null): number | null {
   if (!endDate) return null;
@@ -51,6 +51,7 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
     case "expired": return <Badge variant="danger">Expired</Badge>;
     case "pending": return <Badge variant="warning">Pending Confirmation</Badge>;
     case "pending_payment": return <Badge variant="warning">Pending Payment</Badge>;
+    case "frozen": return <Badge variant="info">Frozen</Badge>;
     case "none": return <Badge variant="neutral">No Sub</Badge>;
   }
 }
@@ -254,11 +255,37 @@ export function PlayersTableView(props: PlayersTableProps) {
                         ? player.groups.map((g) => g.name).join(", ")
                         : "—"}
                     </td>
-                    <td className={cn(tdBase, "text-sm text-slate-700 whitespace-nowrap")}>
-                      {latestSub?.packages?.name || "—"}
-                    </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
-                      {latestSub ? (latestSub.sessions_total === 1 ? latestSub.sessions_remaining : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`) : "—"}
+                      {(() => {
+                        const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+                        if (activeSubs.length > 1) {
+                          return activeSubs.map((s) => (
+                            <div key={s.id} className="whitespace-nowrap">{s.packages?.name || "—"}</div>
+                          ));
+                        }
+                        if (activeSubs.length === 1) return activeSubs[0].packages?.name || "—";
+                        return "—";
+                      })()}
+                    </td>
+                    <td className={cn(tdBase, "text-sm", latestSub?.status === "pending_payment" ? "text-red-600 font-medium" : "text-slate-700")}>
+                      {(() => {
+                        const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+                        if (activeSubs.length > 1) {
+                          return activeSubs.map((s) => (
+                            <div key={s.id} className="whitespace-nowrap">
+                              {`${s.sessions_remaining}/${s.sessions_total}`}
+                            </div>
+                          ));
+                        }
+                        if (activeSubs.length === 1) {
+                          const s = activeSubs[0];
+                          return `${s.sessions_remaining}/${s.sessions_total}`;
+                        }
+                        if (latestSub?.status === "pending_payment") {
+                          return `-${latestSub.sessions_total - latestSub.sessions_remaining}`;
+                        }
+                        return "—";
+                      })()}
                     </td>
                     <td className={cn(tdBase, "text-sm whitespace-nowrap")}>
                       {isSingleSession ? "—" : latestSub?.end_date ? (
@@ -346,7 +373,6 @@ export function PlayersTableView(props: PlayersTableProps) {
                 "rounded-xl border bg-white p-3.5 cursor-pointer transition-all",
                 selected ? "border-primary-300 bg-primary-50 shadow-sm" : "border-slate-150 hover:border-primary-200 hover:shadow-sm",
                 isHighlighted(player.id) && "row-highlight",
-                isInactive && "opacity-60"
               )}
             >
               {/* Header: checkbox + avatar + name + badges */}
@@ -385,12 +411,26 @@ export function PlayersTableView(props: PlayersTableProps) {
                     {player.groups.map((g) => g.name).join(", ")}
                   </span>
                 ) : null}
-                {latestSub?.packages?.name && (
-                  <span className="inline-flex items-center gap-1 text-slate-500">
-                    <Package className="w-3 h-3 text-slate-400" />
-                    {latestSub.packages.name}
-                  </span>
-                )}
+                {(() => {
+                  const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+                  if (activeSubs.length > 1) {
+                    return activeSubs.map((s) => (
+                      <span key={s.id} className="inline-flex items-center gap-1 text-slate-500">
+                        <Package className="w-3 h-3 text-slate-400" />
+                        {s.packages?.name}: {s.sessions_remaining}/{s.sessions_total}
+                      </span>
+                    ));
+                  }
+                  if (activeSubs.length === 1) {
+                    return (
+                      <span className="inline-flex items-center gap-1 text-slate-500">
+                        <Package className="w-3 h-3 text-slate-400" />
+                        {activeSubs[0].packages?.name}: {activeSubs[0].sessions_remaining}/{activeSubs[0].sessions_total}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
                 {player.playing_level && (
                   <span className="inline-flex items-center gap-1 text-slate-500">
                     <Dumbbell className="w-3 h-3 text-slate-400" />
@@ -404,10 +444,15 @@ export function PlayersTableView(props: PlayersTableProps) {
                 <SubscriptionBadge status={subStatus} />
                 <div className="flex items-center gap-3 text-[11px]">
                   {latestSub && (
-                    <span className="text-slate-600 font-medium">
-                      {latestSub.sessions_total === 1
-                        ? `${latestSub.sessions_remaining} session`
-                        : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`}
+                    <span className={cn(
+                      "font-medium",
+                      latestSub.status === "pending_payment" ? "text-red-600" : "text-slate-600"
+                    )}>
+                      {latestSub.status === "pending_payment"
+                        ? `-${latestSub.sessions_total - latestSub.sessions_remaining}`
+                        : latestSub.sessions_total === 1
+                          ? `${latestSub.sessions_remaining} session`
+                          : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`}
                     </span>
                   )}
                   {!isSingleSession && latestSub?.end_date && (

@@ -21,6 +21,14 @@ import {
 } from "lucide-react";
 import type { AttendanceStatus } from "@/types/database";
 
+interface PlayerSubscription {
+  id: string;
+  remaining: number;
+  status: string;
+  end_date: string | null;
+  package_name: string;
+}
+
 interface PlayerRow {
   id: string;
   first_name: string;
@@ -29,6 +37,7 @@ interface PlayerRow {
   sessions_remaining: number | null;
   subscription_status: string | null;
   subscription_end_date: string | null;
+  subscriptions: PlayerSubscription[];
 }
 
 interface AttendanceRecord {
@@ -75,6 +84,7 @@ export function AttendanceTab({
   const [savedRecords, setSavedRecords] = useState<Map<string, AttendanceRecord>>(new Map());
   const [packages, setPackages] = useState<{ id: string; price: number; name: string; session_count: number }[]>([]);
   const [paymentDialog, setPaymentDialog] = useState<{ players: PlayerRow[]; playerPackages: Record<string, string> } | null>(null);
+  const [chosenSubs, setChosenSubs] = useState<Record<string, string>>({});
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -104,14 +114,29 @@ export function AttendanceTab({
 
       const { data: subscriptions } = await supabase
         .from("subscriptions")
-        .select("player_id, sessions_remaining, status, end_date")
+        .select("id, player_id, sessions_remaining, status, end_date, packages(name)")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
-        .eq("status", "active");
+        .in("status", ["active", "pending"])
+        .order("created_at", { ascending: false });
 
-      const subMap = new Map<string, { remaining: number; status: string; end_date: string | null }>();
+      const subMap = new Map<string, PlayerSubscription[]>();
       if (subscriptions) {
         for (const sub of subscriptions) {
-          subMap.set(sub.player_id, { remaining: sub.sessions_remaining, status: sub.status, end_date: sub.end_date });
+          // Skip effectively expired subs (no sessions left or past end date)
+          if (sub.sessions_remaining <= 0) continue;
+          if (sub.end_date && new Date(sub.end_date).getTime() < Date.now()) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pkgName = (sub as any).packages?.name || "Package";
+          const entry: PlayerSubscription = {
+            id: sub.id,
+            remaining: sub.sessions_remaining,
+            status: sub.status,
+            end_date: sub.end_date,
+            package_name: pkgName,
+          };
+          const existing = subMap.get(sub.player_id) || [];
+          existing.push(entry);
+          subMap.set(sub.player_id, existing);
         }
       }
 
@@ -133,15 +158,18 @@ export function AttendanceTab({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const playerRows: PlayerRow[] = groupPlayers.map((gp: any) => {
-        const sub = subMap.get(gp.profiles?.id);
+        const subs = subMap.get(gp.profiles?.id) || [];
+        const primarySub = subs[0] || null;
+        const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
         return {
           id: gp.profiles?.id || "",
           first_name: gp.profiles?.first_name || "",
           last_name: gp.profiles?.last_name || "",
           avatar_url: gp.profiles?.avatar_url,
-          sessions_remaining: sub?.remaining ?? null,
-          subscription_status: sub?.status ?? null,
-          subscription_end_date: sub?.end_date ?? null,
+          sessions_remaining: subs.length > 0 ? totalRemaining : null,
+          subscription_status: primarySub?.status ?? null,
+          subscription_end_date: primarySub?.end_date ?? null,
+          subscriptions: subs,
         };
       }).filter((p: PlayerRow) => p.id);
 
@@ -274,6 +302,20 @@ export function AttendanceTab({
       setPaymentDialog(null);
     }
 
+    // Pre-select subscription for multi-sub players marked present
+    const defaults: Record<string, string> = {};
+    for (const player of players) {
+      const record = records.get(player.id);
+      if (record?.status !== "present") continue;
+      const activeSubs = player.subscriptions.filter((s) => s.remaining > 0);
+      if (activeSubs.length >= 1 && !chosenSubs[player.id]) {
+        defaults[player.id] = activeSubs[0].id;
+      }
+    }
+    if (Object.keys(defaults).length > 0) {
+      setChosenSubs((prev) => ({ ...defaults, ...prev }));
+    }
+
     setShowConfirm(true);
   }
 
@@ -305,6 +347,7 @@ export function AttendanceTab({
             player_id: r.player_id,
             status: r.status as "present" | "absent" | "excused",
             notes: r.notes || undefined,
+            subscription_id: r.status === "present" ? chosenSubs[r.player_id] || undefined : undefined,
           }));
 
         const res = await submitAttendance({
@@ -500,11 +543,18 @@ export function AttendanceTab({
                     <p className="text-sm font-medium text-slate-900 truncate">
                       {player.first_name} {player.last_name}
                     </p>
-                    <div className="flex items-center gap-2">
-                      {player.sessions_remaining !== null ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {player.subscriptions.length > 1 ? (
+                        <span className="text-xs text-slate-400">
+                          {player.subscriptions.map((s) => {
+                            const exp = s.end_date ? new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                            return `${s.package_name}: ${s.remaining}${exp ? ` (${exp})` : ""}`;
+                          }).join(" · ")}
+                        </span>
+                      ) : player.sessions_remaining !== null ? (
                         <span className={`text-xs ${hasNoBalance ? "text-red-500 font-medium" : hasLowBalance ? "text-amber-500" : "text-slate-400"}`}>
-                          {player.sessions_remaining} sessions left
-                          {player.subscription_end_date && ` · Expires ${new Date(player.subscription_end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                          {player.subscriptions[0]?.package_name ? `${player.subscriptions[0].package_name}: ` : ""}{player.sessions_remaining} sessions left
+                          {player.subscription_end_date && ` · Exp ${new Date(player.subscription_end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                         </span>
                       ) : (
                         <span className="text-xs text-slate-400">No active subscription</span>
@@ -694,6 +744,52 @@ export function AttendanceTab({
               This will update existing attendance records.
             </p>
           )}
+
+          {/* Multi-subscription selector */}
+          {(() => {
+            const multiSubPlayers = players.filter((p) => {
+              const record = records.get(p.id);
+              if (record?.status !== "present") return false;
+              return p.subscriptions.filter((s) => s.remaining > 0).length > 1;
+            });
+            if (multiSubPlayers.length === 0) return null;
+            return (
+              <div className="border-t border-slate-200 pt-4 space-y-3">
+                <p className="text-xs font-medium text-slate-700">
+                  Choose which package to deduct from:
+                </p>
+                <div className="space-y-2">
+                  {multiSubPlayers.map((p) => {
+                    const activeSubs = p.subscriptions.filter((s) => s.remaining > 0);
+                    return (
+                      <div key={p.id} className="bg-blue-50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
+                            {p.first_name[0]}{p.last_name[0]}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {p.first_name} {p.last_name}
+                          </span>
+                        </div>
+                        <select
+                          value={chosenSubs[p.id] || activeSubs[0]?.id || ""}
+                          onChange={(e) => setChosenSubs((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        >
+                          {activeSubs.map((sub) => (
+                            <option key={sub.id} value={sub.id}>
+                              {sub.package_name} — {sub.remaining} sessions left
+                              {sub.end_date && ` · Exp ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Zero-balance players inline */}
           {paymentDialog && paymentDialog.players.length > 0 && (() => {

@@ -69,6 +69,9 @@ export async function createExpense(formData: FormData) {
     court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
     court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
     court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
+    payment_status: (formData.get("payment_status") as string) || "paid_full",
+    paid_amount: formData.get("paid_amount") ? Number(formData.get("paid_amount")) : null,
+    due_date: (formData.get("due_date") as string) || null,
     created_by: user!.id,
   });
 
@@ -118,6 +121,9 @@ export async function updateExpense(id: string, formData: FormData) {
       court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
       court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
       court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
+      payment_status: (formData.get("payment_status") as string) || "paid_full",
+      paid_amount: formData.get("paid_amount") ? Number(formData.get("paid_amount")) : null,
+      due_date: (formData.get("due_date") as string) || null,
     })
     .eq("id", id);
 

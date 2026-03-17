@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { StatCard, Pagination, Button, Toast } from "@/components/ui";
-import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings } from "lucide-react";
+import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings, Download } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { deleteExpense } from "@/app/_actions/expenses";
 import type { ExpenseRow, CategoryRow, SortField, SortDir, ExpenseTab } from "./_components/types";
@@ -12,6 +12,7 @@ import { ExpensesFilters } from "./_components/filters";
 import { ExpensesTableView } from "./_components/table";
 import { ExpenseDrawer } from "./_components/expense-drawer";
 import { CategoryDrawer } from "./_components/category-drawer";
+import { CategoryReport } from "./_components/category-report";
 
 export default function AdminExpensesPage() {
   return (
@@ -25,6 +26,7 @@ const TABS: { key: ExpenseTab; label: string }[] = [
   { key: "all", label: "All Expenses" },
   { key: "one-time", label: "One-time" },
   { key: "recurring", label: "Recurring" },
+  { key: "by-category", label: "By Category" },
   { key: "categories", label: "Categories" },
 ];
 
@@ -309,9 +311,11 @@ function AdminExpensesContent() {
         </button>
       </div>
 
-      {/* Categories tab content */}
+      {/* Tab content */}
       {tab === "categories" ? (
         <CategoriesView categories={categories} onManage={() => setCategoryDrawerOpen(true)} />
+      ) : tab === "by-category" ? (
+        <CategoryReport expenses={filteredExpenses} categories={categories} />
       ) : (
         <>
           {/* Filters */}
@@ -332,6 +336,29 @@ function AdminExpensesContent() {
             onReset={resetFilters}
             hasActiveFilters={hasActiveFilters}
           />
+
+          {/* Export */}
+          <div className="flex justify-end mb-3">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const { exportToExcel } = await import("@/lib/utils/export-excel");
+                const rows = filteredExpenses.map((e) => ({
+                  Date: e.expense_date,
+                  Category: e.expense_categories?.name || "",
+                  Description: e.description,
+                  "Amount (EGP)": e.amount,
+                  Type: e.is_recurring ? `Recurring (${e.recurrence_type})` : "One-time",
+                  Payment: e.payment_status === "paid_full" ? "Paid" : e.payment_status === "partially_paid" ? `Partial (${e.paid_amount ?? 0} EGP)` : "Due",
+                }));
+                const dateStr = monthFilter || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                exportToExcel(rows, `expenses-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Expenses");
+              }}
+              disabled={filteredExpenses.length === 0}
+            >
+              <Download className="w-4 h-4 mr-1.5" /> Export
+            </Button>
+          </div>
 
           {/* Table */}
           <div className="flex-1">

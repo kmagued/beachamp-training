@@ -25,6 +25,24 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
   return sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
 }
 
+function PaymentStatusBadge({ expense }: { expense: ExpenseRow }) {
+  if (expense.payment_status === "partially_paid") {
+    const paid = expense.paid_amount ?? 0;
+    const remaining = expense.amount - paid;
+    return (
+      <div>
+        <Badge variant="warning">Partial</Badge>
+        <p className="text-[10px] text-amber-600 mt-0.5">{paid.toLocaleString()} / {expense.amount.toLocaleString()} EGP</p>
+        <p className="text-[10px] text-slate-400">Remaining: {remaining.toLocaleString()} EGP</p>
+      </div>
+    );
+  }
+  if (expense.payment_status === "payment_due") {
+    return <Badge variant="danger">{expense.due_date ? `Due ${formatDate(expense.due_date)}` : "Due"}</Badge>;
+  }
+  return <Badge variant="success">Paid</Badge>;
+}
+
 export function ExpensesTableView(props: ExpensesTableProps) {
   const { expenses, sortField, sortDir, toggleSort, onEdit, onDelete, search, typeFilter, grandTotal } = props;
 
@@ -51,6 +69,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                   <span className="inline-flex items-center gap-1">Amount <SortIcon field="amount" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 <th className={thBase}>Type</th>
+                <th className={thBase}>Payment</th>
                 <th className={cn(thBase, "text-center")}>Actions</th>
               </tr>
             </thead>
@@ -85,6 +104,9 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                       <Badge variant="neutral">One-time</Badge>
                     )}
                   </td>
+                  <td className={tdBase}>
+                    <PaymentStatusBadge expense={expense} />
+                  </td>
                   <td className={cn(tdBase, "text-center")}>
                     <div className="flex items-center justify-center gap-1.5">
                       <button
@@ -107,7 +129,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
               ))}
               {expenses.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400 border-b border-slate-100">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -124,7 +146,7 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                   <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">
                     {grandTotal.toLocaleString()} EGP
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap" colSpan={2} />
+                  <td className="px-4 py-3 whitespace-nowrap" colSpan={3} />
                 </tr>
               </tfoot>
             )}
@@ -162,6 +184,9 @@ export function ExpensesTableView(props: ExpensesTableProps) {
                 <span className="text-slate-400">Date</span>
                 <p className="text-slate-700 font-medium">{formatDate(expense.expense_date)}</p>
               </div>
+            </div>
+            <div className="mt-2">
+              <PaymentStatusBadge expense={expense} />
             </div>
             {expense.notes && (
               <p className="mt-2 text-xs text-slate-400 truncate">{expense.notes}</p>

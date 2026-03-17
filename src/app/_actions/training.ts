@@ -487,7 +487,7 @@ export async function submitAttendance(data: {
   group_id: string;
   schedule_session_id: string;
   session_date: string;
-  records: { player_id: string; status: "present" | "absent" | "excused"; notes?: string }[];
+  records: { player_id: string; status: "present" | "absent" | "excused"; notes?: string; subscription_id?: string }[];
 }) {
   const user = await getCurrentUserRole();
   const authErr = requireCoachOrAdmin(user);
@@ -532,6 +532,7 @@ export async function submitAttendance(data: {
       p_marked_by: user!.id,
       p_schedule_session_id: data.schedule_session_id,
       p_notes: record.notes || null,
+      p_subscription_id: record.subscription_id || null,
     });
 
     if (error) {

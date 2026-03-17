@@ -396,6 +396,29 @@ function AdminPaymentsContent() {
         </button>
       </SelectionBar>
 
+      <div className="flex justify-end mb-3">
+        <button
+          onClick={async () => {
+            const { exportToExcel } = await import("@/lib/utils/export-excel");
+            const rows = filteredPayments.map((p) => ({
+              Date: p.confirmed_at ? new Date(p.confirmed_at).toISOString().split("T")[0] : p.subscriptions?.start_date || "",
+              Player: `${p.profiles?.first_name || ""} ${p.profiles?.last_name || ""}`.trim(),
+              Package: p.subscriptions?.packages?.name || "",
+              "Amount (EGP)": p.amount,
+              Method: p.method,
+              Status: p.status,
+            }));
+            const dateStr = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            exportToExcel(rows, `payments-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Payments");
+          }}
+          disabled={filteredPayments.length === 0}
+          className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          Export
+        </button>
+      </div>
+
       <div className="flex-1">
         {loading ? (
           <PaymentsInlineSkeleton />

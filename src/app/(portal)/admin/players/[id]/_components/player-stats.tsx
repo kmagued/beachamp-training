@@ -5,25 +5,50 @@ import type { SubscriptionRow } from "./types";
 
 interface PlayerStatsProps {
   subsCount: number;
-  activeSub: SubscriptionRow | undefined;
+  activeSubs: SubscriptionRow[];
   totalPaid: number;
   totalSessions: number;
 }
 
-function getExpiryInfo(activeSub: SubscriptionRow | undefined) {
-  if (!activeSub?.end_date) return { label: "Expires", value: "—", color: "bg-slate-300" };
-  const daysLeft = Math.ceil((new Date(activeSub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+function getExpiryInfo(activeSubs: SubscriptionRow[]) {
+  if (activeSubs.length === 0 || !activeSubs.some((s) => s.end_date))
+    return { label: "Expires", value: "—", color: "bg-slate-300" };
+  // Use the latest end_date among all active subs
+  const latestEnd = activeSubs
+    .filter((s) => s.end_date)
+    .sort((a, b) => new Date(b.end_date!).getTime() - new Date(a.end_date!).getTime())[0];
+  if (!latestEnd?.end_date) return { label: "Expires", value: "—", color: "bg-slate-300" };
+  const daysLeft = Math.ceil((new Date(latestEnd.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (daysLeft <= 0) return { label: "Expires", value: "Expired", color: "bg-red-500" };
   if (daysLeft <= 3) return { label: "Expires In", value: `${daysLeft} day${daysLeft === 1 ? "" : "s"}`, color: "bg-red-500" };
   if (daysLeft <= 7) return { label: "Expires In", value: `${daysLeft} days`, color: "bg-amber-500" };
-  return { label: "Expires", value: formatDate(activeSub.end_date), color: "bg-slate-400" };
+  return { label: "Expires", value: formatDate(latestEnd.end_date), color: "bg-slate-400" };
 }
 
-export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: PlayerStatsProps) {
-  const sessionsColor = !activeSub ? "bg-slate-300" :
-    activeSub.sessions_remaining <= 0 ? "bg-red-500" :
-    activeSub.sessions_remaining <= 2 ? "bg-amber-500" : "bg-blue-500";
-  const expiry = getExpiryInfo(activeSub);
+export function PlayerStats({ subsCount, activeSubs, totalPaid, totalSessions }: PlayerStatsProps) {
+  // Exclude single-session packages from package/sessions display
+  const multiSessionSubs = activeSubs.filter((s) => s.sessions_total > 1);
+  const totalRemaining = multiSessionSubs.reduce((sum, s) => sum + s.sessions_remaining, 0);
+  const totalTotal = multiSessionSubs.reduce((sum, s) => sum + s.sessions_total, 0);
+  const hasActive = multiSessionSubs.length > 0;
+  const sessionsColor = !hasActive ? "bg-slate-300" :
+    totalRemaining <= 0 ? "bg-red-500" :
+    totalRemaining <= 2 ? "bg-amber-500" : "bg-blue-500";
+  const expiry = getExpiryInfo(multiSessionSubs);
+
+  // Build active package display
+  const activePackageValue = multiSessionSubs.length > 1
+    ? multiSessionSubs.map((s) => s.packages?.name || "—").join(", ")
+    : multiSessionSubs.length === 1
+      ? multiSessionSubs[0].packages?.name || "None"
+      : "None";
+
+  // Build sessions display
+  const sessionsValue = multiSessionSubs.length > 1
+    ? multiSessionSubs.map((s) => `${s.sessions_remaining}`).join(" + ")
+    : hasActive
+      ? `${totalRemaining}/${totalTotal}`
+      : "—";
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
@@ -34,14 +59,14 @@ export function PlayerStats({ subsCount, activeSub, totalPaid, totalSessions }: 
         icon={<Package className="w-5 h-5" />}
       />
       <StatCard
-        label="Active Package"
-        value={activeSub?.packages?.name || "None"}
-        accentColor={activeSub ? "bg-emerald-500" : "bg-slate-300"}
+        label={activeSubs.length > 1 ? "Active Packages" : "Active Package"}
+        value={activePackageValue}
+        accentColor={hasActive ? "bg-emerald-500" : "bg-slate-300"}
         icon={<Package className="w-5 h-5" />}
       />
       <StatCard
         label="Sessions Left"
-        value={activeSub ? (activeSub.sessions_total === 1 ? activeSub.sessions_remaining : `${activeSub.sessions_remaining}/${activeSub.sessions_total}`) : "—"}
+        value={sessionsValue}
         accentColor={sessionsColor}
         icon={<Activity className="w-5 h-5" />}
       />

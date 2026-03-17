@@ -38,10 +38,19 @@ export type SubscriptionStatus =
   | "attended"
   | "pending"
   | "pending_payment"
+  | "frozen"
   | "none";
 
 export type SortField = "name" | "date" | "level" | "group" | "package" | "sessions" | "expires" | "subscription" | "activity";
 export type SortDir = "asc" | "desc";
+
+/** Check if a subscription is effectively active (not expired by sessions or date). */
+export function isEffectivelyActive(s: { status: string; sessions_remaining: number; sessions_total: number; end_date: string | null }) {
+  if (s.status !== "active" && s.status !== "pending") return false;
+  if (s.sessions_remaining <= 0) return false;
+  if (s.end_date && new Date(s.end_date).getTime() < Date.now()) return false;
+  return true;
+}
 
 /** Pick the most recent subscription (by start_date, falling back to end_date). */
 export function getLatestSubscription(player: PlayerRow) {
@@ -53,22 +62,21 @@ export function getLatestSubscription(player: PlayerRow) {
   })[0];
 }
 
-/** Player is active if they have an active subscription OR trained in last 2 weeks. */
+/** Player is active if they trained in last 30 days. Having a subscription alone is not enough. */
 export function getActivityStatus(player: PlayerRow): ActivityStatus {
   const now = Date.now();
-  const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   const recentlyTrained = !!player.last_attended &&
-    (now - new Date(player.last_attended).getTime()) <= twoWeeksMs;
-  const hasActiveSub = player.subscriptions?.some((s) => s.status === "active") || false;
+    (now - new Date(player.last_attended).getTime()) <= thirtyDaysMs;
 
-  if (hasActiveSub || recentlyTrained) return "active";
+  if (recentlyTrained) return "active";
   return "inactive";
 }
 
 /** Subscription-only status — independent of player activity. */
 export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
   const now = Date.now();
-  const activeSubs = player.subscriptions?.filter((s) => s.status === "active") || [];
+  const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s)) || [];
 
   // Prefer the subscription covering today; if none, pick the nearest upcoming one
   const activeSub =
@@ -110,6 +118,10 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
 
     return "active";
   }
+
+  // Check for frozen subscription
+  const frozenSub = player.subscriptions?.find((s) => s.status === "frozen");
+  if (frozenSub) return "frozen";
 
   // No active subscription
   const expiredSub = player.subscriptions?.find((s) => s.status === "expired");

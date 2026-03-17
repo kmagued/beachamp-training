@@ -20,7 +20,6 @@ export default async function AdminDashboard() {
 
   const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
   const monthEndISO = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0];
-  const twelveMonthsAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const [
     { data: activeProfiles, count: playerCount },
@@ -86,12 +85,12 @@ export default async function AdminDashboard() {
       .from("expenses")
       .select("amount")
       .eq("is_active", true),
-    // Recent attendance (last 2 weeks) for active player count
+    // Recent attendance (last 30 days) for active player count
     supabase
       .from("attendance")
       .select("player_id")
       .eq("status", "present")
-      .gte("session_date", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
+      .gte("session_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
     // All expenses with dates for monthly table
     supabase
       .from("expenses")
@@ -106,11 +105,10 @@ export default async function AdminDashboard() {
     supabase
       .from("group_players")
       .select("group_id, player_id, joined_at, is_active"),
-    // All attendance (last 12 months) for metrics table
+    // All attendance for metrics table
     supabase
       .from("attendance")
-      .select("status, session_date, group_id")
-      .gte("session_date", twelveMonthsAgo),
+      .select("status, session_date, group_id"),
     // All subscriptions for metrics table (churn/retention)
     supabase
       .from("subscriptions")
@@ -154,15 +152,11 @@ export default async function AdminDashboard() {
 
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
-  // Active players: has active subscription OR trained in last 2 weeks
+  // Active players: trained in last 30 days
   const playerIdSet = new Set(
     (activeProfiles || []).map((p: { id: string }) => p.id)
   );
   const activeIds = new Set<string>();
-  for (const s of activeSubscriptions || []) {
-    const pid = (s as { player_id: string }).player_id;
-    if (playerIdSet.has(pid)) activeIds.add(pid);
-  }
   for (const a of recentAttendance || []) {
     const pid = (a as { player_id: string }).player_id;
     if (playerIdSet.has(pid)) activeIds.add(pid);

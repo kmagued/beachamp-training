@@ -31,6 +31,15 @@ interface GroupPlayer {
   };
 }
 
+interface PlayerSubscription {
+  id: string;
+  remaining: number;
+  total: number;
+  end_date: string | null;
+  status: string;
+  package_name: string;
+}
+
 interface AttendanceRecord {
   player_id: string;
   status: "present" | "absent" | "excused";
@@ -51,9 +60,11 @@ export function AttendanceTab({ date }: { date: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
   const [savedAttendanceState, setSavedAttendanceState] = useState<Record<string, SessionAttendanceState>>({});
-  const [playerSessions, setPlayerSessions] = useState<Record<string, { remaining: number; total: number; end_date: string | null; status: string } | null>>({});
+  const [playerSessions, setPlayerSessions] = useState<Record<string, PlayerSubscription[]>>({});
   const [packages, setPackages] = useState<{ id: string; price: number; name: string; session_count: number }[]>([]);
   const [paymentDialog, setPaymentDialog] = useState<{ session: ScheduleSession; players: GroupPlayer[]; playerPackages: Record<string, string> } | null>(null);
+  const [chosenSubs, setChosenSubs] = useState<Record<string, string>>({});
+  const [multiSubDialog, setMultiSubDialog] = useState<{ session: ScheduleSession; records: { player_id: string; status: "present" | "absent" | "excused" }[]; removedPlayerIds: string[]; multiSubPlayers: GroupPlayer[] } | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
@@ -108,22 +119,32 @@ export function AttendanceTab({ date }: { date: string }) {
       });
       setSessionPlayers(playersByGroup);
 
-      // Fetch active + expired subscriptions for all players (most recent per player)
+      // Fetch active/pending subscriptions for all players with package info
       const allPlayerIds = [...new Set((allGroupPlayers || []).map((gp: { player_id: string }) => gp.player_id))];
       if (allPlayerIds.length > 0) {
         const { data: subs } = await supabase
           .from("subscriptions")
-          .select("player_id, sessions_remaining, sessions_total, end_date, status")
+          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, packages(name)")
           .in("player_id", allPlayerIds)
-          .in("status", ["active", "expired"])
+          .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });
 
-        const sessionsMap: Record<string, { remaining: number; total: number; end_date: string | null; status: string } | null> = {};
-        (subs || []).forEach((s: { player_id: string; sessions_remaining: number; sessions_total: number; end_date: string | null; status: string }) => {
-          // Keep the first (most recent) subscription per player; prefer active over expired
-          if (!sessionsMap[s.player_id] || (sessionsMap[s.player_id]!.status === "expired" && s.status === "active")) {
-            sessionsMap[s.player_id] = { remaining: s.sessions_remaining, total: s.sessions_total, end_date: s.end_date, status: s.status };
-          }
+        const sessionsMap: Record<string, PlayerSubscription[]> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (subs || []).forEach((s: any) => {
+          // Skip effectively expired subs
+          if (s.sessions_remaining <= 0) return;
+          if (s.end_date && new Date(s.end_date).getTime() < Date.now()) return;
+          const entry: PlayerSubscription = {
+            id: s.id,
+            remaining: s.sessions_remaining,
+            total: s.sessions_total,
+            end_date: s.end_date,
+            status: s.status,
+            package_name: s.packages?.name || "Package",
+          };
+          if (!sessionsMap[s.player_id]) sessionsMap[s.player_id] = [];
+          sessionsMap[s.player_id].push(entry);
         });
         setPlayerSessions(sessionsMap);
       }
@@ -201,8 +222,24 @@ export function AttendanceTab({ date }: { date: string }) {
       const wasPreviouslyPresent = saved[gp.player_id] === "present";
       // Only flag newly marked present players (not already saved as present)
       if (status !== "present" || wasPreviouslyPresent) return false;
-      const sub = playerSessions[gp.player_id];
-      return !sub || sub.remaining <= 0 || sub.status === "expired";
+      const subs = playerSessions[gp.player_id] || [];
+      const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
+      return subs.length === 0 || totalRemaining <= 0;
+    });
+  }
+
+  function getMultiSubPresentPlayers(session: ScheduleSession) {
+    const state = attendanceState[session.id] || {};
+    const saved = savedAttendanceState[session.id] || {};
+    const players = sessionPlayers[session.group_id] || [];
+
+    return players.filter((gp) => {
+      const status = state[gp.player_id];
+      const wasPreviouslyPresent = saved[gp.player_id] === "present";
+      if (status !== "present" || wasPreviouslyPresent) return false;
+      const subs = playerSessions[gp.player_id] || [];
+      const activeSubs = subs.filter((s) => s.remaining > 0);
+      return activeSubs.length > 1;
     });
   }
 
@@ -221,13 +258,40 @@ export function AttendanceTab({ date }: { date: string }) {
 
     if (records.length === 0 && removedPlayerIds.length === 0) return;
 
+    // Check for players with multiple active subscriptions being marked present
+    const multiSubPlayers = getMultiSubPresentPlayers(session);
+
     // Check for players with no balance being marked present
     const zeroBalancePlayers = getZeroBalancePresentPlayers(session);
     const defaultPkg = packages.find((p) => p.session_count === 1) || packages[0];
-    if (zeroBalancePlayers.length > 0 && defaultPkg) {
+
+    // Pre-select default subscription for multi-sub players
+    if (multiSubPlayers.length > 0) {
+      const defaults: Record<string, string> = {};
+      for (const gp of multiSubPlayers) {
+        const subs = playerSessions[gp.player_id] || [];
+        const activeSubs = subs.filter((s) => s.remaining > 0);
+        if (activeSubs.length >= 1 && !chosenSubs[gp.player_id]) {
+          defaults[gp.player_id] = activeSubs[0].id;
+        }
+      }
+      if (Object.keys(defaults).length > 0) {
+        setChosenSubs((prev) => ({ ...defaults, ...prev }));
+      }
+    }
+
+    // Show dialog if there are multi-sub or zero-balance players
+    if (multiSubPlayers.length > 0 || (zeroBalancePlayers.length > 0 && defaultPkg)) {
       const playerPackages: Record<string, string> = {};
-      zeroBalancePlayers.forEach((gp) => { playerPackages[gp.player_id] = defaultPkg.id; });
-      setPaymentDialog({ session, players: zeroBalancePlayers, playerPackages });
+      if (zeroBalancePlayers.length > 0 && defaultPkg) {
+        zeroBalancePlayers.forEach((gp) => { playerPackages[gp.player_id] = defaultPkg.id; });
+        setPaymentDialog({ session, players: zeroBalancePlayers, playerPackages });
+      }
+      if (multiSubPlayers.length > 0) {
+        setMultiSubDialog({ session, records, removedPlayerIds, multiSubPlayers });
+      } else {
+        setMultiSubDialog({ session, records, removedPlayerIds, multiSubPlayers: [] });
+      }
       return;
     }
 
@@ -259,11 +323,15 @@ export function AttendanceTab({ date }: { date: string }) {
 
       // Submit remaining records (if any)
       if (records.length > 0) {
+        const attendanceRecords = records.map((r) => ({
+          ...r,
+          subscription_id: r.status === "present" ? chosenSubs[r.player_id] || undefined : undefined,
+        }));
         const res = await submitAttendance({
           group_id: session.group_id,
           schedule_session_id: session.id,
           session_date: date,
-          records,
+          records: attendanceRecords,
         });
         if (!("success" in res && res.success)) {
           setSavingSessionId(null);
@@ -277,8 +345,19 @@ export function AttendanceTab({ date }: { date: string }) {
           setPlayerSessions((prev) => {
             const updated = { ...prev };
             for (const r of res.results) {
-              if (r.sessions_remaining !== null && updated[r.player_id]) {
-                updated[r.player_id] = { ...updated[r.player_id]!, remaining: r.sessions_remaining };
+              if (r.sessions_remaining !== null) {
+                const playerSubs = updated[r.player_id];
+                if (playerSubs) {
+                  // Find the specific subscription that was deducted
+                  const chosenSubId = chosenSubs[r.player_id];
+                  if (chosenSubId) {
+                    updated[r.player_id] = playerSubs.map((s) =>
+                      s.id === chosenSubId ? { ...s, remaining: r.sessions_remaining! } : s
+                    );
+                  } else if (playerSubs.length === 1) {
+                    updated[r.player_id] = [{ ...playerSubs[0], remaining: r.sessions_remaining! }];
+                  }
+                }
               }
             }
             return updated;
@@ -307,9 +386,9 @@ export function AttendanceTab({ date }: { date: string }) {
       if (removedPlayerIds.length > 0) {
         const { data: updatedSubs } = await supabase
           .from("subscriptions")
-          .select("player_id, sessions_remaining, sessions_total, end_date, status")
+          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, packages(name)")
           .in("player_id", removedPlayerIds)
-          .in("status", ["active", "expired"])
+          .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });
 
         if (updatedSubs) {
@@ -318,10 +397,20 @@ export function AttendanceTab({ date }: { date: string }) {
             for (const pid of removedPlayerIds) {
               delete updated[pid];
             }
-            for (const s of updatedSubs) {
-              if (!updated[s.player_id] || (updated[s.player_id]!.status === "expired" && s.status === "active")) {
-                updated[s.player_id] = { remaining: s.sessions_remaining, total: s.sessions_total, end_date: s.end_date, status: s.status };
-              }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const s of updatedSubs as any[]) {
+              if (s.sessions_remaining <= 0) continue;
+              if (s.end_date && new Date(s.end_date).getTime() < Date.now()) continue;
+              const entry: PlayerSubscription = {
+                id: s.id,
+                remaining: s.sessions_remaining,
+                total: s.sessions_total,
+                end_date: s.end_date,
+                status: s.status,
+                package_name: s.packages?.name || "Package",
+              };
+              if (!updated[s.player_id]) updated[s.player_id] = [];
+              updated[s.player_id].push(entry);
             }
             return updated;
           });
@@ -334,6 +423,8 @@ export function AttendanceTab({ date }: { date: string }) {
         ...prev,
         [session.id]: { ...attendanceState[session.id] },
       }));
+      setMultiSubDialog(null);
+      setPaymentDialog(null);
 
       const msg = paymentsCreated > 0
         ? `Attendance saved. ${paymentsCreated} pending payment${paymentsCreated > 1 ? "s" : ""} created.`
@@ -556,7 +647,8 @@ export function AttendanceTab({ date }: { date: string }) {
                 <div className="divide-y divide-slate-100">
                   {filteredPlayers.map((gp) => {
                     const status = state[gp.player_id];
-                    const sub = playerSessions[gp.player_id];
+                    const subs = playerSessions[gp.player_id] || [];
+                    const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
                     return (
                       <div
                         key={gp.player_id}
@@ -569,19 +661,22 @@ export function AttendanceTab({ date }: { date: string }) {
                           <p className="text-sm font-medium text-slate-900 truncate">
                             {gp.profiles.first_name} {gp.profiles.last_name}
                           </p>
-                          {sub ? (
+                          {subs.length > 1 ? (
+                            <p className="text-[11px] text-slate-400">
+                              {subs.map((s) => {
+                                const exp = s.end_date ? new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                                return `${s.package_name}: ${s.remaining}${exp ? ` (${exp})` : ""}`;
+                              }).join(" · ")}
+                            </p>
+                          ) : subs.length === 1 ? (
                             <p className={cn(
                               "text-[11px]",
-                              sub.status === "expired"
+                              totalRemaining <= 2 || (subs[0].end_date && Math.ceil((new Date(subs[0].end_date).getTime() - Date.now()) / 86400000) <= 3)
                                 ? "text-red-500 font-medium"
-                                : sub.remaining <= 2 || (sub.end_date && Math.ceil((new Date(sub.end_date).getTime() - Date.now()) / 86400000) <= 3)
-                                  ? "text-red-500 font-medium"
-                                  : "text-slate-400"
+                                : "text-slate-400"
                             )}>
-                              {sub.status === "expired"
-                                ? `Expired · ${sub.remaining}/${sub.total} sessions left`
-                                : `${sub.remaining}/${sub.total} sessions left`}
-                              {sub.end_date && ` · Expires ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                              {subs[0].package_name}: {subs[0].remaining}/{subs[0].total} sessions left
+                              {subs[0].end_date && ` · Expires ${new Date(subs[0].end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                             </p>
                           ) : (
                             <p className="text-[11px] text-red-400">No active subscription</p>
@@ -659,100 +754,134 @@ export function AttendanceTab({ date }: { date: string }) {
         );
       })}
 
-      {/* Zero-balance payment drawer */}
+      {/* Multi-sub + zero-balance drawer */}
       <Drawer
-        open={!!paymentDialog}
-        onClose={() => setPaymentDialog(null)}
-        title="Players with no balance"
+        open={!!multiSubDialog}
+        onClose={() => { setMultiSubDialog(null); setPaymentDialog(null); }}
+        title="Confirm Attendance"
         footer={
-          paymentDialog ? (
+          multiSubDialog ? (
             <div className="flex gap-2">
               <Button
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => setPaymentDialog(null)}
+                onClick={() => { setMultiSubDialog(null); setPaymentDialog(null); }}
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 className="flex-1"
+                disabled={isPending}
                 onClick={() => {
-                  const dialog = paymentDialog;
-                  setPaymentDialog(null);
-                  const state = attendanceState[dialog.session.id] || {};
-                  const saved = savedAttendanceState[dialog.session.id] || {};
-                  const records = Object.entries(state)
-                    .filter(([, s]) => s !== undefined)
-                    .map(([player_id, s]) => ({ player_id, status: s! }));
-                  const removedPlayerIds = Object.keys(saved)
-                    .filter((pid) => saved[pid] !== undefined && (state[pid] === undefined || !(pid in state)));
-                  executeSave(dialog.session, records, removedPlayerIds, dialog.playerPackages);
+                  const dialog = multiSubDialog;
+                  executeSave(dialog.session, dialog.records, dialog.removedPlayerIds, paymentDialog?.playerPackages || {});
                 }}
               >
-                Save & Create Payments
+                {isPending ? "Saving..." : paymentDialog ? "Save & Create Payments" : "Save"}
               </Button>
             </div>
           ) : undefined
         }
       >
-        {paymentDialog && (() => {
-          const total = paymentDialog.players.reduce((sum, gp) => {
-            const pkg = packages.find((p) => p.id === paymentDialog.playerPackages[gp.player_id]);
-            return sum + (pkg?.price ?? 0);
-          }, 0);
-          return (
-            <div className="space-y-4">
-              <p className="text-xs text-slate-500">
-                The following players have no remaining sessions. A pending payment will be created for each.
-              </p>
-
+        {multiSubDialog && (
+          <div className="space-y-4">
+            {/* Multi-subscription selector */}
+            {multiSubDialog.multiSubPlayers.length > 0 && (
               <div className="space-y-3">
-                {paymentDialog.players.map((gp) => {
-                  const pkgId = paymentDialog.playerPackages[gp.player_id];
-                  const playerPkg = packages.find((p) => p.id === pkgId);
-                  return (
-                    <div key={gp.player_id} className="bg-red-50 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-red-600 shrink-0">
-                          {gp.profiles.first_name[0]}{gp.profiles.last_name[0]}
+                <p className="text-xs font-medium text-slate-700">
+                  Choose which package to deduct from:
+                </p>
+                <div className="space-y-2">
+                  {multiSubDialog.multiSubPlayers.map((gp) => {
+                    const subs = (playerSessions[gp.player_id] || []).filter((s) => s.remaining > 0);
+                    return (
+                      <div key={gp.player_id} className="bg-blue-50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 shrink-0">
+                            {gp.profiles.first_name[0]}{gp.profiles.last_name[0]}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {gp.profiles.first_name} {gp.profiles.last_name}
+                          </span>
                         </div>
-                        <span className="text-xs font-medium text-slate-700">
-                          {gp.profiles.first_name} {gp.profiles.last_name}
-                        </span>
-                        {playerPkg && (
-                          <span className="ml-auto text-[11px] font-medium text-slate-500">{playerPkg.price} EGP</span>
-                        )}
+                        <select
+                          value={chosenSubs[gp.player_id] || subs[0]?.id || ""}
+                          onChange={(e) => setChosenSubs((prev) => ({ ...prev, [gp.player_id]: e.target.value }))}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        >
+                          {subs.map((sub) => (
+                            <option key={sub.id} value={sub.id}>
+                              {sub.package_name} — {sub.remaining} sessions left
+                              {sub.end_date && ` · Exp ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <select
-                        value={pkgId}
-                        onChange={(e) => setPaymentDialog((prev) => prev ? {
-                          ...prev,
-                          playerPackages: { ...prev.playerPackages, [gp.player_id]: e.target.value }
-                        } : null)}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                      >
-                        {packages.map((pkg) => (
-                          <option key={pkg.id} value={pkg.id}>
-                            {pkg.name} — {pkg.price} EGP
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {paymentDialog.players.length > 1 && (
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-xs font-medium text-slate-500">Total</span>
-                  <span className="text-sm font-semibold text-slate-900">{total} EGP</span>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          );
-        })()}
+              </div>
+            )}
+
+            {/* Zero-balance players */}
+            {paymentDialog && paymentDialog.players.length > 0 && (() => {
+              const total = paymentDialog.players.reduce((sum, gp) => {
+                const pkg = packages.find((p) => p.id === paymentDialog.playerPackages[gp.player_id]);
+                return sum + (pkg?.price ?? 0);
+              }, 0);
+              return (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-slate-700">
+                    Players with no remaining sessions — a pending payment will be created:
+                  </p>
+                  <div className="space-y-2">
+                    {paymentDialog.players.map((gp) => {
+                      const pkgId = paymentDialog.playerPackages[gp.player_id];
+                      const playerPkg = packages.find((p) => p.id === pkgId);
+                      return (
+                        <div key={gp.player_id} className="bg-red-50 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-red-600 shrink-0">
+                              {gp.profiles.first_name[0]}{gp.profiles.last_name[0]}
+                            </div>
+                            <span className="text-xs font-medium text-slate-700">
+                              {gp.profiles.first_name} {gp.profiles.last_name}
+                            </span>
+                            {playerPkg && (
+                              <span className="ml-auto text-[11px] font-medium text-slate-500">{playerPkg.price} EGP</span>
+                            )}
+                          </div>
+                          <select
+                            value={pkgId}
+                            onChange={(e) => setPaymentDialog((prev) => prev ? {
+                              ...prev,
+                              playerPackages: { ...prev.playerPackages, [gp.player_id]: e.target.value }
+                            } : null)}
+                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          >
+                            {packages.map((pkg) => (
+                              <option key={pkg.id} value={pkg.id}>
+                                {pkg.name} — {pkg.price} EGP
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {paymentDialog.players.length > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <span className="text-xs font-medium text-slate-500">Total</span>
+                      <span className="text-sm font-semibold text-slate-900">{total} EGP</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </Drawer>
     </div>
   );

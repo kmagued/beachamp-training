@@ -36,11 +36,14 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState("monthly");
   const [notes, setNotes] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"paid_full" | "partially_paid" | "payment_due">("paid_full");
+  const [paidAmount, setPaidAmount] = useState("");
+  const [dueDate, setDueDate] = useState("");
 
   // Court reservation fields (generic mode)
   const [courtCount, setCourtCount] = useState("");
   const [courtHours, setCourtHours] = useState("");
-  const [courtHourlyRate, setCourtHourlyRate] = useState("375");
+  const [courtHourlyRate, setCourtHourlyRate] = useState("250");
   const [useCourtCalculator, setUseCourtCalculator] = useState(true);
 
   // Session-based court calculator
@@ -114,10 +117,13 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setNotes(editingExpense.notes || "");
         setCourtCount(editingExpense.court_count ? String(editingExpense.court_count) : "");
         setCourtHours(editingExpense.court_hours ? String(editingExpense.court_hours) : "");
-        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "375");
+        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "250");
         setUseCourtCalculator(!!editingExpense.court_count);
         setSelectedSessions(new Set());
         setSessionCourts({});
+        setPaymentStatus(editingExpense.payment_status || "paid_full");
+        setPaidAmount(editingExpense.paid_amount ? String(editingExpense.paid_amount) : "");
+        setDueDate(editingExpense.due_date || "");
       } else {
         setCategoryId(activeCategories[0]?.id || "");
         setDescription("");
@@ -128,10 +134,13 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         setNotes("");
         setCourtCount("");
         setCourtHours("");
-        setCourtHourlyRate("375");
+        setCourtHourlyRate("250");
         setUseCourtCalculator(true);
         setSelectedSessions(new Set());
         setSessionCourts({});
+        setPaymentStatus("paid_full");
+        setPaidAmount("");
+        setDueDate("");
       }
       setError("");
       setShowNewCategory(false);
@@ -150,6 +159,9 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
     formData.set("is_recurring", String(isRecurring));
     if (isRecurring) formData.set("recurrence_type", recurrenceType);
     formData.set("notes", notes);
+    formData.set("payment_status", paymentStatus);
+    if (paymentStatus === "partially_paid" && paidAmount) formData.set("paid_amount", paidAmount);
+    if (paymentStatus === "payment_due" && dueDate) formData.set("due_date", dueDate);
     if (isCourtReservation && useCourtCalculator) {
       formData.set("court_hourly_rate", courtHourlyRate);
       if (hasSessionMode) {
@@ -297,7 +309,7 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
                 {/* Hourly rate — shared for both modes */}
                 <div>
                   <Label>Hourly Rate (EGP)</Label>
-                  <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="375" />
+                  <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="250" />
                 </div>
 
                 {hasSessionMode ? (
@@ -448,6 +460,44 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
             </select>
+          </div>
+        )}
+
+        {/* Payment status */}
+        <div>
+          <Label>Payment Status</Label>
+          <select
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value as "paid_full" | "partially_paid" | "payment_due")}
+            className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="paid_full">Paid in Full</option>
+            <option value="partially_paid">Partially Paid</option>
+            <option value="payment_due">Payment Due</option>
+          </select>
+        </div>
+
+        {paymentStatus === "partially_paid" && (
+          <div>
+            <Label required>Amount Paid (EGP)</Label>
+            <Input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={paidAmount}
+              onChange={(e) => setPaidAmount(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+        )}
+
+        {paymentStatus === "payment_due" && (
+          <div>
+            <Label>Due Date</Label>
+            <DatePicker
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
           </div>
         )}
 

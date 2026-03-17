@@ -194,8 +194,9 @@ function DrawerContent({
   const [editMethod, setEditMethod] = useState(payment.method);
   const [editStatus, setEditStatus] = useState(payment.status);
   function getDisplayDate(p: PaymentRow): string {
-    if (p.subscriptions?.start_date) return p.subscriptions.start_date;
+    if (p.status === "pending") return "";
     if (p.confirmed_at) return new Date(p.confirmed_at).toISOString().split("T")[0];
+    if (p.subscriptions?.start_date) return p.subscriptions.start_date;
     return "";
   }
 
