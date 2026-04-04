@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { notifyAdmins } from "@/app/_actions/notifications";
 
 export async function submitSubscription(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,6 +159,20 @@ export async function submitSubscription(formData: FormData) {
       discount_amount: discountAmount,
     });
   }
+
+  // Notify admins of new subscription
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", user.id)
+    .single();
+  const playerName = profile ? `${profile.first_name} ${profile.last_name}` : "A player";
+  await notifyAdmins({
+    title: "New Subscription",
+    body: `${playerName} subscribed to ${pkg.name}. Payment pending review.`,
+    type: "payment",
+    link: "/admin/payments?statusFilter=Pending",
+  });
 
   revalidatePath("/player/dashboard");
   revalidatePath("/player/subscribe");

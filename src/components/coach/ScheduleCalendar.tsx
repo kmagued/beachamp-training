@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { Skeleton } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Clock, ClipboardCheck } from "lucide-react";
+import { Skeleton, Button, Input, Select, Drawer, Toast, DatePicker } from "@/components/ui";
+import { ChevronLeft, ChevronRight, Clock, ClipboardCheck, Pencil, Trash2, Plus } from "lucide-react";
 import Link from "next/link";
+import { createSingleSession, updateScheduleSession, cancelScheduleSessionDate } from "@/app/_actions/training";
 
 // Saturday-first week for Egypt locale
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5]; // Sat, Sun, Mon, Tue, Wed, Thu, Fri
@@ -23,8 +24,10 @@ interface ScheduleBlock {
   end_time: string;
   location: string | null;
   end_date: string | null;
+  created_at: string;
   player_count: number;
   has_attendance: boolean; // for the current week
+  is_cancelled: boolean; // for the current week date
 }
 
 interface ScheduleCalendarProps {
@@ -77,6 +80,9 @@ function getWeekDatesFromSaturday(saturday: Date) {
   return dates;
 }
 
+interface GroupOption { id: string; name: string }
+interface CoachOption { id: string; first_name: string; last_name: string }
+
 export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: ScheduleCalendarProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -85,6 +91,16 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   const [sessions, setSessions] = useState<ScheduleBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(isAdmin);
+
+  // Admin edit state
+  const [isPending, startTransition] = useTransition();
+  const [editingSession, setEditingSession] = useState<ScheduleBlock | null>(null);
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [coaches, setCoaches] = useState<CoachOption[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -136,7 +152,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
 
       let query = supabase
         .from("schedule_sessions")
-        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, end_date, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, end_date, created_at, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
         .eq("is_active", true);
 
       if (!showAll) {
@@ -176,15 +192,22 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         playerCounts.set(gid, count || 0);
       }
 
-      // Check attendance for this week
+      // Check attendance and cancellations for this week
       const weekStart = formatLocalDate(weekDates[0]);
       const weekEnd = formatLocalDate(weekDates[6]);
 
-      const { data: attendanceRecords } = await supabase
-        .from("attendance")
-        .select("schedule_session_id, session_date")
-        .gte("session_date", weekStart)
-        .lte("session_date", weekEnd);
+      const [{ data: attendanceRecords }, { data: cancellationRecords }] = await Promise.all([
+        supabase
+          .from("attendance")
+          .select("schedule_session_id, session_date")
+          .gte("session_date", weekStart)
+          .lte("session_date", weekEnd),
+        supabase
+          .from("schedule_session_cancellations")
+          .select("schedule_session_id, cancelled_date")
+          .gte("cancelled_date", weekStart)
+          .lte("cancelled_date", weekEnd),
+      ]);
 
       const attendanceSet = new Set<string>();
       if (attendanceRecords) {
@@ -192,6 +215,13 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           if (a.schedule_session_id) {
             attendanceSet.add(`${a.schedule_session_id}_${a.session_date}`);
           }
+        }
+      }
+
+      const cancellationSet = new Set<string>();
+      if (cancellationRecords) {
+        for (const c of cancellationRecords) {
+          cancellationSet.add(`${c.schedule_session_id}_${c.cancelled_date}`);
         }
       }
 
@@ -213,8 +243,10 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           end_time: s.end_time,
           location: s.location,
           end_date: s.end_date,
+          created_at: s.created_at,
           player_count: playerCounts.get(s.group_id) || 0,
           has_attendance: attendanceSet.has(`${s.id}_${dateStr}`),
+          is_cancelled: cancellationSet.has(`${s.id}_${dateStr}`),
         };
       });
 
@@ -223,9 +255,74 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coachId, showAll, selectedSaturday]);
+  }, [coachId, showAll, selectedSaturday, refreshKey]);
 
-  // Group sessions by day, filtering out sessions past their end_date
+  // Load groups + coaches for admin edit forms
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function loadOptions() {
+      const [{ data: g }, { data: c }] = await Promise.all([
+        supabase.from("groups").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("profiles").select("id, first_name, last_name").in("role", ["coach", "admin"]).eq("is_active", true).order("first_name"),
+      ]);
+      setGroups((g as GroupOption[]) || []);
+      setCoaches((c as CoachOption[]) || []);
+    }
+    loadOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  function handleCreate(formData: FormData) {
+    setFormError(null);
+    startTransition(async () => {
+      const result = await createSingleSession(formData);
+      if ("error" in result) setFormError(result.error ?? "Failed");
+      else {
+        setShowAddDrawer(false);
+        setToast({ message: "Session added", variant: "success" });
+        setRefreshKey((k) => k + 1);
+      }
+    });
+  }
+
+  function handleUpdate(formData: FormData) {
+    if (!editingSession) return;
+    setFormError(null);
+    startTransition(async () => {
+      const result = await updateScheduleSession(editingSession.id, formData);
+      if ("error" in result) setFormError(result.error ?? "Failed");
+      else {
+        setEditingSession(null);
+        setToast({ message: "Session updated", variant: "success" });
+        setRefreshKey((k) => k + 1);
+      }
+    });
+  }
+
+  function handleCancelDate(sessionId: string, date: string) {
+    startTransition(async () => {
+      const res = await cancelScheduleSessionDate(sessionId, date);
+      if ("error" in res) setToast({ message: res.error ?? "Failed", variant: "error" });
+      else setToast({ message: "Session cancelled for this date", variant: "success" });
+      setRefreshKey((k) => k + 1);
+    });
+  }
+
+  function openAdd() {
+    setEditingSession(null);
+    setFormError(null);
+    setShowAddDrawer(true);
+  }
+
+  function openEdit(session: ScheduleBlock) {
+    setShowAddDrawer(false);
+    setFormError(null);
+    setEditingSession(session);
+  }
+
+
+
+  // Group sessions by day, filtering out sessions outside their valid date range
   const sessionsByDay = new Map<number, ScheduleBlock[]>();
   for (const s of sessions) {
     // Find the actual date for this day_of_week in the current week view
@@ -234,8 +331,17 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
       const endDate = new Date(s.end_date + "T23:59:59");
       if (dayDate > endDate) continue; // skip expired sessions
     }
+    // Skip cancelled sessions for this specific date
+    if (s.is_cancelled) continue;
+    // Skip sessions for dates before the session was created
+    if (dayDate && s.created_at) {
+      const createdDate = new Date(s.created_at);
+      createdDate.setHours(0, 0, 0, 0);
+      if (dayDate < createdDate) continue;
+    }
     const existing = sessionsByDay.get(s.day_of_week) || [];
     existing.push(s);
+    existing.sort((a, b) => a.start_time.localeCompare(b.start_time));
     sessionsByDay.set(s.day_of_week, existing);
   }
 
@@ -269,16 +375,21 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           </span>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-              showAll
-                ? "bg-primary-50 border-primary text-primary"
-                : "border-slate-200 text-slate-500 hover:border-slate-300"
-            }`}
-          >
-            {showAll ? "All Sessions" : "My Sessions"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                showAll
+                  ? "bg-primary-50 border-primary text-primary"
+                  : "border-slate-200 text-slate-500 hover:border-slate-300"
+              }`}
+            >
+              {showAll ? "All Sessions" : "My Sessions"}
+            </button>
+            <Button size="sm" onClick={openAdd}>
+              <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span></span>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -333,26 +444,44 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                       daySessions.map((session) => {
                         const sessionDate = formatLocalDate(dateForDay);
                         return (
-                          <Link
-                            key={session.id}
-                            href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
-                            className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
-                              session.has_attendance ? "opacity-60" : ""
-                            } hover:shadow-sm transition-shadow`}
-                          >
-                            <p className="text-[11px] font-semibold text-slate-900 truncate">
-                              {session.group_name}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {formatTime(session.start_time)}
-                            </p>
-                            {session.has_attendance && (
-                              <div className="flex items-center gap-0.5 mt-0.5">
-                                <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
-                                <span className="text-[9px] text-emerald-600">Logged</span>
+                          <div key={session.id} className="relative group/session">
+                            <Link
+                              href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
+                              className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
+                                session.has_attendance ? "opacity-60" : ""
+                              } hover:shadow-sm transition-shadow`}
+                            >
+                              <p className="text-[11px] font-semibold text-slate-900 truncate">
+                                {session.group_name}
+                              </p>
+                              <p className="text-[10px] text-slate-500">
+                                {formatTime(session.start_time)}
+                              </p>
+                              {session.has_attendance && (
+                                <div className="flex items-center gap-0.5 mt-0.5">
+                                  <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                  <span className="text-[9px] text-emerald-600">Logged</span>
+                                </div>
+                              )}
+                            </Link>
+                            {isAdmin && (
+                              <div className="absolute top-1 right-1 hidden group-hover/session:flex gap-0.5">
+                                <button
+                                  onClick={(e) => { e.preventDefault(); openEdit(session); }}
+                                  className="p-0.5 rounded bg-white/80 text-slate-400 hover:text-slate-600 shadow-sm"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.preventDefault(); handleCancelDate(session.id, sessionDate); }}
+                                  className="p-0.5 rounded bg-white/80 text-slate-400 hover:text-red-500 shadow-sm"
+                                  title="Cancel this date only"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               </div>
                             )}
-                          </Link>
+                          </div>
                         );
                       })
                     )}
@@ -396,27 +525,44 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                         {daySessions.map((session) => {
                           const sessionDate = formatLocalDate(dateForDay);
                           return (
-                            <Link
-                              key={session.id}
-                              href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
-                              className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
-                                session.has_attendance ? "opacity-60" : ""
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-900">{session.group_name}</span>
-                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {formatTime(session.start_time)}
-                                </span>
-                              </div>
-                              {session.has_attendance && (
-                                <div className="flex items-center gap-0.5 mt-0.5">
-                                  <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
-                                  <span className="text-[9px] text-emerald-600">Logged</span>
+                            <div key={session.id} className="relative">
+                              <Link
+                                href={`${sessionBasePath}/${session.id}?date=${sessionDate}`}
+                                className={`block w-full text-left p-2 rounded-lg border-l-3 ${getLevelColor(session.group_level)} ${
+                                  session.has_attendance ? "opacity-60" : ""
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-900">{session.group_name}</span>
+                                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                    {isAdmin && (
+                                      <>
+                                        <button
+                                          onClick={(e) => { e.preventDefault(); openEdit(session); }}
+                                          className="p-0.5 text-slate-400 hover:text-slate-600"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={(e) => { e.preventDefault(); handleCancelDate(session.id, sessionDate); }}
+                                          className="p-0.5 text-slate-400 hover:text-red-500"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    )}
+                                    <Clock className="w-3 h-3" />
+                                    {formatTime(session.start_time)}
+                                  </span>
                                 </div>
-                              )}
-                            </Link>
+                                {session.has_attendance && (
+                                  <div className="flex items-center gap-0.5 mt-0.5">
+                                    <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                    <span className="text-[9px] text-emerald-600">Logged</span>
+                                  </div>
+                                )}
+                              </Link>
+                            </div>
                           );
                         })}
                       </div>
@@ -429,6 +575,111 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         </>
       )}
 
+      {/* Admin Add Session Drawer */}
+      {isAdmin && (
+        <>
+          <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
+          <Drawer
+            open={showAddDrawer}
+            onClose={() => setShowAddDrawer(false)}
+            title="Add Session"
+          >
+            <form action={handleCreate} className="space-y-4">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+                  {formError}
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Group</label>
+                <Select name="group_id" defaultValue="">
+                  <option value="">Select group...</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Date</label>
+                <DatePicker name="session_date" placeholder="Select date" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
+                  <Input name="start_time" type="time" required />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">End Time</label>
+                  <Input name="end_time" type="time" required />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
+                <Select name="coach_id" defaultValue="">
+                  <option value="">No coach</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
+                <Input name="location" placeholder="e.g. Court 1" />
+              </div>
+              <Button type="submit" fullWidth disabled={isPending}>
+                {isPending ? "Saving..." : "Add Session"}
+              </Button>
+            </form>
+          </Drawer>
+
+          {/* Admin Edit Session Drawer */}
+          <Drawer
+            open={editingSession !== null}
+            onClose={() => setEditingSession(null)}
+            title="Edit Session"
+          >
+            {editingSession && (
+              <form action={handleUpdate} className="space-y-4">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+                    {formError}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
+                    <Input name="start_time" type="time" required defaultValue={editingSession.start_time?.slice(0, 5) || ""} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">End Time</label>
+                    <Input name="end_time" type="time" required defaultValue={editingSession.end_time?.slice(0, 5) || ""} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
+                  <Select name="coach_id" defaultValue={editingSession.coach_id || ""}>
+                    <option value="">No coach</option>
+                    {coaches.map((c) => (
+                      <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
+                  <Input name="location" placeholder="e.g. Court 1" defaultValue={editingSession.location || ""} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">End Date</label>
+                  <DatePicker name="end_date" value={editingSession.end_date || ""} />
+                </div>
+                <Button type="submit" fullWidth disabled={isPending}>
+                  {isPending ? "Saving..." : "Update Session"}
+                </Button>
+              </form>
+            )}
+          </Drawer>
+        </>
+      )}
     </div>
   );
 }

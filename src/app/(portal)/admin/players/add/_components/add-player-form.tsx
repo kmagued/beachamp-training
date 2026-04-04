@@ -23,6 +23,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
   const [phone, setPhone] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [area, setArea] = useState("");
+  const [gender, setGender] = useState("");
   const [playingLevel, setPlayingLevel] = useState("");
   const [trainingGoals, setTrainingGoals] = useState<string[]>([]);
   const [healthConditions, setHealthConditions] = useState("");
@@ -85,6 +86,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
     formData.set("phone", phone);
     formData.set("date_of_birth", dateOfBirth);
     formData.set("area", area);
+    formData.set("gender", gender);
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
@@ -117,6 +119,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
         setPhone("");
         setDateOfBirth("");
         setArea("");
+        setGender("");
         setPlayingLevel("");
         setTrainingGoals([]);
         setHealthConditions("");
@@ -182,11 +185,24 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
           </div>
           <div>
             <Label>Area of Residence</Label>
-            <Select value={area} onChange={(e) => setArea(e.target.value)}>
-              <option value="">Select area...</option>
+            <Input
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="e.g. Maadi, New Cairo"
+              list="area-suggestions"
+            />
+            <datalist id="area-suggestions">
               {branding.areas.map((a) => (
-                <option key={a} value={a}>{a}</option>
+                <option key={a} value={a} />
               ))}
+            </datalist>
+          </div>
+          <div>
+            <Label>Gender</Label>
+            <Select value={gender} onChange={(e) => setGender(e.target.value)}>
+              <option value="">Select...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
             </Select>
           </div>
           <div>
@@ -198,7 +214,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
               ))}
             </Select>
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <Label>Training Goals</Label>
             <div className="flex flex-wrap gap-2">
               {branding.trainingGoals.map((goal) => {

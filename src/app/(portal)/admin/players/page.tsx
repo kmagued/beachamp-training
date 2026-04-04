@@ -80,7 +80,7 @@ function AdminPlayersContent() {
     const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+        .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
         .eq("role", "player")
         .order("created_at", { ascending: false }),
       supabase

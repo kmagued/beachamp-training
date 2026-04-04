@@ -25,6 +25,7 @@ export async function updatePlayer(playerId: string, formData: FormData) {
     phone: (formData.get("phone") as string)?.trim() || null,
     date_of_birth: (formData.get("date_of_birth") as string)?.trim() || null,
     area: (formData.get("area") as string)?.trim() || null,
+    gender: (formData.get("gender") as string)?.trim() || null,
     playing_level: (formData.get("playing_level") as string)?.trim() || null,
     training_goals: (formData.get("training_goals") as string)?.trim() || null,
     health_conditions: (formData.get("health_conditions") as string)?.trim() || null,
@@ -34,7 +35,6 @@ export async function updatePlayer(playerId: string, formData: FormData) {
     preferred_position: (formData.get("preferred_position") as string)?.trim() || null,
     guardian_name: (formData.get("guardian_name") as string)?.trim() || null,
     guardian_phone: (formData.get("guardian_phone") as string)?.trim() || null,
-    is_active: formData.get("is_active") === "true",
   };
 
   if (createdAt) {

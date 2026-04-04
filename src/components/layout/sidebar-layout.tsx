@@ -24,27 +24,19 @@ import {
   Receipt,
   ClipboardList,
   Ticket,
+  UserCheck,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
+import { NotificationBell } from "./notification-bell";
 
 type Portal = "player" | "coach" | "admin";
 
-const portalConfig: Record<Portal, { label: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
-  player: { label: "Player Portal", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
-  coach: {
-    label: "Coach Portal",
-    avatar: "bg-primary",
-    labelColor: "text-primary",
-    accentBg: "bg-primary-50",
-    accentText: "text-primary-700",
-  },
-  admin: {
-    label: "Admin Portal",
-    avatar: "bg-primary",
-    labelColor: "text-primary",
-    accentBg: "bg-primary-50",
-    accentText: "text-primary-700",
-  },
+const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
+  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
+  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
+  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
 };
 
 const iconMap = {
@@ -59,103 +51,134 @@ const iconMap = {
   coaches: GraduationCap,
   users: ShieldCheck,
   groups: UsersRound,
-  "my-groups": Users,
+  "my-groups": UsersRound,
   schedule: Calendar,
   expenses: Receipt,
   "promo-codes": Ticket,
   "daily-report": ClipboardList,
+  "private-sessions": UserCheck,
 } as const;
-
-const playerNav = [
-  { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
-  { key: "sessions", label: "My Sessions", href: "/player/sessions" },
-  { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions" },
-  { key: "feedback", label: "Feedback", href: "/player/feedback" },
-  { key: "profile", label: "Profile", href: "/player/profile" },
-] as const;
-
-const coachNav = [
-  { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
-  { key: "schedule", label: "Schedule", href: "/coach/schedule" },
-  { key: "my-groups", label: "My Groups", href: "/coach/groups" },
-] as const;
 
 type NavItem = { key: string; label: string; href: string; section?: string };
 
+const playerNav: NavItem[] = [
+  { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
+  { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
+  { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
+  { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
+  { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },
+  { key: "profile", label: "Profile", href: "/player/profile", section: "Account" },
+];
+
+const coachNav: NavItem[] = [
+  { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
+  { key: "schedule", label: "Schedule", href: "/coach/schedule" },
+  { key: "my-groups", label: "My Groups", href: "/coach/groups" },
+];
+
 const adminNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
-  { key: "players", label: "Players", href: "/admin/players" },
-  { key: "coaches", label: "Coaches", href: "/admin/coaches" },
-  { key: "groups", label: "Groups", href: "/admin/groups" },
-  { key: "payments", label: "Payments", href: "/admin/payments" },
-  { key: "expenses", label: "Expenses", href: "/admin/expenses" },
-  { key: "packages", label: "Packages", href: "/admin/packages" },
-  { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes" },
-  { key: "users", label: "Admins", href: "/admin/users" },
-  // Training Operations
-  { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
+  { key: "players", label: "Players", href: "/admin/players", section: "People" },
+  { key: "coaches", label: "Coaches", href: "/admin/coaches", section: "People" },
+  { key: "groups", label: "Groups", href: "/admin/groups", section: "People" },
+  { key: "payments", label: "Payments", href: "/admin/payments", section: "Finance" },
+  { key: "expenses", label: "Expenses", href: "/admin/expenses", section: "Finance" },
+  { key: "packages", label: "Packages", href: "/admin/packages", section: "Finance" },
+  { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes", section: "Finance" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
+  { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
+  { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
+  { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
 
 interface SidebarLayoutProps {
   portal: Portal;
-  user: Pick<Profile, "first_name" | "last_name" | "role" | "email">;
+  user: Pick<Profile, "id" | "first_name" | "last_name" | "role" | "email">;
   children: React.ReactNode;
 }
+
+const SIDEBAR_W = 220;
+const SIDEBAR_COLLAPSED_W = 64;
 
 export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const config = portalConfig[portal];
   const navItems = portal === "admin" ? adminNav : portal === "coach" ? coachNav : playerNav;
 
   const initials = `${(user.first_name || "")[0] || ""}${(user.last_name || "")[0] || ""}`.toUpperCase() || "U";
+  const notifHref = portal === "admin" ? "/admin/notifications" : portal === "coach" ? "/coach/notifications" : "/player/notifications";
 
-  // Match the most specific route first (longer href = more specific)
   const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
   const matched = sortedNav.find((item) => pathname.startsWith(item.href))?.key;
-  // /player/subscribe should highlight the subscriptions tab
   const activeKey = matched || (pathname.startsWith(`/${portal}/subscribe`) ? "subscriptions" : "dashboard");
+
+  const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
 
   return (
     <div className="min-h-screen flex bg-surface-bg">
-      {/* Desktop sidebar — light */}
-      <aside className="hidden md:flex flex-col w-[220px] bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-30">
-        {/* Brand */}
-        <div className="px-5 pt-5 pb-4">
-          <p className={cn("text-xs font-semibold uppercase tracking-wider mb-1", config.labelColor)}>{config.label}</p>
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          "hidden md:flex flex-col bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-in-out",
+        )}
+        style={{ width: sidebarW }}
+      >
+        {/* Header */}
+        <div className="h-14 flex items-center justify-between border-b border-slate-100 shrink-0 px-3">
+          {!collapsed && (
+            <p className={cn("text-xs font-semibold uppercase tracking-wider pl-2", config.labelColor)}>
+              {config.label}
+            </p>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn(
+              "p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors",
+              collapsed && "mx-auto",
+            )}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 mt-2 overflow-y-auto">
+        <nav className="flex-1 px-2 pt-2 overflow-y-auto overflow-x-hidden">
           {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
-            const navItem = item as NavItem;
-            const prevItem = index > 0 ? (navItems[index - 1] as NavItem) : null;
-            const showSection = navItem.section && navItem.section !== prevItem?.section;
+            const prevItem = index > 0 ? navItems[index - 1] : null;
+            const showSection = item.section && item.section !== prevItem?.section;
             return (
               <div key={item.key}>
                 {showSection && (
-                  <div className="mt-4 mb-2 px-3">
-                    <div className="border-t border-slate-200" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
-                      {navItem.section}
-                    </p>
-                  </div>
+                  collapsed ? (
+                    <div className="my-2 mx-2 border-t border-slate-200" />
+                  ) : (
+                    <div className="mt-2.5 mb-1 px-3">
+                      <div className="border-t border-slate-200" />
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-2">
+                        {item.section}
+                      </p>
+                    </div>
+                  )
                 )}
                 <Link
                   href={item.href}
+                  title={collapsed ? item.label : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
+                    "flex items-center rounded-lg text-[13px] font-medium transition-colors",
+                    collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
                     isActive
                       ? cn(config.accentBg, config.accentText)
                       : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
                   )}
                 >
-                  {Icon && <Icon className="w-[18px] h-[18px]" />}
-                  {item.label}
+                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                  {!collapsed && <span className="truncate">{item.label}</span>}
                 </Link>
               </div>
             );
@@ -163,8 +186,8 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </nav>
 
         {/* Dev portal switcher */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="px-3 border-t border-slate-200 pt-3 mt-2">
+        {process.env.NODE_ENV === "development" && !collapsed && (
+          <div className="px-3 border-t border-slate-200 pt-3 pb-4 mt-2">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
             <div className="flex gap-1">
               {(["admin", "coach", "player"] as const).map((p) => (
@@ -184,43 +207,52 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             </div>
           </div>
         )}
-
-        {/* User section */}
-        <div className="px-3 pb-4 border-t border-slate-200 pt-3 mt-2">
-          <div className="flex items-center gap-3 px-2 mb-3">
-            <div
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
-                config.avatar,
-              )}
-            >
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">
-                {user.first_name} {user.last_name}
-              </p>
-              <p className="text-[11px] text-slate-400 capitalize">{user.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => logout()}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors w-full"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
-        </div>
       </aside>
 
-      {/* Mobile header */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 h-14">
-        <Link href={navItems[0].href} className="text-sm font-bold text-slate-900">
-          {branding.name}
-        </Link>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-slate-600 p-1">
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+      {/* Top navbar */}
+      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 h-14 transition-[left] duration-200">
+        <div className="flex items-center justify-between h-full px-4">
+          {/* Left: brand on mobile */}
+          <div className="flex items-center gap-3 md:hidden">
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="text-slate-600 p-1 -ml-1"
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <Link href={navItems[0].href} className="text-sm font-bold text-slate-900">
+              {branding.name}
+            </Link>
+          </div>
+
+          {/* Spacer on desktop */}
+          <div className="hidden md:block" />
+
+          {/* Right: notifications + user */}
+          <div className="flex items-center gap-2">
+            <NotificationBell userId={user.id} href={notifHref} />
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 ml-1">
+              <div
+                className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
+                  config.avatar,
+                )}
+              >
+                {initials}
+              </div>
+              <span className="text-sm font-medium text-slate-700 max-w-[140px] truncate">
+                {user.first_name} {user.last_name}
+              </span>
+            </div>
+            <button
+              onClick={() => logout()}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Mobile slide-out menu */}
@@ -233,30 +265,23 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       />
       <div
         className={cn(
-          "md:hidden fixed inset-y-0 right-0 w-64 bg-white border-l border-slate-200 z-50 flex flex-col transition-transform duration-300 ease-in-out",
-          mobileOpen ? "translate-x-0" : "translate-x-full",
+          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 flex flex-col transition-transform duration-300 ease-in-out pt-14",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-          <p className={cn("text-xs font-semibold uppercase tracking-wider", config.labelColor)}>{config.label}</p>
-          <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <nav className="flex-1 px-3 overflow-y-auto">
+        <nav className="flex-1 px-3 pt-4 overflow-y-auto">
           {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
-            const navItem = item as NavItem;
-            const prevItem = index > 0 ? (navItems[index - 1] as NavItem) : null;
-            const showSection = navItem.section && navItem.section !== prevItem?.section;
+            const prevItem = index > 0 ? navItems[index - 1] : null;
+            const showSection = item.section && item.section !== prevItem?.section;
             return (
               <div key={item.key}>
                 {showSection && (
                   <div className="mt-4 mb-2 px-3">
                     <div className="border-t border-slate-200" />
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
-                      {navItem.section}
+                      {item.section}
                     </p>
                   </div>
                 )}
@@ -277,9 +302,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             );
           })}
         </nav>
-        {/* Dev portal switcher */}
+
         {process.env.NODE_ENV === "development" && (
-          <div className="px-3 border-t border-slate-200 pt-3">
+          <div className="px-3 border-t border-slate-200 pt-3 pb-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
             <div className="flex gap-1">
               {(["admin", "coach", "player"] as const).map((p) => (
@@ -299,35 +324,13 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             </div>
           </div>
         )}
-
-        <div className="px-3 pb-4 border-t border-slate-200 pt-3">
-          <div className="flex items-center gap-3 px-2 mb-3">
-            <div
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
-                config.avatar,
-              )}
-            >
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">
-                {user.first_name} {user.last_name}
-              </p>
-              <p className="text-[11px] text-slate-400 capitalize">{user.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => logout()}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors w-full"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
-        </div>
       </div>
 
-      <main className="flex-1 min-w-0 overflow-x-hidden md:ml-[220px] pt-14 md:pt-0">{children}</main>
+      {/* Main content — desktop gets sidebar margin via CSS variable */}
+      <style>{`:root { --sidebar-w: ${sidebarW}px; }`}</style>
+      <main className="flex-1 min-w-0 overflow-x-hidden pt-14 md:ml-[var(--sidebar-w)] transition-[margin] duration-200">
+        {children}
+      </main>
     </div>
   );
 }

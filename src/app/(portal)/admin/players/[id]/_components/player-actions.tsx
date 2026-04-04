@@ -269,6 +269,7 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
   const [phone, setPhone] = useState(player.phone || "");
   const [dateOfBirth, setDateOfBirth] = useState(player.date_of_birth || "");
   const [area, setArea] = useState(player.area || "");
+  const [gender, setGender] = useState(player.gender || "");
   const [playingLevel, setPlayingLevel] = useState(player.playing_level || "");
   const [trainingGoals, setTrainingGoals] = useState<string[]>(
     player.training_goals ? player.training_goals.split(", ").filter(Boolean) : []
@@ -280,7 +281,6 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
   const [preferredPosition, setPreferredPosition] = useState(player.preferred_position || "");
   const [guardianName, setGuardianName] = useState(player.guardian_name || "");
   const [guardianPhone, setGuardianPhone] = useState(player.guardian_phone || "");
-  const [isActive, setIsActive] = useState(player.is_active);
   const [registrationDate, setRegistrationDate] = useState(
     player.created_at ? new Date(player.created_at).toISOString().split("T")[0] : ""
   );
@@ -294,6 +294,7 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
     formData.set("phone", phone);
     formData.set("date_of_birth", dateOfBirth);
     formData.set("area", area);
+    formData.set("gender", gender);
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
@@ -303,7 +304,6 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
     formData.set("preferred_position", preferredPosition);
     formData.set("guardian_name", guardianName);
     formData.set("guardian_phone", guardianPhone);
-    formData.set("is_active", String(isActive));
     formData.set("created_at", registrationDate);
 
     startTransition(async () => {
@@ -372,33 +372,34 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
           </div>
         </div>
 
-        <div>
-          <Label>Area</Label>
-          <Select value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Select area...</option>
-            {branding.areas.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </Select>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>Playing Level</Label>
-            <Select value={playingLevel} onChange={(e) => setPlayingLevel(e.target.value)}>
-              <option value="">Select level...</option>
-              {branding.levels.map((l) => (
-                <option key={l.value} value={l.value}>{l.label}</option>
+            <Label>Area</Label>
+            <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Maadi, New Cairo" list="area-suggestions-detail" />
+            <datalist id="area-suggestions-detail">
+              {branding.areas.map((a) => (
+                <option key={a} value={a} />
               ))}
-            </Select>
+            </datalist>
           </div>
           <div>
-            <Label>Status</Label>
-            <Select value={String(isActive)} onChange={(e) => setIsActive(e.target.value === "true")}>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+            <Label>Gender</Label>
+            <Select value={gender} onChange={(e) => setGender(e.target.value)}>
+              <option value="">Select...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
             </Select>
           </div>
+        </div>
+
+        <div>
+          <Label>Playing Level</Label>
+          <Select value={playingLevel} onChange={(e) => setPlayingLevel(e.target.value)}>
+            <option value="">Select level...</option>
+            {branding.levels.map((l) => (
+              <option key={l.value} value={l.value}>{l.label}</option>
+            ))}
+          </Select>
         </div>
 
         <div>

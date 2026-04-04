@@ -60,23 +60,85 @@ export default function AdminGroupDetailPage() {
     if (data) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const playerIds = data.map((gp: any) => gp.profiles?.id).filter(Boolean);
+      // Fetch ALL subscriptions (not filtered by status) to match players list logic
       const { data: subs } = await supabase
         .from("subscriptions")
-        .select("player_id, sessions_remaining")
+        .select("player_id, sessions_remaining, sessions_total, start_date, end_date, status")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
-        .eq("status", "active");
+        .order("created_at", { ascending: false });
 
-      const subMap = new Map((subs || []).map((s: { player_id: string; sessions_remaining: number }) => [s.player_id, s.sessions_remaining]));
+      // Group all subscriptions by player
+      const subsByPlayer = new Map<string, typeof allSubs>();
+      type SubRow = { player_id: string; sessions_remaining: number; sessions_total: number; start_date: string | null; end_date: string | null; status: string };
+      const allSubs = (subs || []) as SubRow[];
+      for (const s of allSubs) {
+        const existing = subsByPlayer.get(s.player_id) || [];
+        existing.push(s);
+        subsByPlayer.set(s.player_id, existing);
+      }
+
+      // Use the same status logic as the players list
+      function resolveStatus(playerSubs: SubRow[]): { sessions_remaining: number | null; sessions_total: number | null; end_date: string | null; sub_status: string | null } {
+        if (!playerSubs.length) return { sessions_remaining: null, sessions_total: null, end_date: null, sub_status: null };
+
+        const now = Date.now();
+        // Find effectively active subs
+        const activeSubs = playerSubs.filter((s) => {
+          if (s.status !== "active" && s.status !== "pending") return false;
+          if (s.sessions_remaining <= 0) return false;
+          if (s.end_date && new Date(s.end_date).getTime() < now) return false;
+          return true;
+        });
+
+        // Pick the one covering today, or the nearest upcoming, or the first active
+        const activeSub =
+          activeSubs.find((s) => {
+            const start = s.start_date ? new Date(s.start_date).getTime() : 0;
+            const end = s.end_date ? new Date(s.end_date).getTime() : Infinity;
+            return start <= now && now <= end;
+          }) ||
+          activeSubs.filter((s) => s.start_date && new Date(s.start_date).getTime() > now)
+            .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime())[0] ||
+          activeSubs[0] || null;
+
+        if (activeSub) {
+          return { sessions_remaining: activeSub.sessions_remaining, sessions_total: activeSub.sessions_total, end_date: activeSub.end_date, sub_status: activeSub.status };
+        }
+
+        // Frozen
+        const frozen = playerSubs.find((s) => s.status === "frozen");
+        if (frozen) return { sessions_remaining: frozen.sessions_remaining, sessions_total: frozen.sessions_total, end_date: frozen.end_date, sub_status: "frozen" };
+
+        // Expired
+        const expired = playerSubs.find((s) => s.status === "expired");
+        if (expired) return { sessions_remaining: expired.sessions_remaining, sessions_total: expired.sessions_total, end_date: expired.end_date, sub_status: "expired" };
+
+        // Pending
+        const pendingPayment = playerSubs.find((s) => s.status === "pending_payment");
+        if (pendingPayment) return { sessions_remaining: pendingPayment.sessions_remaining, sessions_total: pendingPayment.sessions_total, end_date: pendingPayment.end_date, sub_status: "pending_payment" };
+
+        const pending = playerSubs.find((s) => s.status === "pending");
+        if (pending) return { sessions_remaining: pending.sessions_remaining, sessions_total: pending.sessions_total, end_date: pending.end_date, sub_status: "pending" };
+
+        return { sessions_remaining: null, sessions_total: null, end_date: null, sub_status: null };
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setPlayers(data.map((gp: any) => ({
-        id: gp.profiles?.id || "",
-        first_name: gp.profiles?.first_name || "",
-        last_name: gp.profiles?.last_name || "",
-        playing_level: gp.profiles?.playing_level,
-        sessions_remaining: subMap.get(gp.profiles?.id) ?? null,
-        joined_at: gp.joined_at,
-      })));
+      setPlayers(data.map((gp: any) => {
+        const playerSubs = subsByPlayer.get(gp.profiles?.id) || [];
+        const resolved = resolveStatus(playerSubs);
+        return {
+          id: gp.profiles?.id || "",
+          first_name: gp.profiles?.first_name || "",
+          last_name: gp.profiles?.last_name || "",
+          playing_level: gp.profiles?.playing_level,
+          sessions_remaining: resolved.sessions_remaining,
+          sessions_total: resolved.sessions_total,
+          end_date: resolved.end_date,
+          sub_status: resolved.sub_status,
+          joined_at: gp.joined_at,
+        };
+      }));
     }
   }, [groupId, supabase]);
 

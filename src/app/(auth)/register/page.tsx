@@ -21,6 +21,7 @@ export default function RegisterPage() {
     first_name: "",
     last_name: "",
     date_of_birth: "",
+    gender: "",
     email: "",
     phone: "",
     area: "",
@@ -151,12 +152,25 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div>
-              <Label required>Date of Birth</Label>
-              <DatePicker
-                value={form.date_of_birth}
-                onChange={(e) => updateField("date_of_birth", e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label required>Date of Birth</Label>
+                <DatePicker
+                  value={form.date_of_birth}
+                  onChange={(e) => updateField("date_of_birth", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Gender</Label>
+                <Select
+                  value={form.gender}
+                  onChange={(e) => updateField("gender", e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </Select>
+              </div>
             </div>
 
             <div>
@@ -181,15 +195,18 @@ export default function RegisterPage() {
 
             <div>
               <Label required>Area of Residence</Label>
-              <Select
+              <Input
+                type="text"
                 value={form.area}
                 onChange={(e) => updateField("area", e.target.value)}
-              >
-                <option value="">Select area...</option>
+                placeholder="e.g. Maadi, New Cairo"
+                list="area-suggestions-register"
+              />
+              <datalist id="area-suggestions-register">
                 {branding.areas.map((a) => (
-                  <option key={a} value={a}>{a}</option>
+                  <option key={a} value={a} />
                 ))}
-              </Select>
+              </datalist>
             </div>
 
             <div className="pt-2 border-t border-slate-100">

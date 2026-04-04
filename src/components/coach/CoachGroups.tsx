@@ -106,12 +106,14 @@ export function CoachGroups({ coachId, isAdmin }: CoachGroupsProps) {
             .eq("group_id", g.id)
             .eq("is_active", true);
 
-          // Get schedule
+          // Get schedule (only active, not expired)
+          const today = new Date().toISOString().split("T")[0];
           const { data: schedule } = await supabase
             .from("schedule_sessions")
             .select("day_of_week, start_time, end_time, location")
             .eq("group_id", g.id)
             .eq("is_active", true)
+            .or(`end_date.is.null,end_date.gte.${today}`)
             .order("day_of_week")
             .order("start_time");
 

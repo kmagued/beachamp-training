@@ -12,6 +12,9 @@ export type PaymentStatus = "pending" | "confirmed" | "rejected";
 export type AttendanceStatus = "present" | "absent" | "excused";
 export type RecurrenceType = "monthly" | "weekly";
 export type DiscountType = "percentage" | "fixed_amount";
+export type PrivateSessionStatus = "pending" | "confirmed" | "rejected" | "cancelled" | "completed";
+export type NotificationType = "system" | "payment" | "subscription" | "session" | "private_session" | "reminder";
+export type Gender = "male" | "female";
 export type PreferredHand = "left" | "right";
 export type PreferredPosition = "defender" | "blocker";
 
@@ -39,6 +42,7 @@ export interface Database {
           preferred_position: PreferredPosition | null;
           guardian_name: string | null;
           guardian_phone: string | null;
+          gender: Gender | null;
           is_active: boolean;
           profile_completed: boolean;
           created_at: string;
@@ -64,6 +68,7 @@ export interface Database {
           preferred_position?: PreferredPosition | null;
           guardian_name?: string | null;
           guardian_phone?: string | null;
+          gender?: Gender | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
@@ -89,6 +94,7 @@ export interface Database {
           preferred_position?: PreferredPosition | null;
           guardian_name?: string | null;
           guardian_phone?: string | null;
+          gender?: Gender | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
@@ -146,6 +152,8 @@ export interface Database {
           end_date: string | null;
           status: SubscriptionStatus;
           promo_code_id: string | null;
+          frozen_at: string | null;
+          frozen_days_remaining: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -159,6 +167,8 @@ export interface Database {
           end_date?: string | null;
           status: SubscriptionStatus;
           promo_code_id?: string | null;
+          frozen_at?: string | null;
+          frozen_days_remaining?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -172,6 +182,8 @@ export interface Database {
           end_date?: string | null;
           status?: SubscriptionStatus;
           promo_code_id?: string | null;
+          frozen_at?: string | null;
+          frozen_days_remaining?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -504,6 +516,120 @@ export interface Database {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          body: string | null;
+          type: NotificationType;
+          link: string | null;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          body?: string | null;
+          type?: NotificationType;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          body?: string | null;
+          type?: NotificationType;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      private_session_requests: {
+        Row: {
+          id: string;
+          player_id: string;
+          coach_id: string | null;
+          requested_day_of_week: number;
+          requested_time: string;
+          duration_minutes: number;
+          location: string | null;
+          notes: string | null;
+          status: PrivateSessionStatus;
+          admin_notes: string | null;
+          confirmed_by: string | null;
+          confirmed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          coach_id?: string | null;
+          requested_day_of_week: number;
+          requested_time: string;
+          duration_minutes?: number;
+          location?: string | null;
+          notes?: string | null;
+          status?: PrivateSessionStatus;
+          admin_notes?: string | null;
+          confirmed_by?: string | null;
+          confirmed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          coach_id?: string | null;
+          requested_day_of_week?: number;
+          requested_time?: string;
+          duration_minutes?: number;
+          location?: string | null;
+          notes?: string | null;
+          status?: PrivateSessionStatus;
+          admin_notes?: string | null;
+          confirmed_by?: string | null;
+          confirmed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      subscription_freezes: {
+        Row: {
+          id: string;
+          subscription_id: string;
+          frozen_at: string;
+          unfrozen_at: string | null;
+          days_frozen: number | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          subscription_id: string;
+          frozen_at?: string;
+          unfrozen_at?: string | null;
+          days_frozen?: number | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          subscription_id?: string;
+          frozen_at?: string;
+          unfrozen_at?: string | null;
+          days_frozen?: number | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       promo_codes: {
         Row: {
           id: string;
@@ -619,6 +745,8 @@ export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
 export type PromoCode = Database["public"]["Tables"]["promo_codes"]["Row"];
 export type PromoCodeUse = Database["public"]["Tables"]["promo_code_uses"]["Row"];
+export type PrivateSessionRequest = Database["public"]["Tables"]["private_session_requests"]["Row"];
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
