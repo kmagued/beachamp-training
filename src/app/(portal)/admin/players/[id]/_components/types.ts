@@ -15,6 +15,7 @@ export interface PlayerProfile {
   preferred_position: string | null;
   guardian_name: string | null;
   guardian_phone: string | null;
+  gender: string | null;
   is_active: boolean;
   created_at: string;
 }

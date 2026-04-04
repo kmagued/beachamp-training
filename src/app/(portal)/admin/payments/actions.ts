@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
+import { createNotification, notifyAdmins } from "@/app/_actions/notifications";
 
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,6 +87,17 @@ export async function confirmPayment(paymentId: string) {
     }
   }
 
+  // Notify player that payment is confirmed
+  if (payment.player_id) {
+    await createNotification({
+      user_id: payment.player_id,
+      title: "Payment Confirmed",
+      body: "Your payment has been confirmed and your subscription is now active.",
+      type: "payment",
+      link: "/player/subscriptions",
+    });
+  }
+
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
   revalidatePath("/player/subscriptions");
@@ -99,7 +111,7 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("subscription_id, status")
+    .select("subscription_id, status, player_id")
     .eq("id", paymentId)
     .single();
 
@@ -125,6 +137,17 @@ export async function rejectPayment(paymentId: string, reason: string) {
       .eq("id", payment.subscription_id);
 
     if (subError) return { error: subError.message };
+  }
+
+  // Notify player of rejection
+  if (payment.player_id) {
+    await createNotification({
+      user_id: payment.player_id,
+      title: "Payment Rejected",
+      body: reason ? `Your payment was rejected: ${reason}` : "Your payment was rejected. Please contact support.",
+      type: "payment",
+      link: "/player/subscriptions",
+    });
   }
 
   revalidatePath("/admin/payments");

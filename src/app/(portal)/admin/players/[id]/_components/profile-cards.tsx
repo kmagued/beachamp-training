@@ -1,6 +1,6 @@
 import { Card, Badge } from "@/components/ui";
 import {
-  Phone, Mail, MapPin, Calendar,
+  Phone, Mail, MapPin, Calendar, User,
   Activity, Heart, Target, Ruler, Hand, Shield, Users,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
@@ -41,6 +41,7 @@ export function ProfileCard({ player }: { player: PlayerProfile }) {
             <InfoItem icon={<Phone className="w-4 h-4" />} label="Phone" value={player.phone} />
             <InfoItem icon={<Mail className="w-4 h-4" />} label="Email" value={player.email} />
             <InfoItem icon={<MapPin className="w-4 h-4" />} label="Area" value={player.area} />
+            <InfoItem icon={<User className="w-4 h-4" />} label="Gender" value={player.gender ? player.gender.charAt(0).toUpperCase() + player.gender.slice(1) : null} />
           </div>
         </div>
 

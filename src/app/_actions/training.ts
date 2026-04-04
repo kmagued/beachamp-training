@@ -419,6 +419,50 @@ export async function createScheduleSession(formData: FormData) {
   return { success: true };
 }
 
+/** Create a one-off session on a specific date (not recurring) */
+export async function createSingleSession(formData: FormData) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const groupId = formData.get("group_id") as string;
+  const coachId = (formData.get("coach_id") as string) || null;
+  const startTime = formData.get("start_time") as string;
+  const endTime = formData.get("end_time") as string;
+  const sessionDate = (formData.get("session_date") as string)?.trim();
+
+  if (!startTime || !endTime) return { error: "Start time and end time are required." };
+  const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
+  if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
+  if (!sessionDate) return { error: "A date is required." };
+  if (!groupId) return { error: "A group is required." };
+
+  // Derive day_of_week from the date, set end_date = same date so it only shows once
+  const dayOfWeek = new Date(sessionDate + "T00:00:00").getDay();
+
+  const { error } = await supabase.from("schedule_sessions").insert({
+    group_id: groupId,
+    coach_id: coachId,
+    day_of_week: dayOfWeek,
+    start_time: startTime,
+    end_time: endTime,
+    location: (formData.get("location") as string)?.trim() || null,
+    end_date: sessionDate,
+    is_active: true,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/groups");
+  revalidatePath(`/admin/groups/${groupId}`);
+  revalidatePath("/admin/schedule");
+  revalidatePath("/coach/schedule");
+  return { success: true };
+}
+
 export async function updateScheduleSession(id: string, formData: FormData) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
@@ -474,6 +518,31 @@ export async function deleteScheduleSession(id: string) {
   if (error) return { error: error.message };
 
   revalidatePath("/admin/groups");
+  revalidatePath("/admin/schedule");
+  revalidatePath("/coach/schedule");
+  return { success: true };
+}
+
+/** Cancel a single occurrence of a recurring session on a specific date */
+export async function cancelScheduleSessionDate(scheduleSessionId: string, date: string) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const { error } = await supabase.from("schedule_session_cancellations").insert({
+    schedule_session_id: scheduleSessionId,
+    cancelled_date: date,
+    cancelled_by: user!.id,
+  });
+
+  if (error) {
+    if (error.code === "23505") return { error: "This session is already cancelled for this date" };
+    return { error: error.message };
+  }
+
   revalidatePath("/admin/schedule");
   revalidatePath("/coach/schedule");
   return { success: true };

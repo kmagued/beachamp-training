@@ -24,7 +24,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at")
+      .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at")
       .eq("id", id)
       .eq("role", "player")
       .single(),
@@ -95,7 +95,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
         Back to Players
       </Link>
 
-      <PlayerHeader player={player} actions={<PlayerActionsMenu player={player} />} />
+      <PlayerHeader player={player} hasActiveSubscription={activeSubs.length > 0} actions={<PlayerActionsMenu player={player} />} />
       <ProfileCard player={player} />
       <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
       <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />

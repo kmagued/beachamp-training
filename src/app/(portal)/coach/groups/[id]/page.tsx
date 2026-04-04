@@ -52,21 +52,47 @@ export default function CoachGroupDetailPage() {
       const playerIds = data.map((gp: any) => gp.profiles?.id).filter(Boolean);
       const { data: subs } = await supabase
         .from("subscriptions")
-        .select("player_id, sessions_remaining")
+        .select("player_id, sessions_remaining, sessions_total, start_date, end_date, status")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
-        .eq("status", "active");
+        .order("created_at", { ascending: false });
 
-      const subMap = new Map((subs || []).map((s: { player_id: string; sessions_remaining: number }) => [s.player_id, s.sessions_remaining]));
+      type SubRow = { player_id: string; sessions_remaining: number; sessions_total: number; start_date: string | null; end_date: string | null; status: string };
+      const subsByPlayer = new Map<string, SubRow[]>();
+      for (const s of (subs || []) as SubRow[]) {
+        const existing = subsByPlayer.get(s.player_id) || [];
+        existing.push(s);
+        subsByPlayer.set(s.player_id, existing);
+      }
+
+      function resolveStatus(playerSubs: SubRow[]) {
+        if (!playerSubs.length) return { sessions_remaining: null, sessions_total: null, end_date: null, sub_status: null };
+        const now = Date.now();
+        const activeSubs = playerSubs.filter((s) => (s.status === "active" || s.status === "pending") && s.sessions_remaining > 0 && (!s.end_date || new Date(s.end_date).getTime() >= now));
+        const activeSub = activeSubs.find((s) => { const start = s.start_date ? new Date(s.start_date).getTime() : 0; const end = s.end_date ? new Date(s.end_date).getTime() : Infinity; return start <= now && now <= end; }) || activeSubs[0] || null;
+        if (activeSub) return { sessions_remaining: activeSub.sessions_remaining, sessions_total: activeSub.sessions_total, end_date: activeSub.end_date, sub_status: activeSub.status };
+        const frozen = playerSubs.find((s) => s.status === "frozen");
+        if (frozen) return { sessions_remaining: frozen.sessions_remaining, sessions_total: frozen.sessions_total, end_date: frozen.end_date, sub_status: "frozen" };
+        const expired = playerSubs.find((s) => s.status === "expired");
+        if (expired) return { sessions_remaining: expired.sessions_remaining, sessions_total: expired.sessions_total, end_date: expired.end_date, sub_status: "expired" };
+        const pp = playerSubs.find((s) => s.status === "pending_payment");
+        if (pp) return { sessions_remaining: pp.sessions_remaining, sessions_total: pp.sessions_total, end_date: pp.end_date, sub_status: "pending_payment" };
+        const p = playerSubs.find((s) => s.status === "pending");
+        if (p) return { sessions_remaining: p.sessions_remaining, sessions_total: p.sessions_total, end_date: p.end_date, sub_status: "pending" };
+        return { sessions_remaining: null, sessions_total: null, end_date: null, sub_status: null };
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setPlayers(data.map((gp: any) => ({
-        id: gp.profiles?.id || "",
-        first_name: gp.profiles?.first_name || "",
-        last_name: gp.profiles?.last_name || "",
-        playing_level: gp.profiles?.playing_level,
-        sessions_remaining: subMap.get(gp.profiles?.id) ?? null,
-        joined_at: gp.joined_at,
-      })));
+      setPlayers(data.map((gp: any) => {
+        const resolved = resolveStatus(subsByPlayer.get(gp.profiles?.id) || []);
+        return {
+          id: gp.profiles?.id || "",
+          first_name: gp.profiles?.first_name || "",
+          last_name: gp.profiles?.last_name || "",
+          playing_level: gp.profiles?.playing_level,
+          ...resolved,
+          joined_at: gp.joined_at,
+        };
+      }));
     }
   }, [groupId, supabase]);
 

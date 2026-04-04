@@ -127,20 +127,22 @@ export default function PlayerProfilePage() {
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Phone</label>
                 <Input name="phone" defaultValue={profile.phone || ""} />
               </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Gender</label>
+                <Select name="gender" defaultValue={profile.gender || ""}>
+                  <option value="">Select...</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </Select>
+              </div>
             </div>
 
             {/* Right column */}
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Area</label>
-                <Select name="area" defaultValue={profile.area || ""}>
-                  <option value="">Select area</option>
-                  {branding.areas.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </Select>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Area of Residence</label>
+                <Input name="area" defaultValue={profile.area || ""} placeholder="e.g. Maadi, New Cairo" />
               </div>
 
               <div>

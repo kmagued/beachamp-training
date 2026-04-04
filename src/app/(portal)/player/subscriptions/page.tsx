@@ -6,7 +6,6 @@ import { Card, Badge, EmptyState } from "@/components/ui";
 import { Package, ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
-import { FreezeButton } from "./freeze-button";
 
 interface SubWithPackage extends Subscription {
   packages: { name: string; session_count: number; price: number } | null;
@@ -152,13 +151,6 @@ export default async function PlayerSubscriptionsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {(sub.status === "active" || sub.status === "frozen") && sub.sessions_total > 1 && (
-                            <FreezeButton
-                              subscriptionId={sub.id}
-                              status={sub.status}
-                              packageName={sub.packages?.name || "Package"}
-                            />
-                          )}
                         </td>
                       </tr>
                     );
@@ -212,15 +204,6 @@ export default async function PlayerSubscriptionsPage() {
                       ) : (
                         <span className="text-amber-500">Awaiting confirmation</span>
                       )}
-                    </div>
-                  )}
-                  {(sub.status === "active" || sub.status === "frozen") && sub.sessions_total > 1 && (
-                    <div className="mt-2 pt-2 border-t border-slate-100">
-                      <FreezeButton
-                        subscriptionId={sub.id}
-                        status={sub.status}
-                        packageName={sub.packages?.name || "Package"}
-                      />
                     </div>
                   )}
                 </Card>
