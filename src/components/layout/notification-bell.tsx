@@ -39,7 +39,14 @@ export function NotificationBell({ userId, href }: NotificationBellProps) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Listen for manual mark-read events from inbox
+    const onUpdate = () => fetchCount();
+    window.addEventListener("notifications-updated", onUpdate);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("notifications-updated", onUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
