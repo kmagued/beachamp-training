@@ -46,12 +46,14 @@ export function NotificationInbox({ notifications }: { notifications: Notificati
   function handleMarkRead(id: string) {
     startTransition(async () => {
       await markNotificationRead(id);
+      window.dispatchEvent(new Event("notifications-updated"));
     });
   }
 
   function handleMarkAllRead() {
     startTransition(async () => {
       await markAllNotificationsRead();
+      window.dispatchEvent(new Event("notifications-updated"));
     });
   }
 

@@ -119,8 +119,9 @@ function AdminPaymentsContent() {
   }, [payments]);
 
   function getPaymentDate(p: PaymentRow): Date {
-    if (p.subscriptions?.start_date) return new Date(p.subscriptions.start_date + "T00:00:00");
+    if (p.status === "pending") return new Date(p.created_at);
     if (p.confirmed_at) return new Date(p.confirmed_at);
+    if (p.subscriptions?.start_date) return new Date(p.subscriptions.start_date + "T00:00:00");
     return new Date(p.created_at);
   }
 
