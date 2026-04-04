@@ -10,10 +10,31 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 type SortField = "name" | "sessions" | "status";
 type SortDir = "asc" | "desc";
 
-function getStatus(sessions: number | null): { label: string; variant: "success" | "warning" | "danger" | "neutral"; priority: number } {
-  if (sessions === null) return { label: "Inactive", variant: "neutral", priority: 3 };
-  if (sessions === 0) return { label: "Expired", variant: "danger", priority: 2 };
-  if (sessions <= 2) return { label: "Low", variant: "warning", priority: 1 };
+function getStatus(player: GroupPlayerRow): { label: string; variant: "success" | "warning" | "danger" | "neutral" | "info"; priority: number } {
+  const { sessions_remaining, sessions_total, end_date, sub_status } = player;
+
+  // No subscription at all
+  if (sub_status === null) return { label: "No Sub", variant: "neutral", priority: 5 };
+
+  if (sub_status === "frozen") return { label: "Frozen", variant: "info", priority: 2 };
+  if (sub_status === "pending" || sub_status === "pending_payment") return { label: "Pending", variant: "warning", priority: 3 };
+  if (sub_status === "expired") {
+    if (sessions_total === 1) return { label: "Attended", variant: "neutral", priority: 4 };
+    return { label: "Expired", variant: "danger", priority: 4 };
+  }
+  if (sub_status === "cancelled") return { label: "Cancelled", variant: "neutral", priority: 5 };
+
+  // Active subscription checks
+  if (sessions_remaining === null || sessions_remaining <= 0) return { label: "Expired", variant: "danger", priority: 4 };
+  if (end_date && new Date(end_date).getTime() < Date.now()) return { label: "Expired", variant: "danger", priority: 4 };
+
+  // Expiring soon
+  const total = sessions_total || 1;
+  const daysLeft = end_date ? Math.ceil((new Date(end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+  if (total > 1 && ((daysLeft !== null && daysLeft <= 10) || sessions_remaining / total <= 0.3)) {
+    return { label: "Expiring Soon", variant: "warning", priority: 1 };
+  }
+
   return { label: "Active", variant: "success", priority: 0 };
 }
 
@@ -54,7 +75,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
       if (sortField === "name") {
         cmp = `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
       } else if (sortField === "status") {
-        cmp = getStatus(a.sessions_remaining).priority - getStatus(b.sessions_remaining).priority;
+        cmp = getStatus(a).priority - getStatus(b).priority;
       } else {
         if (a.sessions_remaining === null && b.sessions_remaining === null) cmp = 0;
         else if (a.sessions_remaining === null) cmp = 1;
@@ -266,8 +287,8 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                       )}
                     </td>
                     <td className="py-2.5">
-                      <Badge variant={getStatus(p.sessions_remaining).variant}>
-                        {getStatus(p.sessions_remaining).label}
+                      <Badge variant={getStatus(p).variant}>
+                        {getStatus(p).label}
                       </Badge>
                     </td>
                     <td className="py-2.5 text-slate-500">{p.joined_at}</td>
@@ -328,8 +349,8 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                       <p className="text-sm font-medium text-slate-900 truncate">
                         {p.first_name} {p.last_name}
                       </p>
-                      <Badge variant={getStatus(p.sessions_remaining).variant}>
-                        {getStatus(p.sessions_remaining).label}
+                      <Badge variant={getStatus(p).variant}>
+                        {getStatus(p).label}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">

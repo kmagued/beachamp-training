@@ -13,6 +13,9 @@ export interface GroupPlayerRow {
   last_name: string;
   playing_level: string | null;
   sessions_remaining: number | null;
+  sessions_total: number | null;
+  end_date: string | null;
+  sub_status: string | null;
   joined_at: string;
 }
 

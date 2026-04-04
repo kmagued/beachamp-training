@@ -184,10 +184,10 @@ export default async function AdminDashboard() {
     return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   };
 
-  // Income by month
+  // Income by month (use confirmed_at as the primary date — payment appears in the month it was confirmed)
   const incomeByMonth: Record<string, number> = {};
   for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }[]) {
-    const dateStr = p.subscriptions?.start_date || p.confirmed_at;
+    const dateStr = p.confirmed_at || p.subscriptions?.start_date;
     if (!dateStr) continue;
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) continue;
@@ -338,9 +338,8 @@ export default async function AdminDashboard() {
         revenuePayments={(revenuePayments || [])
           .map((p: { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }) => ({
             amount: p.amount,
-            date: p.subscriptions?.start_date
-              ? p.subscriptions.start_date + "T00:00:00"
-              : p.confirmed_at || "",
+            date: p.confirmed_at
+              || (p.subscriptions?.start_date ? p.subscriptions.start_date + "T00:00:00" : ""),
           }))
           .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
         subsByPackage={subsByPackage}

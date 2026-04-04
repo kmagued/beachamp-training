@@ -8,8 +8,7 @@ export async function playerFreezeSubscription(subscriptionId: string) {
   const currentUser = await getCurrentUser();
   if (!currentUser) return { error: "Not authenticated" };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
+  const admin = createAdminClient();
 
   // Verify the subscription belongs to the current player
   const { data: sub, error: fetchError } = await admin
@@ -55,8 +54,7 @@ export async function playerUnfreezeSubscription(subscriptionId: string) {
   const currentUser = await getCurrentUser();
   if (!currentUser) return { error: "Not authenticated" };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
+  const admin = createAdminClient();
 
   const { data: sub, error: fetchError } = await admin
     .from("subscriptions")
@@ -75,9 +73,8 @@ export async function playerUnfreezeSubscription(subscriptionId: string) {
         .split("T")[0]
     : null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateData: Record<string, any> = {
-    status: "active",
+  const updateData: Record<string, string | number | null> = {
+    status: "active" as const,
     frozen_at: null,
     frozen_days_remaining: null,
   };

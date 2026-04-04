@@ -13,6 +13,7 @@ export interface BulkPlayerRow {
   phone?: string;
   date_of_birth?: string;
   area?: string;
+  gender?: string;
   height?: number | null;
   weight?: number | null;
   preferred_hand?: string;

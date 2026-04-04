@@ -21,6 +21,7 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
   const phone = (formData.get("phone") as string)?.trim() || null;
   const dateOfBirth = (formData.get("date_of_birth") as string)?.trim() || null;
   const area = (formData.get("area") as string)?.trim() || null;
+  const gender = (formData.get("gender") as string)?.trim() || null;
   const playingLevel = (formData.get("playing_level") as string)?.trim() || null;
   const trainingGoals = (formData.get("training_goals") as string)?.trim() || null;
   const healthConditions = (formData.get("health_conditions") as string)?.trim() || null;
@@ -81,6 +82,7 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
     phone,
     date_of_birth: dateOfBirth,
     area,
+    gender,
     playing_level: playingLevel,
     training_goals: trainingGoals,
     health_conditions: healthConditions,
@@ -209,6 +211,7 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
         phone: row.phone?.trim() || null,
         date_of_birth: row.date_of_birth || null,
         area: row.area?.trim() || null,
+        gender: row.gender?.trim().toLowerCase() || null,
         height: row.height ?? null,
         weight: row.weight ?? null,
         preferred_hand: row.preferred_hand?.trim().toLowerCase() || null,

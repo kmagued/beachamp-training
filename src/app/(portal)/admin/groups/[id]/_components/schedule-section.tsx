@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useCallback, useMemo } from "react";
 import { Card, Button, Input, Select, Drawer, Toast } from "@/components/ui";
-import { Calendar, Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Calendar, Plus, Pencil, Trash2, AlertCircle, ChevronDown, ChevronRight, History } from "lucide-react";
 import { createScheduleSession, updateScheduleSession, deleteScheduleSession } from "@/app/_actions/training";
 import { formatTime } from "../../_components/types";
 import type { ScheduleRow, CoachRow } from "./types";
@@ -25,11 +25,19 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
   const handleToastClose = useCallback(() => setToast(null), []);
   const [endMode, setEndMode] = useState<"date" | "weeks">("date");
   const [numWeeks, setNumWeeks] = useState<string>("12");
+  const [showPast, setShowPast] = useState(false);
 
-  const expiredSchedules = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return new Set(schedule.filter((s) => s.end_date && s.end_date < today).map((s) => s.id));
-  }, [schedule]);
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const activeSchedule = useMemo(
+    () => schedule.filter((s) => !s.end_date || s.end_date >= today),
+    [schedule, today]
+  );
+
+  const endedSchedule = useMemo(
+    () => schedule.filter((s) => s.end_date && s.end_date < today),
+    [schedule, today]
+  );
 
   function resolveEndDate(formData: FormData) {
     if (endMode === "weeks") {
@@ -108,15 +116,15 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
         <h2 className="font-semibold text-slate-900 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-400" />
           Weekly Schedule
-          <span className="bg-slate-100 text-slate-600 text-xs px-1.5 py-0.5 rounded-full">{schedule.length}</span>
+          <span className="bg-slate-100 text-slate-600 text-xs px-1.5 py-0.5 rounded-full">{activeSchedule.length}</span>
         </h2>
         <Button size="sm" onClick={openAdd}>
           <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span><span className="sm:hidden">Add</span></span>
         </Button>
       </div>
 
-      {schedule.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">No schedule set. Add session slots for this group.</p>
+      {activeSchedule.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-8">No active schedule. Add session slots for this group.</p>
       ) : (
         <>
           {/* Desktop table */}
@@ -133,20 +141,15 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedule.map((s) => {
-                  const isExpired = expiredSchedules.has(s.id);
-                  return (
-                  <tr key={s.id} className={isExpired ? "opacity-50 bg-slate-50/50" : "hover:bg-slate-50/50"}>
+                {activeSchedule.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50">
                     <td className="py-2.5 font-medium text-slate-900">{DAY_NAMES_FULL[s.day_of_week]}</td>
                     <td className="py-2.5 text-slate-600">{formatTime(s.start_time)} — {formatTime(s.end_time)}</td>
                     <td className="py-2.5 text-slate-600">{s.coach_name || "—"}</td>
                     <td className="py-2.5 text-slate-500">{s.location || "—"}</td>
                     <td className="py-2.5 text-slate-500">
                       {s.end_date ? (
-                        <span className={isExpired ? "text-red-500 font-medium" : ""}>
-                          {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                          {isExpired && <span className="text-[10px] ml-1">(ended)</span>}
-                        </span>
+                        new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                       ) : (
                         <span className="text-amber-500 flex items-center gap-1 text-xs">
                           <AlertCircle className="w-3 h-3" /> No end date
@@ -171,18 +174,15 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                       </div>
                     </td>
                   </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2">
-            {schedule.map((s) => {
-              const isExpired = expiredSchedules.has(s.id);
-              return (
-              <div key={s.id} className={`border border-slate-100 rounded-lg p-3 ${isExpired ? "opacity-50" : ""}`}>
+            {activeSchedule.map((s) => (
+              <div key={s.id} className="border border-slate-100 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-slate-900 text-sm">{DAY_NAMES_FULL[s.day_of_week]}</span>
                   <div className="flex gap-1">
@@ -216,9 +216,8 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                   <div className="col-span-2">
                     <span className="text-slate-400">Ends</span>
                     {s.end_date ? (
-                      <p className={isExpired ? "text-red-500 font-medium" : "text-slate-700 font-medium"}>
+                      <p className="text-slate-700 font-medium">
                         {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        {isExpired && " (ended)"}
                       </p>
                     ) : (
                       <p className="text-amber-500 font-medium flex items-center gap-1">
@@ -228,10 +227,68 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                   </div>
                 </div>
               </div>
-              );
-            })}
+            ))}
           </div>
         </>
+      )}
+
+      {/* Past/Ended Schedule */}
+      {endedSchedule.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <button
+            onClick={() => setShowPast(!showPast)}
+            className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {showPast ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            <History className="w-3.5 h-3.5" />
+            Past Schedule ({endedSchedule.length})
+          </button>
+          {showPast && (
+            <div className="mt-3 space-y-1.5">
+              {/* Desktop */}
+              <div className="hidden sm:block overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
+                <table className="w-full text-sm opacity-60">
+                  <tbody className="divide-y divide-slate-100">
+                    {endedSchedule.map((s) => (
+                      <tr key={s.id}>
+                        <td className="py-2 font-medium text-slate-600">{DAY_NAMES_FULL[s.day_of_week]}</td>
+                        <td className="py-2 text-slate-500">{formatTime(s.start_time)} — {formatTime(s.end_time)}</td>
+                        <td className="py-2 text-slate-500">{s.coach_name || "—"}</td>
+                        <td className="py-2 text-slate-500">{s.location || "—"}</td>
+                        <td className="py-2 text-red-400 text-xs">
+                          Ended {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile */}
+              <div className="sm:hidden space-y-2">
+                {endedSchedule.map((s) => (
+                  <div key={s.id} className="border border-slate-100 rounded-lg p-3 opacity-60">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-slate-600 text-sm">{DAY_NAMES_FULL[s.day_of_week]}</span>
+                      <span className="text-[10px] text-red-400">
+                        Ended {new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-400">Time</span>
+                        <p className="text-slate-500">{formatTime(s.start_time)} — {formatTime(s.end_time)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Coach</span>
+                        <p className="text-slate-500">{s.coach_name || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Add/Edit Session Drawer */}
