@@ -319,13 +319,9 @@ function DrawerContent({
                 label="Method"
                 value={<span className="capitalize">{payment.method.replace(/_/g, " ")}</span>}
               />
-              <DetailRow
-                label="Submitted"
-                value={formatDateTime(payment.created_at)}
-              />
               {payment.confirmed_at && (
                 <DetailRow
-                  label="Confirmed"
+                  label="Payment Date"
                   value={formatDateTime(payment.confirmed_at)}
                 />
               )}

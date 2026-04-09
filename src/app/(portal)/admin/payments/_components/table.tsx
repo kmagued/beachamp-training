@@ -147,13 +147,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                       {payment.method.replace("_", " ")}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
-                      {payment.status === "pending"
-                        ? "—"
-                        : payment.confirmed_at
-                          ? formatDate(payment.confirmed_at)
-                          : payment.subscriptions?.start_date
-                            ? formatDate(payment.subscriptions.start_date)
-                            : "—"}
+                      {payment.confirmed_at ? formatDate(payment.confirmed_at) : "—"}
                     </td>
                     <td className={tdBase}>
                       <StatusBadge status={payment.status} />
@@ -288,13 +282,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
               <div>
                 <span className="text-slate-400">Date</span>
                 <p className="text-slate-700 font-medium">
-                  {payment.status === "pending"
-                    ? "—"
-                    : payment.confirmed_at
-                      ? formatDate(payment.confirmed_at)
-                      : payment.subscriptions?.start_date
-                        ? formatDate(payment.subscriptions.start_date)
-                        : "—"}
+                  {payment.confirmed_at ? formatDate(payment.confirmed_at) : "—"}
                 </p>
               </div>
             </div>

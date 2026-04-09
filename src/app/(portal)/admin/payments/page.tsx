@@ -118,11 +118,9 @@ function AdminPaymentsContent() {
     return [...names].sort();
   }, [payments]);
 
-  function getPaymentDate(p: PaymentRow): Date {
-    if (p.status === "pending") return new Date(p.created_at);
+  function getPaymentDate(p: PaymentRow): Date | null {
     if (p.confirmed_at) return new Date(p.confirmed_at);
-    if (p.subscriptions?.start_date) return new Date(p.subscriptions.start_date + "T00:00:00");
-    return new Date(p.created_at);
+    return null;
   }
 
   // Derive unique months from payments (sorted newest first)
@@ -130,6 +128,7 @@ function AdminPaymentsContent() {
     const months = new Set<string>();
     payments.forEach((p) => {
       const d = getPaymentDate(p);
+      if (!d) return;
       months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
     });
     return [...months].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
@@ -152,6 +151,7 @@ function AdminPaymentsContent() {
     if (monthFilter) {
       result = result.filter((p) => {
         const d = getPaymentDate(p);
+        if (!d) return false;
         return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === monthFilter;
       });
     }
@@ -181,8 +181,8 @@ function AdminPaymentsContent() {
     return [...result].sort((a, b) => {
       let cmp = 0;
       if (sortField === "date") {
-        const aDate = new Date(a.subscriptions?.start_date || a.confirmed_at || a.created_at).getTime();
-        const bDate = new Date(b.subscriptions?.start_date || b.confirmed_at || b.created_at).getTime();
+        const aDate = a.confirmed_at ? new Date(a.confirmed_at).getTime() : 0;
+        const bDate = b.confirmed_at ? new Date(b.confirmed_at).getTime() : 0;
         cmp = aDate - bDate;
       } else if (sortField === "amount") {
         cmp = a.amount - b.amount;
@@ -402,7 +402,7 @@ function AdminPaymentsContent() {
           onClick={async () => {
             const { exportToExcel } = await import("@/lib/utils/export-excel");
             const rows = filteredPayments.map((p) => ({
-              Date: p.confirmed_at ? new Date(p.confirmed_at).toISOString().split("T")[0] : p.subscriptions?.start_date || "",
+              Date: p.confirmed_at ? new Date(p.confirmed_at).toISOString().split("T")[0] : "",
               Player: `${p.profiles?.first_name || ""} ${p.profiles?.last_name || ""}`.trim(),
               Package: p.subscriptions?.packages?.name || "",
               "Amount (EGP)": p.amount,

@@ -65,7 +65,7 @@ export default async function AdminDashboard() {
     // All confirmed payments for revenue chart
     supabase
       .from("payments")
-      .select("amount, confirmed_at, subscriptions!payments_subscription_id_fkey(start_date)")
+      .select("amount, confirmed_at")
       .eq("status", "confirmed"),
     // One-time expenses this month
     supabase
@@ -185,12 +185,11 @@ export default async function AdminDashboard() {
     return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   };
 
-  // Income by month (use confirmed_at as the primary date — payment appears in the month it was confirmed)
+  // Income by month — uses confirmed_at exclusively
   const incomeByMonth: Record<string, number> = {};
-  for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }[]) {
-    const dateStr = p.confirmed_at || p.subscriptions?.start_date;
-    if (!dateStr) continue;
-    const d = new Date(dateStr);
+  for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null }[]) {
+    if (!p.confirmed_at) continue;
+    const d = new Date(p.confirmed_at);
     if (isNaN(d.getTime())) continue;
     const k = monthKey(d);
     incomeByMonth[k] = (incomeByMonth[k] || 0) + p.amount;
@@ -377,10 +376,9 @@ export default async function AdminDashboard() {
         {/* Charts */}
         <DashboardCharts
         revenuePayments={(revenuePayments || [])
-          .map((p: { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }) => ({
+          .map((p: { amount: number; confirmed_at: string | null }) => ({
             amount: p.amount,
-            date: p.confirmed_at
-              || (p.subscriptions?.start_date ? p.subscriptions.start_date + "T00:00:00" : ""),
+            date: p.confirmed_at || "",
           }))
           .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
         subsByPackage={subsByPackage}

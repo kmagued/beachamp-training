@@ -40,24 +40,14 @@ export function PaymentsTab({ date }: { date: string }) {
   const fetchPayments = useCallback(async () => {
     setLoading(true);
 
-    // Fetch confirmed payments by confirmed_at date, plus pending payments by created_at date
-    const [{ data: confirmedData }, { data: pendingData }] = await Promise.all([
-      supabase
-        .from("payments")
-        .select("id, amount, method, status, note, confirmed_at, created_at, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(packages(name))")
-        .eq("status", "confirmed")
-        .gte("confirmed_at", `${date}T00:00:00`)
-        .lte("confirmed_at", `${date}T23:59:59`)
-        .order("confirmed_at", { ascending: false }),
-      supabase
-        .from("payments")
-        .select("id, amount, method, status, note, confirmed_at, created_at, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(packages(name))")
-        .eq("status", "pending")
-        .gte("created_at", `${date}T00:00:00`)
-        .lte("created_at", `${date}T23:59:59`)
-        .order("created_at", { ascending: false }),
-    ]);
-    const data = [...(confirmedData || []), ...(pendingData || [])];
+    // Daily report shows only confirmed payments, bucketed by confirmed_at
+    const { data } = await supabase
+      .from("payments")
+      .select("id, amount, method, status, note, confirmed_at, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(packages(name))")
+      .eq("status", "confirmed")
+      .gte("confirmed_at", `${date}T00:00:00`)
+      .lte("confirmed_at", `${date}T23:59:59`)
+      .order("confirmed_at", { ascending: false });
 
     setPayments((data || []) as unknown as DailyPayment[]);
     setLoading(false);

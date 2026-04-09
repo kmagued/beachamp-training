@@ -269,24 +269,6 @@ export async function updatePayment(
 
   if (error) return { error: error.message };
 
-  // Update subscription start_date (and recalculate end_date) when payment date changes
-  if (updates.payment_date !== undefined && payment.subscription_id) {
-    const pkg = payment.subscriptions?.packages;
-    const newStart = new Date(updates.payment_date);
-    const subUpdate: Record<string, string> = {
-      start_date: newStart.toISOString().split("T")[0],
-    };
-    if (pkg?.validity_days) {
-      const newEnd = new Date(newStart);
-      newEnd.setDate(newEnd.getDate() + pkg.validity_days);
-      subUpdate.end_date = newEnd.toISOString().split("T")[0];
-    }
-    await supabase
-      .from("subscriptions")
-      .update(subUpdate)
-      .eq("id", payment.subscription_id);
-  }
-
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
   revalidatePath("/player/subscriptions");

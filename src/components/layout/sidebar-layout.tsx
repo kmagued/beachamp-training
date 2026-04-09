@@ -35,9 +35,9 @@ import { NotificationBell } from "./notification-bell";
 type Portal = "player" | "coach" | "admin";
 
 const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
-  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
-  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
-  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
+  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
+  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
+  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
 };
 
 const iconMap = {
@@ -128,18 +128,11 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         style={{ width: sidebarW }}
       >
         {/* Header */}
-        <div className="h-14 flex items-center justify-between border-b border-primary-200/60 shrink-0 px-3">
+        <div className="h-14 flex items-center justify-between shrink-0 px-3">
           {!collapsed && (
-            <Link href={navItems[0].href} className="flex items-center pl-1">
-              <Image
-                src="/images/logo.png"
-                alt={branding.name}
-                width={88}
-                height={28}
-                priority
-                className="h-7 w-auto object-contain"
-              />
-            </Link>
+            <p className={cn("text-[11px] font-semibold uppercase tracking-[0.15em] pl-2", config.labelColor)}>
+              {config.label}
+            </p>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -209,10 +202,24 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             </div>
           </div>
         )}
+
+        {/* Brand mark at bottom */}
+        <div className={cn("shrink-0 flex items-center justify-center px-3 pb-4 pt-2", collapsed && "px-1")}>
+          <Link href={navItems[0].href} className="opacity-60 hover:opacity-100 transition-opacity">
+            <Image
+              src="/images/logo.png"
+              alt={branding.name}
+              width={collapsed ? 40 : 160}
+              height={collapsed ? 40 : 56}
+              priority
+              className={cn("object-contain", collapsed ? "w-10 h-10" : "h-14 w-auto")}
+            />
+          </Link>
+        </div>
       </aside>
 
       {/* Top navbar */}
-      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-sand/10 shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-14 transition-[left] duration-200">
+      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-14 transition-[left] duration-200">
         <div className="flex items-center justify-between h-full px-4">
           {/* Left: brand on mobile */}
           <div className="flex items-center gap-3 md:hidden">
