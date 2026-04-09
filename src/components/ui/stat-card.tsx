@@ -13,20 +13,34 @@ interface StatCardProps {
   href?: string;
 }
 
-export function StatCard({ label, value, subtitle, accentColor = "bg-primary", icon, className, href }: StatCardProps) {
+export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800", icon, className, href }: StatCardProps) {
   const content = (
     <>
-      <div className={cn("absolute top-0 left-0 right-0 h-[3px]", accentColor)} />
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
-          <p className="text-base sm:text-lg font-bold text-slate-900 mt-1 capitalize">{value}</p>
-          {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+      <div className="flex items-center gap-3 sm:gap-4">
+        {icon && (
+          <div
+            className={cn(
+              "shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white",
+              accentColor
+            )}
+          >
+            {icon}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider truncate">
+            {label}
+          </p>
+          <p className="text-lg sm:text-xl font-bold text-primary-900 mt-0.5 capitalize truncate">
+            {value}
+          </p>
+          {subtitle && (
+            <p className="text-[11px] text-primary-700/50 mt-0.5 truncate">{subtitle}</p>
+          )}
         </div>
-        <div className="flex items-center gap-1 text-slate-300">
-          {icon}
-          {href && <ChevronRight className="w-4 h-4" />}
-        </div>
+        {href && (
+          <ChevronRight className="w-4 h-4 text-primary-700/30 shrink-0" />
+        )}
       </div>
     </>
   );
@@ -35,7 +49,10 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary", i
     return (
       <Link
         href={href}
-        className={cn("block bg-white rounded-xl border border-slate-200 p-5 relative overflow-hidden hover:border-slate-300 hover:shadow-sm transition-all", className)}
+        className={cn(
+          "group block bg-white rounded-2xl border border-primary-100 p-4 sm:p-5 hover:border-primary-300 hover:shadow-md hover:shadow-primary-900/5 transition-all",
+          className
+        )}
       >
         {content}
       </Link>
@@ -43,7 +60,12 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary", i
   }
 
   return (
-    <div className={cn("bg-white rounded-xl border border-slate-200 p-5 relative overflow-hidden", className)}>
+    <div
+      className={cn(
+        "bg-white rounded-2xl border border-primary-100 p-4 sm:p-5",
+        className
+      )}
+    >
       {content}
     </div>
   );

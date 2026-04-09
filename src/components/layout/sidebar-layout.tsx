@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
@@ -34,9 +35,9 @@ import { NotificationBell } from "./notification-bell";
 type Portal = "player" | "coach" | "admin";
 
 const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
-  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
-  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
-  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary", labelColor: "text-primary", accentBg: "bg-primary-50", accentText: "text-primary-700" },
+  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
+  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
+  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary-800", labelColor: "text-secondary", accentBg: "bg-primary-800", accentText: "text-white" },
 };
 
 const iconMap = {
@@ -118,25 +119,32 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
 
   return (
-    <div className="min-h-screen flex bg-surface-bg">
+    <div className="min-h-screen flex bg-sand/10">
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden md:flex flex-col bg-white border-r border-slate-200 fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-in-out",
+          "hidden md:flex flex-col bg-white shadow-[4px_0_24px_-12px_rgba(18,75,93,0.08)] fixed inset-y-0 left-0 z-30 transition-[width] duration-200 ease-in-out",
         )}
         style={{ width: sidebarW }}
       >
         {/* Header */}
-        <div className="h-14 flex items-center justify-between border-b border-slate-100 shrink-0 px-3">
+        <div className="h-14 flex items-center justify-between border-b border-primary-200/60 shrink-0 px-3">
           {!collapsed && (
-            <p className={cn("text-xs font-semibold uppercase tracking-wider pl-2", config.labelColor)}>
-              {config.label}
-            </p>
+            <Link href={navItems[0].href} className="flex items-center pl-1">
+              <Image
+                src="/images/logo.png"
+                alt={branding.name}
+                width={88}
+                height={28}
+                priority
+                className="h-7 w-auto object-contain"
+              />
+            </Link>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
-              "p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors",
+              "p-1.5 rounded-lg text-primary-700/50 hover:text-primary-900 hover:bg-sand/50 transition-colors",
               collapsed && "mx-auto",
             )}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -146,7 +154,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 pt-2 overflow-y-auto overflow-x-hidden">
+        <nav className="flex-1 px-2 pt-2 overflow-y-auto overflow-x-hidden space-y-1">
           {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
@@ -154,18 +162,12 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             const showSection = item.section && item.section !== prevItem?.section;
             return (
               <div key={item.key}>
-                {showSection && (
-                  collapsed ? (
-                    <div className="my-2 mx-2 border-t border-slate-200" />
-                  ) : (
-                    <div className="mt-2.5 mb-1 px-3">
-                      <div className="border-t border-slate-200" />
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-2">
-                        {item.section}
-                      </p>
-                    </div>
-                  )
+                {showSection && !collapsed && (
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
+                    {item.section}
+                  </p>
                 )}
+                {showSection && collapsed && <div className="h-3" />}
                 <Link
                   href={item.href}
                   title={collapsed ? item.label : undefined}
@@ -174,7 +176,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                     collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
                     isActive
                       ? cn(config.accentBg, config.accentText)
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+                      : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
                   )}
                 >
                   {Icon && <Icon className="w-4 h-4 shrink-0" />}
@@ -187,8 +189,8 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
         {/* Dev portal switcher */}
         {process.env.NODE_ENV === "development" && !collapsed && (
-          <div className="px-3 border-t border-slate-200 pt-3 pb-4 mt-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
+          <div className="px-3 border-t border-primary-200/60 pt-3 pb-4 mt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
             <div className="flex gap-1">
               {(["admin", "coach", "player"] as const).map((p) => (
                 <a
@@ -198,7 +200,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                     "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
                     portal === p
                       ? "bg-primary-50 text-primary-700"
-                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                      : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
                   )}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -210,18 +212,25 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       </aside>
 
       {/* Top navbar */}
-      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 h-14 transition-[left] duration-200">
+      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-sand/10 shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-14 transition-[left] duration-200">
         <div className="flex items-center justify-between h-full px-4">
           {/* Left: brand on mobile */}
           <div className="flex items-center gap-3 md:hidden">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="text-slate-600 p-1 -ml-1"
+              className="text-primary-800 p-1 -ml-1"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link href={navItems[0].href} className="text-sm font-bold text-slate-900">
-              {branding.name}
+            <Link href={navItems[0].href} className="flex items-center">
+              <Image
+                src="/images/logo.png"
+                alt={branding.name}
+                width={88}
+                height={28}
+                priority
+                className="h-7 w-auto object-contain"
+              />
             </Link>
           </div>
 
@@ -231,7 +240,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
           {/* Right: notifications + user */}
           <div className="flex items-center gap-2">
             <NotificationBell userId={user.id} href={notifHref} />
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 ml-1">
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-primary-200/60 ml-1">
               <div
                 className={cn(
                   "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
@@ -240,13 +249,13 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
               >
                 {initials}
               </div>
-              <span className="text-sm font-medium text-slate-700 max-w-[140px] truncate">
+              <span className="text-sm font-medium text-primary-800 max-w-[140px] truncate">
                 {user.first_name} {user.last_name}
               </span>
             </div>
             <button
               onClick={() => logout()}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+              className="p-2 rounded-lg text-primary-700/50 hover:text-primary-900 hover:bg-sand/50 transition-colors"
               title="Sign out"
             >
               <LogOut className="w-4 h-4" />
@@ -265,7 +274,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       />
       <div
         className={cn(
-          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 flex flex-col transition-transform duration-300 ease-in-out pt-14",
+          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-primary-200/60 z-50 flex flex-col transition-transform duration-300 ease-in-out pt-14",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -278,12 +287,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             return (
               <div key={item.key}>
                 {showSection && (
-                  <div className="mt-4 mb-2 px-3">
-                    <div className="border-t border-slate-200" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
-                      {item.section}
-                    </p>
-                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
+                    {item.section}
+                  </p>
                 )}
                 <Link
                   href={item.href}
@@ -292,7 +298,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
                     isActive
                       ? cn(config.accentBg, config.accentText)
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50",
+                      : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
                   )}
                 >
                   {Icon && <Icon className="w-[18px] h-[18px]" />}
@@ -304,8 +310,8 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </nav>
 
         {process.env.NODE_ENV === "development" && (
-          <div className="px-3 border-t border-slate-200 pt-3 pb-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-3 mb-1.5">Switch Portal</p>
+          <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
             <div className="flex gap-1">
               {(["admin", "coach", "player"] as const).map((p) => (
                 <a
@@ -315,7 +321,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                     "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
                     portal === p
                       ? "bg-primary-50 text-primary-700"
-                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                      : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
                   )}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}

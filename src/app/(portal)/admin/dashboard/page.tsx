@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
-import { StatCard, Card } from "@/components/ui";
+import { StatCard } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import { Users, CreditCard, CalendarDays, Receipt, TrendingUp, BarChart3 } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
@@ -241,100 +242,140 @@ export default async function AdminDashboard() {
     .map((g) => ({ name: g.name, count: gpCountByGroup[g.id] || 0, max: g.max_players }))
     .sort((a, b) => b.count - a.count);
 
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Admin Dashboard
-        </h1>
-        <p className="text-slate-500 text-sm">
-          Welcome back, {currentUser.profile.first_name}. Here&apos;s what&apos;s happening.
-        </p>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        <StatCard
-          label="Active Players"
-          value={activePlayerCount}
-          accentColor="bg-primary"
-          icon={<Users className="w-5 h-5" />}
-          subtitle={`Total: ${playerCount ?? 0}`}
-          href="/admin/players?activity=Active"
-        />
-        <RevenueCard
-          label={`Revenue (${currentMonth})`}
-          value={`${monthlyRevenue.toLocaleString()} EGP`}
-          subtitle={`All Time: ${totalRevenue.toLocaleString()} EGP`}
-        />
-        <StatCard
-          label={`Expenses (${currentMonth})`}
-          value={`${monthlyExpenses.toLocaleString()} EGP`}
-          accentColor="bg-red-500"
-          icon={<Receipt className="w-5 h-5" />}
-          subtitle={`All Time: ${allTimeExpenses.toLocaleString()} EGP`}
-          href="/admin/expenses"
-        />
-        <StatCard
-          label={`Profit (${currentMonth})`}
-          value={`${monthlyProfit.toLocaleString()} EGP`}
-          accentColor={monthlyProfit >= 0 ? "bg-emerald-500" : "bg-red-500"}
-          icon={<TrendingUp className="w-5 h-5" />}
-          subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
-        />
-        <StatCard
-          label="Pending Payments"
-          value={pendingPayments ?? 0}
-          accentColor={pendingPayments ? "bg-amber-500" : "bg-slate-300"}
-          icon={<CreditCard className="w-5 h-5" />}
-          href="/admin/payments?statusFilter=Pending"
-        />
-        <StatCard
-          label="Sessions Today"
-          value={todaySessionCount ?? 0}
-          accentColor="bg-brand-coach"
-          icon={<CalendarDays className="w-5 h-5" />}
-          href="/admin/daily-report"
-        />
-      </div>
-
-      {/* Key Metrics Table */}
-      <div className="mb-6">
-        <MetricsTable
-          attendanceRecords={(attendanceAll || []) as { status: string; session_date: string; group_id: string }[]}
-          subscriptions={(allSubscriptions || []) as { player_id: string; status: string; start_date: string | null; end_date: string | null; created_at: string }[]}
-          profiles={(allPlayerProfiles || []) as { id: string; created_at: string }[]}
-          groupPlayers={allGpRows}
-          groups={groups.map((g) => ({ id: g.id, max_players: g.max_players }))}
-        />
-      </div>
-
-      {/* Group Breakdown */}
-      {groupCounts.length > 0 && (
-        <div className="mb-6">
-          <Card>
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <BarChart3 className="w-4 h-4 text-slate-400" />
-              Players by Group
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {groupCounts.map((g) => (
-                <div key={g.name} className="bg-slate-50 rounded-lg px-4 py-3">
-                  <p className="text-xs font-medium text-slate-500 truncate">{g.name}</p>
-                  <p className="text-lg font-bold text-slate-900 mt-0.5">
-                    {g.count}
-                    <span className="text-xs font-normal text-slate-400 ml-1">/ {g.max}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
+    <div className="min-h-screen bg-sand/10">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-secondary uppercase tracking-[0.18em]">
+              {today}
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary-900 mt-1.5 tracking-tight">
+              Welcome back, {currentUser.profile.first_name}.
+            </h1>
+            <p className="text-primary-700/60 text-sm mt-1">
+              Here&apos;s what&apos;s happening across the academy.
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* Charts */}
-      <DashboardCharts
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-8">
+          <StatCard
+            label="Active Players"
+            value={activePlayerCount}
+            accentColor="bg-primary-800"
+            icon={<Users className="w-5 h-5" />}
+            subtitle={`Total: ${playerCount ?? 0}`}
+            href="/admin/players?activity=Active"
+          />
+          <RevenueCard
+            label={`Revenue (${currentMonth})`}
+            value={`${monthlyRevenue.toLocaleString()} EGP`}
+            subtitle={`All Time: ${totalRevenue.toLocaleString()} EGP`}
+          />
+          <StatCard
+            label={`Expenses (${currentMonth})`}
+            value={`${monthlyExpenses.toLocaleString()} EGP`}
+            accentColor="bg-red-500"
+            icon={<Receipt className="w-5 h-5" />}
+            subtitle={`All Time: ${allTimeExpenses.toLocaleString()} EGP`}
+            href="/admin/expenses"
+          />
+          <StatCard
+            label={`Profit (${currentMonth})`}
+            value={`${monthlyProfit.toLocaleString()} EGP`}
+            accentColor={monthlyProfit >= 0 ? "bg-emerald-500" : "bg-red-500"}
+            icon={<TrendingUp className="w-5 h-5" />}
+            subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
+          />
+          <StatCard
+            label="Pending Payments"
+            value={pendingPayments ?? 0}
+            accentColor={pendingPayments ? "bg-accent" : "bg-primary-200"}
+            icon={<CreditCard className="w-5 h-5" />}
+            href="/admin/payments?statusFilter=Pending"
+          />
+          <StatCard
+            label="Sessions Today"
+            value={todaySessionCount ?? 0}
+            accentColor="bg-secondary"
+            icon={<CalendarDays className="w-5 h-5" />}
+            href="/admin/daily-report"
+          />
+        </div>
+
+        {/* Key Metrics Table */}
+        <div className="mb-8">
+          <MetricsTable
+            attendanceRecords={(attendanceAll || []) as { status: string; session_date: string; group_id: string }[]}
+            subscriptions={(allSubscriptions || []) as { player_id: string; status: string; start_date: string | null; end_date: string | null; created_at: string }[]}
+            profiles={(allPlayerProfiles || []) as { id: string; created_at: string }[]}
+            groupPlayers={allGpRows}
+            groups={groups.map((g) => ({ id: g.id, max_players: g.max_players }))}
+          />
+        </div>
+
+        {/* Group Breakdown */}
+        {groupCounts.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-white rounded-2xl border border-primary-100 p-5 sm:p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-bold text-primary-900 flex items-center gap-2 text-base">
+                  <BarChart3 className="w-4 h-4 text-secondary" />
+                  Players by Group
+                </h2>
+                <span className="text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider">
+                  Capacity
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {groupCounts.map((g) => {
+                  const pct = g.max > 0 ? Math.min(100, (g.count / g.max) * 100) : 0;
+                  const full = pct >= 90;
+                  return (
+                    <div
+                      key={g.name}
+                      className="rounded-xl border border-primary-100 p-4 hover:border-primary-300 transition-colors"
+                    >
+                      <div className="flex items-baseline justify-between mb-2">
+                        <p className="text-sm font-semibold text-primary-900 truncate">
+                          {g.name}
+                        </p>
+                        <p className="text-sm font-bold text-primary-900 shrink-0">
+                          {g.count}
+                          <span className="text-xs font-normal text-primary-700/40">
+                            {" "}/ {g.max}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            full ? "bg-accent" : "bg-secondary"
+                          )}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Charts */}
+        <DashboardCharts
         revenuePayments={(revenuePayments || [])
           .map((p: { amount: number; confirmed_at: string | null; subscriptions: { start_date: string | null } | null }) => ({
             amount: p.amount,
@@ -345,9 +386,10 @@ export default async function AdminDashboard() {
         subsByPackage={subsByPackage}
       />
 
-      {/* Monthly Financial Table */}
-      <div className="mb-6">
-        <MonthlyFinancialTable data={monthlyData} />
+        {/* Monthly Financial Table */}
+        <div className="mb-6">
+          <MonthlyFinancialTable data={monthlyData} />
+        </div>
       </div>
     </div>
   );

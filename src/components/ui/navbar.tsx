@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
-import { buttonVariants } from "@/components/ui";
 import { UserMenu } from "./user-menu";
 import { branding } from "@/lib/config/branding";
 
@@ -15,27 +15,39 @@ interface NavbarProps {
 
 export function Navbar({ user, className }: NavbarProps) {
   return (
-    <nav className={cn("sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100", className)}>
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-7xl mx-auto">
-        <Link href="/" className="text-sm font-bold text-slate-900">
-          {branding.name}
+    <nav
+      className={cn(
+        "sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-primary-100",
+        className
+      )}
+    >
+      <div className="flex items-center justify-between h-14 px-5 sm:px-6 max-w-6xl mx-auto">
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/images/teal-logo.png"
+            alt={branding.name}
+            width={96}
+            height={32}
+            priority
+            className="h-8 w-auto object-contain"
+          />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {user ? (
             <UserMenu initials={user.initials} email={user.email} />
           ) : (
             <>
               <Link
                 href="/login"
-                className="text-slate-600 hover:text-slate-900 font-medium text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 transition-colors"
+                className="text-primary-700 hover:text-primary-900 text-[13px] font-medium px-3 py-1.5 transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 href="/register"
-                className={cn(buttonVariants.primary, "text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg")}
+                className="bg-primary-800 hover:bg-primary-900 text-white text-[13px] font-semibold px-4 py-1.5 rounded-md transition-colors"
               >
-                Join Now
+                Join
               </Link>
             </>
           )}

@@ -5,6 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: branding.meta.title,
   description: branding.meta.description,
+  icons: {
+    icon: "/images/favicon.png",
+    shortcut: "/images/favicon.png",
+    apple: "/images/favicon.png",
+  },
 };
 
 export const viewport: Viewport = {
