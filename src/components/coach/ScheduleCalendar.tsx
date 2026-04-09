@@ -179,17 +179,19 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         return;
       }
 
-      // Get player counts per group
-      const groupIds = [...new Set(data.map((s: { group_id: string }) => s.group_id))];
+      // Get player counts per group — single batched query
+      const groupIds = [...new Set(data.map((s: { group_id: string }) => s.group_id))] as string[];
       const playerCounts = new Map<string, number>();
 
-      for (const gid of groupIds) {
-        const { count } = await supabase
+      if (groupIds.length > 0) {
+        const { data: gpRows } = await supabase
           .from("group_players")
-          .select("*", { count: "exact", head: true })
-          .eq("group_id", gid)
+          .select("group_id")
+          .in("group_id", groupIds)
           .eq("is_active", true);
-        playerCounts.set(gid, count || 0);
+        for (const row of (gpRows || []) as { group_id: string }[]) {
+          playerCounts.set(row.group_id, (playerCounts.get(row.group_id) || 0) + 1);
+        }
       }
 
       // Check attendance and cancellations for this week

@@ -16,7 +16,7 @@ interface StatCardProps {
 export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800", icon, className, href }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-center gap-3 sm:gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 h-full">
         {icon && (
           <div
             className={cn(
@@ -50,7 +50,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
       <Link
         href={href}
         className={cn(
-          "group block bg-white rounded-2xl border border-primary-100 p-4 sm:p-5 hover:border-primary-300 hover:shadow-md hover:shadow-primary-900/5 transition-all",
+          "group block h-full bg-white rounded-2xl border border-primary-100 p-4 sm:p-5 hover:border-primary-300 hover:shadow-md hover:shadow-primary-900/5 transition-all",
           className
         )}
       >
@@ -62,7 +62,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
   return (
     <div
       className={cn(
-        "bg-white rounded-2xl border border-primary-100 p-4 sm:p-5",
+        "h-full bg-white rounded-2xl border border-primary-100 p-4 sm:p-5",
         className
       )}
     >

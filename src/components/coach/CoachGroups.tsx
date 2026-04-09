@@ -59,18 +59,15 @@ export function CoachGroups({ coachId, isAdmin }: CoachGroupsProps) {
 
   useEffect(() => {
     async function load() {
-      // Get groups
+      // 1. Resolve group IDs the user has access to
       let groupIds: string[] = [];
-
       if (isAdmin) {
-        // Admin sees all active groups
         const { data: allGroups } = await supabase
           .from("groups")
           .select("id")
           .eq("is_active", true);
         groupIds = (allGroups || []).map((g: { id: string }) => g.id);
       } else {
-        // Coach sees only assigned groups
         const { data: coachGroups } = await supabase
           .from("coach_groups")
           .select("group_id")
@@ -85,83 +82,60 @@ export function CoachGroups({ coachId, isAdmin }: CoachGroupsProps) {
         return;
       }
 
-      const { data: groupData } = await supabase
-        .from("groups")
-        .select("*")
-        .in("id", groupIds)
-        .eq("is_active", true)
-        .order("name");
+      // 2. Batch fetch all data in 3 parallel queries (no per-group N+1)
+      const today = new Date().toISOString().split("T")[0];
+      const [
+        { data: groupData },
+        { data: groupPlayersData },
+        { data: scheduleData },
+      ] = await Promise.all([
+        supabase
+          .from("groups")
+          .select("id, name, level, max_players")
+          .in("id", groupIds)
+          .eq("is_active", true)
+          .order("name"),
+        supabase
+          .from("group_players")
+          .select("group_id")
+          .in("group_id", groupIds)
+          .eq("is_active", true),
+        supabase
+          .from("schedule_sessions")
+          .select("group_id, day_of_week, start_time, end_time, location")
+          .in("group_id", groupIds)
+          .eq("is_active", true)
+          .or(`end_date.is.null,end_date.gte.${today}`)
+          .order("day_of_week")
+          .order("start_time"),
+      ]);
 
       if (!groupData) {
         setLoading(false);
         return;
       }
 
-      const enriched: GroupInfo[] = await Promise.all(
-        groupData.map(async (g: { id: string; name: string; level: string; max_players: number }) => {
-          // Get player count
-          const { count } = await supabase
-            .from("group_players")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", g.id)
-            .eq("is_active", true);
+      // Build lookup maps
+      const countByGroup = new Map<string, number>();
+      for (const gp of (groupPlayersData || []) as { group_id: string }[]) {
+        countByGroup.set(gp.group_id, (countByGroup.get(gp.group_id) || 0) + 1);
+      }
+      const scheduleByGroup = new Map<string, GroupInfo["schedule"]>();
+      for (const s of (scheduleData || []) as { group_id: string; day_of_week: number; start_time: string; end_time: string; location: string | null }[]) {
+        const list = scheduleByGroup.get(s.group_id) || [];
+        list.push({ day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time, location: s.location });
+        scheduleByGroup.set(s.group_id, list);
+      }
 
-          // Get schedule (only active, not expired)
-          const today = new Date().toISOString().split("T")[0];
-          const { data: schedule } = await supabase
-            .from("schedule_sessions")
-            .select("day_of_week, start_time, end_time, location")
-            .eq("group_id", g.id)
-            .eq("is_active", true)
-            .or(`end_date.is.null,end_date.gte.${today}`)
-            .order("day_of_week")
-            .order("start_time");
-
-          // Get players with details
-          const { data: playerData } = await supabase
-            .from("group_players")
-            .select("player_id, profiles!group_players_player_id_fkey(id, first_name, last_name, phone)")
-            .eq("group_id", g.id)
-            .eq("is_active", true);
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const players: { id: string; first_name: string; last_name: string; phone: string | null; sessions_remaining: number | null; last_attendance: string | null }[] = (playerData || []).map((gp: any) => ({
-            id: gp.profiles?.id || "",
-            first_name: gp.profiles?.first_name || "",
-            last_name: gp.profiles?.last_name || "",
-            phone: gp.profiles?.phone,
-            sessions_remaining: null as number | null,
-            last_attendance: null as string | null,
-          })).filter((p: { id: string }) => p.id);
-
-          // Get subscriptions for these players
-          const playerIds = players.map((p: { id: string }) => p.id);
-          if (playerIds.length > 0) {
-            const { data: subs } = await supabase
-              .from("subscriptions")
-              .select("player_id, sessions_remaining")
-              .in("player_id", playerIds)
-              .eq("status", "active");
-
-            if (subs) {
-              const subMap = new Map(subs.map((s: { player_id: string; sessions_remaining: number }) => [s.player_id, s.sessions_remaining]));
-              for (const p of players) {
-                p.sessions_remaining = subMap.get(p.id) ?? null;
-              }
-            }
-          }
-
-          return {
-            id: g.id,
-            name: g.name,
-            level: g.level,
-            max_players: g.max_players,
-            player_count: count || 0,
-            schedule: schedule || [],
-            players,
-          };
-        })
-      );
+      const enriched: GroupInfo[] = (groupData as { id: string; name: string; level: string; max_players: number }[]).map((g) => ({
+        id: g.id,
+        name: g.name,
+        level: g.level,
+        max_players: g.max_players,
+        player_count: countByGroup.get(g.id) || 0,
+        schedule: scheduleByGroup.get(g.id) || [],
+        players: [],
+      }));
 
       setGroups(enriched);
       setLoading(false);
