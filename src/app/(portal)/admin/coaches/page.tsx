@@ -45,36 +45,33 @@ function AdminCoachesContent() {
   );
 
   const fetchCoaches = useCallback(async () => {
+    // Single nested-select query — coaches with their group assignments
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, area, is_active, created_at")
+      .select("id, first_name, last_name, email, phone, area, is_active, created_at, coach_groups!coach_groups_coach_id_fkey(is_active, groups(name))")
       .eq("role", "coach")
       .order("created_at", { ascending: false });
 
     if (data) {
-      // Get group assignments for each coach
-      const coachIds = data.map((c: { id: string }) => c.id);
-      const { data: assignments } = await supabase
-        .from("coach_groups")
-        .select("coach_id, group_id, groups(name)")
-        .in("coach_id", coachIds)
-        .eq("is_active", true);
-
-      const groupMap = new Map<string, string[]>();
-      if (assignments) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCoaches((data as any[]).map((c) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const a of assignments as any[]) {
-          const existing = groupMap.get(a.coach_id) || [];
-          existing.push(a.groups?.name || "Unknown");
-          groupMap.set(a.coach_id, existing);
-        }
-      }
-
-      setCoaches(data.map((c: { id: string }) => ({
-        ...c,
-        group_count: (groupMap.get(c.id) || []).length,
-        group_names: groupMap.get(c.id) || [],
-      })) as CoachRow[]);
+        const activeAssignments = (c.coach_groups || []).filter((cg: any) => cg.is_active);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const group_names = activeAssignments.map((cg: any) => cg.groups?.name || "Unknown");
+        return {
+          id: c.id,
+          first_name: c.first_name,
+          last_name: c.last_name,
+          email: c.email,
+          phone: c.phone,
+          area: c.area,
+          is_active: c.is_active,
+          created_at: c.created_at,
+          group_count: group_names.length,
+          group_names,
+        };
+      }) as CoachRow[]);
     }
     setLoading(false);
   }, [supabase]);

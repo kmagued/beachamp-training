@@ -36,44 +36,66 @@ export default function AdminGroupsPage() {
       return;
     }
 
-    const enriched: GroupData[] = await Promise.all(
-      groupData.map(async (g) => {
-        const { count } = await supabase
-          .from("group_players")
-          .select("*", { count: "exact", head: true })
-          .eq("group_id", g.id)
-          .eq("is_active", true);
+    const groupIds = (groupData as { id: string }[]).map((g) => g.id);
+    const today = new Date().toISOString().split("T")[0];
 
-        const { data: coachData } = await supabase
-          .from("coach_groups")
-          .select("coach_id, is_primary, profiles!coach_groups_coach_id_fkey(first_name, last_name)")
-          .eq("group_id", g.id)
-          .eq("is_active", true);
+    // Batch all related data in 3 parallel queries (no per-group N+1)
+    const [
+      { data: gpRows },
+      { data: coachRows },
+      { data: schedRows },
+    ] = await Promise.all([
+      supabase
+        .from("group_players")
+        .select("group_id")
+        .in("group_id", groupIds)
+        .eq("is_active", true),
+      supabase
+        .from("coach_groups")
+        .select("group_id, coach_id, is_primary, profiles!coach_groups_coach_id_fkey(first_name, last_name)")
+        .in("group_id", groupIds)
+        .eq("is_active", true),
+      supabase
+        .from("schedule_sessions")
+        .select("group_id, day_of_week, start_time, end_time")
+        .in("group_id", groupIds)
+        .eq("is_active", true)
+        .or(`end_date.is.null,end_date.gte.${today}`)
+        .order("day_of_week")
+        .order("start_time"),
+    ]);
 
-        const today = new Date().toISOString().split("T")[0];
-        const { data: schedData } = await supabase
-          .from("schedule_sessions")
-          .select("day_of_week, start_time, end_time")
-          .eq("group_id", g.id)
-          .eq("is_active", true)
-          .or(`end_date.is.null,end_date.gte.${today}`)
-          .order("day_of_week")
-          .order("start_time");
+    const countByGroup = new Map<string, number>();
+    for (const row of (gpRows || []) as { group_id: string }[]) {
+      countByGroup.set(row.group_id, (countByGroup.get(row.group_id) || 0) + 1);
+    }
 
-        return {
-          ...g,
-          player_count: count || 0,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          coaches: (coachData || []).map((c: any) => ({
-            id: c.coach_id,
-            first_name: c.profiles?.first_name || "",
-            last_name: c.profiles?.last_name || "",
-            is_primary: c.is_primary,
-          })),
-          schedule: schedData || [],
-        };
-      }),
-    );
+    const coachesByGroup = new Map<string, { id: string; first_name: string; last_name: string; is_primary: boolean }[]>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const c of (coachRows || []) as any[]) {
+      const list = coachesByGroup.get(c.group_id) || [];
+      list.push({
+        id: c.coach_id,
+        first_name: c.profiles?.first_name || "",
+        last_name: c.profiles?.last_name || "",
+        is_primary: c.is_primary,
+      });
+      coachesByGroup.set(c.group_id, list);
+    }
+
+    const schedByGroup = new Map<string, { day_of_week: number; start_time: string; end_time: string }[]>();
+    for (const s of (schedRows || []) as { group_id: string; day_of_week: number; start_time: string; end_time: string }[]) {
+      const list = schedByGroup.get(s.group_id) || [];
+      list.push({ day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time });
+      schedByGroup.set(s.group_id, list);
+    }
+
+    const enriched: GroupData[] = (groupData as GroupData[]).map((g) => ({
+      ...g,
+      player_count: countByGroup.get(g.id) || 0,
+      coaches: coachesByGroup.get(g.id) || [],
+      schedule: schedByGroup.get(g.id) || [],
+    }));
 
     setGroups(enriched);
     setLoading(false);

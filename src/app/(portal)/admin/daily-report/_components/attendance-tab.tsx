@@ -99,13 +99,21 @@ export function AttendanceTab({ date }: { date: string }) {
         return;
       }
 
-      // Fetch players for each group
+      // Fetch group players + existing attendance in parallel (both depend only on step 1)
       const groupIds = [...new Set(sessionsData.map((s) => s.group_id))];
-      const { data: allGroupPlayers } = await supabase
-        .from("group_players")
-        .select("player_id, group_id, profiles!group_players_player_id_fkey(id, first_name, last_name)")
-        .in("group_id", groupIds)
-        .eq("is_active", true);
+      const sessionIds = sessionsData.map((s) => s.id);
+      const [{ data: allGroupPlayers }, { data: existingAttPrefetch }] = await Promise.all([
+        supabase
+          .from("group_players")
+          .select("player_id, group_id, profiles!group_players_player_id_fkey(id, first_name, last_name)")
+          .in("group_id", groupIds)
+          .eq("is_active", true),
+        supabase
+          .from("attendance")
+          .select("player_id, status, schedule_session_id")
+          .eq("session_date", date)
+          .in("schedule_session_id", sessionIds),
+      ]);
 
       const playersByGroup: Record<string, GroupPlayer[]> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,13 +157,8 @@ export function AttendanceTab({ date }: { date: string }) {
         setPlayerSessions(sessionsMap);
       }
 
-      // Fetch existing attendance for this date
-      const sessionIds = sessionsData.map((s) => s.id);
-      const { data: existingAtt } = await supabase
-        .from("attendance")
-        .select("player_id, status, schedule_session_id")
-        .eq("session_date", date)
-        .in("schedule_session_id", sessionIds);
+      // Existing attendance was prefetched in parallel above
+      const existingAtt = existingAttPrefetch;
 
       const attBySession: Record<string, AttendanceRecord[]> = {};
       (existingAtt || []).forEach((a: { schedule_session_id: string } & AttendanceRecord) => {

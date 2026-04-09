@@ -27,18 +27,20 @@ export default function AdminPackagesPage() {
       .order("sort_order", { ascending: true });
 
     if (pkgs) {
-      // Get subscriber counts
-      const withCounts = await Promise.all(
-        pkgs.map(async (pkg: Package) => {
-          const { count } = await supabase
-            .from("subscriptions")
-            .select("*", { count: "exact", head: true })
-            .eq("package_id", pkg.id)
-            .eq("status", "active");
-          return { ...pkg, subscriber_count: count || 0 };
-        })
-      );
-      setPackages(withCounts);
+      // Single batched query for active subscriber counts
+      const pkgIds = (pkgs as Package[]).map((p) => p.id);
+      const { data: subRows } = await supabase
+        .from("subscriptions")
+        .select("package_id")
+        .in("package_id", pkgIds)
+        .eq("status", "active");
+
+      const countMap = new Map<string, number>();
+      for (const row of (subRows || []) as { package_id: string }[]) {
+        countMap.set(row.package_id, (countMap.get(row.package_id) || 0) + 1);
+      }
+
+      setPackages((pkgs as Package[]).map((pkg) => ({ ...pkg, subscriber_count: countMap.get(pkg.id) || 0 })));
     }
     setLoading(false);
   }

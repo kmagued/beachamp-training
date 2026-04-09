@@ -23,103 +23,78 @@ export default async function AdminDashboard() {
   const monthEndISO = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0];
 
   const [
-    { data: activeProfiles, count: playerCount },
+    { data: allPlayerProfiles, count: playerCount },
     { count: pendingPayments },
-    { data: revenueData },
-    { data: activeSubscriptions },
     { count: todaySessionCount },
+    // ALL confirmed payments — drives monthly revenue, all-time revenue, chart, and monthly table
     { data: revenuePayments },
-    { data: oneTimeExpenseData },
-    { data: recurringExpenseData },
-    { data: allExpenseData },
-    { data: recentAttendance },
+    // ALL subscriptions (any status) with package join — drives chart + metrics table
+    { data: allSubscriptions },
+    // ALL active expenses with full fields — drives monthly, all-time, recurring, monthly table
     { data: allExpensesWithDates },
+    { data: recentAttendance },
     { data: groupsData },
     { data: groupPlayersData },
     { data: attendanceAll },
-    { data: allSubscriptions },
-    { data: allPlayerProfiles },
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id", { count: "exact" })
+      .select("id, created_at", { count: "exact" })
       .eq("role", "player"),
     supabase
       .from("payments")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending"),
     supabase
-      .from("payments")
-      .select("amount")
-      .eq("status", "confirmed")
-      .gte("confirmed_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-    supabase
-      .from("subscriptions")
-      .select("player_id, package_id, packages(name)")
-      .eq("status", "active"),
-    supabase
       .from("schedule_sessions")
       .select("*", { count: "exact", head: true })
       .eq("day_of_week", todayDow)
       .eq("is_active", true),
-    // All confirmed payments for revenue chart
     supabase
       .from("payments")
       .select("amount, confirmed_at")
       .eq("status", "confirmed"),
-    // One-time expenses this month
+    supabase
+      .from("subscriptions")
+      .select("player_id, package_id, status, start_date, end_date, created_at, packages(name)"),
     supabase
       .from("expenses")
-      .select("amount")
-      .eq("is_active", true)
-      .eq("is_recurring", false)
-      .gte("expense_date", monthStartISO)
-      .lte("expense_date", monthEndISO),
-    // Active recurring expenses
-    supabase
-      .from("expenses")
-      .select("amount, recurrence_type")
-      .eq("is_active", true)
-      .eq("is_recurring", true),
-    // All expenses (for all-time total)
-    supabase
-      .from("expenses")
-      .select("amount")
+      .select("amount, expense_date, is_recurring, recurrence_type")
       .eq("is_active", true),
-    // Recent attendance (last 30 days) for active player count
     supabase
       .from("attendance")
       .select("player_id")
       .eq("status", "present")
       .gte("session_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
-    // All expenses with dates for monthly table
-    supabase
-      .from("expenses")
-      .select("amount, expense_date, is_recurring, recurrence_type")
-      .eq("is_active", true),
-    // Groups
     supabase
       .from("groups")
       .select("id, name, max_players")
       .eq("is_active", true),
-    // Group players (all, with joined_at for historical capacity)
     supabase
       .from("group_players")
       .select("group_id, player_id, joined_at, is_active"),
-    // All attendance for metrics table
     supabase
       .from("attendance")
       .select("status, session_date, group_id"),
-    // All subscriptions for metrics table (churn/retention)
-    supabase
-      .from("subscriptions")
-      .select("player_id, status, start_date, end_date, created_at"),
-    // All player profiles (for new member counting)
-    supabase
-      .from("profiles")
-      .select("id, created_at")
-      .eq("role", "player"),
   ]);
+
+  // Derive everything else in JS — no extra queries
+  const activeProfiles = allPlayerProfiles;
+  const monthStartTime = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const monthlyRevenuePayments = ((revenuePayments || []) as { amount: number; confirmed_at: string | null }[])
+    .filter((p) => p.confirmed_at && new Date(p.confirmed_at).getTime() >= monthStartTime);
+  const revenueData = monthlyRevenuePayments;
+
+  // Active subscriptions for the chart
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeSubscriptions = ((allSubscriptions || []) as any[]).filter((s) => s.status === "active");
+
+  // Expense slices
+  const oneTimeExpenseData = ((allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean }[])
+    .filter((e) => !e.is_recurring && e.expense_date >= monthStartISO && e.expense_date <= monthEndISO);
+  const recurringExpenseData = ((allExpensesWithDates || []) as { amount: number; is_recurring: boolean; recurrence_type: string | null }[])
+    .filter((e) => e.is_recurring);
+  const allExpenseData = allExpensesWithDates;
 
   const monthlyRevenue = (revenueData || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
@@ -137,10 +112,10 @@ export default async function AdminDashboard() {
     0
   );
   const recurringExpenses = (recurringExpenseData || [])
-    .filter((e: { recurrence_type: string }) => e.recurrence_type === "monthly")
+    .filter((e: { recurrence_type: string | null }) => e.recurrence_type === "monthly")
     .reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
     + (recurringExpenseData || [])
-    .filter((e: { recurrence_type: string }) => e.recurrence_type === "weekly")
+    .filter((e: { recurrence_type: string | null }) => e.recurrence_type === "weekly")
     .reduce((sum: number, e: { amount: number }) => sum + e.amount * 4, 0);
   const monthlyExpenses = oneTimeExpenses + recurringExpenses;
   const monthlyProfit = monthlyRevenue - monthlyExpenses;

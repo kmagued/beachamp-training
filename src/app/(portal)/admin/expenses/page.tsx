@@ -247,7 +247,29 @@ function AdminExpensesContent() {
             Track court reservations, salaries, and other costs
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const { exportToExcel } = await import("@/lib/utils/export-excel");
+              const rows = filteredExpenses.map((e) => ({
+                Date: e.expense_date,
+                Category: e.expense_categories?.name || "",
+                Description: e.description,
+                "Amount (EGP)": e.amount,
+                Type: e.is_recurring ? `Recurring (${e.recurrence_type})` : "One-time",
+                Payment: e.payment_status === "paid_full" ? "Paid" : e.payment_status === "partially_paid" ? `Partial (${e.paid_amount ?? 0} EGP)` : "Due",
+              }));
+              const dateStr = monthFilter || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+              exportToExcel(rows, `expenses-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Expenses");
+            }}
+            disabled={filteredExpenses.length === 0}
+            aria-label="Export to Excel"
+            className="!px-3 sm:!px-4"
+          >
+            <Download className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
           <Button
             variant="outline"
             onClick={() => setCategoryDrawerOpen(true)}
@@ -350,29 +372,6 @@ function AdminExpensesContent() {
             onReset={resetFilters}
             hasActiveFilters={hasActiveFilters}
           />
-
-          {/* Export */}
-          <div className="flex justify-end mb-3">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const { exportToExcel } = await import("@/lib/utils/export-excel");
-                const rows = filteredExpenses.map((e) => ({
-                  Date: e.expense_date,
-                  Category: e.expense_categories?.name || "",
-                  Description: e.description,
-                  "Amount (EGP)": e.amount,
-                  Type: e.is_recurring ? `Recurring (${e.recurrence_type})` : "One-time",
-                  Payment: e.payment_status === "paid_full" ? "Paid" : e.payment_status === "partially_paid" ? `Partial (${e.paid_amount ?? 0} EGP)` : "Due",
-                }));
-                const dateStr = monthFilter || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-                exportToExcel(rows, `expenses-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Expenses");
-              }}
-              disabled={filteredExpenses.length === 0}
-            >
-              <Download className="w-4 h-4 mr-1.5" /> Export
-            </Button>
-          </div>
 
           {/* Table */}
           <div className="flex-1">

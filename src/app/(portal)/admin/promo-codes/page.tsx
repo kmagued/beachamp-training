@@ -43,16 +43,18 @@ export default function AdminPromoCodesPage() {
     if (pkgs) setPackages(pkgs as Package[]);
 
     if (codes) {
-      const withCounts = await Promise.all(
-        (codes as PromoCode[]).map(async (code) => {
-          const { count } = await supabase
-            .from("promo_code_uses")
-            .select("*", { count: "exact", head: true })
-            .eq("promo_code_id", code.id);
-          return { ...code, use_count: count || 0 };
-        })
-      );
-      setPromoCodes(withCounts);
+      const codeIds = (codes as PromoCode[]).map((c) => c.id);
+      const { data: useRows } = await supabase
+        .from("promo_code_uses")
+        .select("promo_code_id")
+        .in("promo_code_id", codeIds);
+
+      const useCount = new Map<string, number>();
+      for (const row of (useRows || []) as { promo_code_id: string }[]) {
+        useCount.set(row.promo_code_id, (useCount.get(row.promo_code_id) || 0) + 1);
+      }
+
+      setPromoCodes((codes as PromoCode[]).map((c) => ({ ...c, use_count: useCount.get(c.id) || 0 })));
     }
     setLoading(false);
   }
