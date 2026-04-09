@@ -31,7 +31,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
           <p className="text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider truncate">
             {label}
           </p>
-          <p className="text-lg sm:text-xl font-bold text-primary-900 mt-0.5 capitalize truncate">
+          <p className="text-sm sm:text-xl font-bold text-primary-900 mt-0.5 capitalize truncate">
             {value}
           </p>
           {subtitle && (

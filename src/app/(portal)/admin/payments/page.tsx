@@ -328,18 +328,47 @@ function AdminPaymentsContent() {
             {(!!search || !!monthFilter || !!statusFilter || !!methodFilter || !!packageFilter || !!typeFilter) && ` · ${filteredPayments.length} matching`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            onClick={async () => {
+              const { exportToExcel } = await import("@/lib/utils/export-excel");
+              const rows = filteredPayments.map((p) => ({
+                Date: p.confirmed_at ? new Date(p.confirmed_at).toISOString().split("T")[0] : "",
+                Player: `${p.profiles?.first_name || ""} ${p.profiles?.last_name || ""}`.trim(),
+                Package: p.subscriptions?.packages?.name || "",
+                "Amount (EGP)": p.amount,
+                Method: p.method,
+                Status: p.status,
+              }));
+              const dateStr = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+              exportToExcel(rows, `payments-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Payments");
+            }}
+            disabled={filteredPayments.length === 0}
+            title="Export to Excel"
+            aria-label="Export to Excel"
+            className="p-2 sm:px-3 sm:py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="hidden sm:inline">Export</span>
+          </button>
           <Link
             href="/admin/payments/import"
-            className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            className="p-2 sm:px-4 sm:py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center"
+            title="Import"
+            aria-label="Import"
           >
-            Import
+            <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 12l-4-4m0 0l-4 4m4-4v12" />
+            </svg>
+            <span className="hidden sm:inline">Import</span>
           </Link>
           <button
             onClick={() => setShowNewPayment(true)}
-            className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+            className="px-3 sm:px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors whitespace-nowrap"
           >
-            + New Payment
+            + New<span className="hidden sm:inline"> Payment</span>
           </button>
         </div>
       </div>
@@ -396,29 +425,6 @@ function AdminPaymentsContent() {
           Delete All
         </button>
       </SelectionBar>
-
-      <div className="flex justify-end mb-3">
-        <button
-          onClick={async () => {
-            const { exportToExcel } = await import("@/lib/utils/export-excel");
-            const rows = filteredPayments.map((p) => ({
-              Date: p.confirmed_at ? new Date(p.confirmed_at).toISOString().split("T")[0] : "",
-              Player: `${p.profiles?.first_name || ""} ${p.profiles?.last_name || ""}`.trim(),
-              Package: p.subscriptions?.packages?.name || "",
-              "Amount (EGP)": p.amount,
-              Method: p.method,
-              Status: p.status,
-            }));
-            const dateStr = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-            exportToExcel(rows, `payments-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Payments");
-          }}
-          disabled={filteredPayments.length === 0}
-          className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          Export
-        </button>
-      </div>
 
       <div className="flex-1">
         {loading ? (

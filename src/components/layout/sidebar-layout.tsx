@@ -204,7 +204,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         )}
 
         {/* Brand mark at bottom */}
-        <div className={cn("shrink-0 flex items-center justify-center px-3 pb-4 pt-2", collapsed && "px-1")}>
+        <div className={cn("shrink-0 flex items-center justify-center px-3 pb-8 pt-2", collapsed && "px-1")}>
           <Link href={navItems[0].href} className="opacity-60 hover:opacity-100 transition-opacity">
             <Image
               src="/images/logo.png"
@@ -229,16 +229,6 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link href={navItems[0].href} className="flex items-center">
-              <Image
-                src="/images/logo.png"
-                alt={branding.name}
-                width={88}
-                height={28}
-                priority
-                className="h-7 w-auto object-contain"
-              />
-            </Link>
           </div>
 
           {/* Spacer on desktop */}
@@ -281,11 +271,17 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       />
       <div
         className={cn(
-          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-primary-200/60 z-50 flex flex-col transition-transform duration-300 ease-in-out pt-14",
+          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-primary-200/60 z-50 flex flex-col transition-transform duration-300 ease-in-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <nav className="flex-1 px-3 pt-4 overflow-y-auto">
+        {/* Header */}
+        <div className="h-14 flex items-center px-5 shrink-0">
+          <p className={cn("text-[11px] font-semibold uppercase tracking-[0.15em]", config.labelColor)}>
+            {config.label}
+          </p>
+        </div>
+        <nav className="flex-1 px-3 pt-2 overflow-y-auto">
           {navItems.map((item, index) => {
             const Icon = iconMap[item.key as keyof typeof iconMap];
             const isActive = activeKey === item.key;
@@ -337,6 +333,24 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             </div>
           </div>
         )}
+
+        {/* Brand mark at bottom */}
+        <div className="shrink-0 flex items-center justify-center px-3 pb-8 pt-2">
+          <Link
+            href={navItems[0].href}
+            onClick={() => setMobileOpen(false)}
+            className="opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <Image
+              src="/images/logo.png"
+              alt={branding.name}
+              width={160}
+              height={56}
+              priority
+              className="h-14 w-auto object-contain"
+            />
+          </Link>
+        </div>
       </div>
 
       {/* Main content — desktop gets sidebar margin via CSS variable */}

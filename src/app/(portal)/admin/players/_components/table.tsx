@@ -354,7 +354,7 @@ export function PlayersTableView(props: PlayersTableProps) {
       </Card>
 
       {/* Mobile Cards */}
-      <div className="sm:hidden space-y-2">
+      <div className="sm:hidden space-y-2.5">
         {players.map((player) => {
           const latestSub = getLatestSubscription(player);
           const activity = getActivityStatus(player);
@@ -362,115 +362,130 @@ export function PlayersTableView(props: PlayersTableProps) {
           const isSingleSession = latestSub?.sessions_total === 1;
           const selected = selectedIds.has(player.id);
           const daysLeft = !isSingleSession && latestSub ? getDaysLeft(latestSub.end_date) : null;
-          const showExpiryWarning = daysLeft !== null;
           const isInactive = activity === "inactive";
+          const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
+          const expiryTone =
+            daysLeft !== null && daysLeft <= 3 ? "danger" :
+            daysLeft !== null && daysLeft <= 7 ? "warning" : "muted";
           return (
             <div
               key={player.id}
               id={getRowId(player.id)}
               onClick={(e: React.MouseEvent) => handleRowClick(e, player)}
               className={cn(
-                "rounded-xl border bg-white p-3.5 cursor-pointer transition-all",
-                selected ? "border-primary-300 bg-primary-50 shadow-sm" : "border-slate-150 hover:border-primary-200 hover:shadow-sm",
+                "rounded-2xl bg-white p-4 cursor-pointer transition-all shadow-[0_2px_12px_-4px_rgba(18,75,93,0.06)]",
+                selected ? "ring-2 ring-primary-800 bg-primary-50/40" : "hover:shadow-[0_4px_18px_-4px_rgba(18,75,93,0.12)]",
                 isHighlighted(player.id) && "row-highlight",
               )}
             >
-              {/* Header: checkbox + avatar + name + badges */}
-              <div className="flex items-center gap-2.5">
+              {/* Header */}
+              <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   checked={selected}
                   onChange={() => toggleSelect(player.id)}
-                  className="table-checkbox shrink-0"
+                  className="table-checkbox shrink-0 mt-1"
                 />
                 <div className={cn(
-                  "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                  isInactive ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary"
+                  "w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                  isInactive ? "bg-primary-100 text-primary-700/40" : "bg-primary-800 text-white"
                 )}>
                   {player.first_name[0]}{player.last_name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold text-slate-900 truncate">
+                    <p className="text-[15px] font-semibold text-primary-900 truncate">
                       {player.first_name} {player.last_name}
                     </p>
                     <ActivityIcon status={activity} />
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate">{player.email}</p>
+                  <p className="text-[11px] text-primary-700/50 truncate mt-0.5">{player.email}</p>
+                  <div className="mt-2">
+                    <SubscriptionBadge status={subStatus} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="shrink-0 -mt-1">
                   <ContactIcons phone={player.phone} email={player.email} />
                 </div>
               </div>
 
-              {/* Info row */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
-                {player.groups?.length ? (
-                  <span className="inline-flex items-center gap-1 text-slate-500">
-                    <Users className="w-3 h-3 text-slate-400" />
-                    {player.groups.map((g) => g.name).join(", ")}
-                  </span>
-                ) : null}
-                {(() => {
-                  const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s) && s.sessions_total > 1) || [];
-                  if (activeSubs.length > 1) {
-                    return activeSubs.map((s) => (
-                      <span key={s.id} className="inline-flex items-center gap-1 text-slate-500">
-                        <Package className="w-3 h-3 text-slate-400" />
-                        {s.packages?.name}: {s.sessions_remaining}/{s.sessions_total}
-                      </span>
-                    ));
-                  }
-                  if (activeSubs.length === 1) {
-                    return (
-                      <span className="inline-flex items-center gap-1 text-slate-500">
-                        <Package className="w-3 h-3 text-slate-400" />
-                        {activeSubs[0].packages?.name}: {activeSubs[0].sessions_remaining}/{activeSubs[0].sessions_total}
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
-                {player.playing_level && (
-                  <span className="inline-flex items-center gap-1 text-slate-500">
-                    <Dumbbell className="w-3 h-3 text-slate-400" />
-                    {player.playing_level.charAt(0).toUpperCase() + player.playing_level.slice(1)}
-                  </span>
-                )}
-              </div>
-
-              {/* Bottom row: subscription + sessions + expiry */}
-              <div className="mt-2.5 flex items-center justify-between">
-                <SubscriptionBadge status={subStatus} />
-                <div className="flex items-center gap-3 text-[11px]">
-                  {latestSub && (
-                    <span className={cn(
-                      "font-medium",
-                      latestSub.status === "pending_payment" ? "text-red-600" : "text-slate-600"
-                    )}>
-                      {latestSub.status === "pending_payment"
-                        ? `-${latestSub.sessions_total - latestSub.sessions_remaining}`
-                        : latestSub.sessions_total === 1
-                          ? `${latestSub.sessions_remaining} session`
-                          : `${latestSub.sessions_remaining}/${latestSub.sessions_total}`}
+              {/* Meta chips */}
+              {(player.groups?.length || player.playing_level) && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {player.groups?.map((g) => (
+                    <span
+                      key={g.id}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-800 bg-sand/60 rounded-full px-2.5 py-1"
+                    >
+                      <Users className="w-3 h-3" />
+                      {g.name}
                     </span>
-                  )}
-                  {!isSingleSession && latestSub?.end_date && (
-                    <span className={cn(
-                      "inline-flex items-center gap-0.5",
-                      showExpiryWarning && daysLeft! <= 3 ? "text-red-500 font-medium" :
-                      showExpiryWarning && daysLeft! <= 7 ? "text-amber-500 font-medium" :
-                      "text-slate-400"
-                    )}>
-                      <CalendarDays className="w-3 h-3" />
-                      {formatDate(latestSub.end_date)}
-                      {showExpiryWarning && daysLeft! <= 7 && (
-                        <span className="ml-0.5">({daysLeft! <= 0 ? "Exp" : `${daysLeft}d`})</span>
-                      )}
+                  ))}
+                  {player.playing_level && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-800 bg-sand/60 rounded-full px-2.5 py-1 capitalize">
+                      <Dumbbell className="w-3 h-3" />
+                      {player.playing_level}
                     </span>
                   )}
                 </div>
-              </div>
+              )}
+
+              {/* Subscription block */}
+              {latestSub && (
+                <div className="mt-3 pt-3 border-t border-primary-100/60">
+                  {activeSubs.length > 1 ? (
+                    <div className="space-y-2">
+                      {activeSubs.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-[12px] text-primary-800 min-w-0">
+                            <Package className="w-3.5 h-3.5 text-primary-700/50 shrink-0" />
+                            <span className="truncate font-medium">{s.packages?.name}</span>
+                          </span>
+                          <span className="text-[12px] font-bold text-primary-900 shrink-0">
+                            {s.sessions_remaining}<span className="text-primary-700/40 font-normal">/{s.sessions_total}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-primary-800 min-w-0">
+                        <Package className="w-3.5 h-3.5 text-primary-700/50 shrink-0" />
+                        <span className="truncate font-medium">
+                          {latestSub.packages?.name || "—"}
+                        </span>
+                      </span>
+                      <span className={cn(
+                        "text-[12px] font-bold shrink-0",
+                        latestSub.status === "pending_payment" ? "text-red-600" : "text-primary-900"
+                      )}>
+                        {latestSub.status === "pending_payment"
+                          ? `-${latestSub.sessions_total - latestSub.sessions_remaining}`
+                          : isSingleSession
+                            ? `${latestSub.sessions_remaining} session`
+                            : <>{latestSub.sessions_remaining}<span className="text-primary-700/40 font-normal">/{latestSub.sessions_total}</span></>}
+                      </span>
+                    </div>
+                  )}
+                  {!isSingleSession && latestSub.end_date && (
+                    <div className="mt-2 flex items-center justify-between text-[11px]">
+                      <span className="text-primary-700/50">Expires</span>
+                      <span className={cn(
+                        "inline-flex items-center gap-1 font-medium",
+                        expiryTone === "danger" && "text-red-600",
+                        expiryTone === "warning" && "text-amber-600",
+                        expiryTone === "muted" && "text-primary-700/60"
+                      )}>
+                        <CalendarDays className="w-3 h-3" />
+                        {formatDate(latestSub.end_date)}
+                        {daysLeft !== null && daysLeft <= 7 && (
+                          <span>· {daysLeft <= 0 ? "Expired" : `${daysLeft}d left`}</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

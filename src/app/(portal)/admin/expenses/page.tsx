@@ -256,11 +256,17 @@ function AdminExpensesContent() {
             <Settings className="w-4 h-4 mr-1.5" />
             Categories
           </Button>
-          <Button onClick={() => { setEditingExpense(null); setExpenseDrawerOpen(true); }}>
-            <Plus className="w-4 h-4 mr-1.5" /> Add Expense
+          <Button
+            onClick={() => { setEditingExpense(null); setExpenseDrawerOpen(true); }}
+            aria-label="Add expense"
+            className="!px-3 sm:!px-4"
+          >
+            <Plus className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Add Expense</span>
           </Button>
         </div>
       </div>
+
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
