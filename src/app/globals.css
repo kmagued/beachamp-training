@@ -10,6 +10,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* iOS Safari ignores width:100% on native date/time inputs and renders them
+   at their intrinsic UA width, which overflows narrow containers. Force them
+   to fill the parent box. */
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  width: -webkit-fill-available;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* Hide scrollbar for horizontal tab navigation */
 .no-scrollbar {
   -ms-overflow-style: none;
