@@ -3,10 +3,12 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { revalidatePath } from "next/cache";
-import { sendEmail } from "@/lib/email/send";
 import type { NotificationType } from "@/types/database";
 
-/** Create a notification for a specific user + send email */
+// Email delivery is wired from a DB trigger (trg_notification_email) so every
+// notification — whether inserted from JS or from a DB trigger — emails too.
+
+/** Create a notification for a specific user. */
 export async function createNotification(data: {
   user_id: string;
   title: string;
@@ -16,7 +18,6 @@ export async function createNotification(data: {
 }) {
   const admin = createAdminClient();
 
-  // Insert in-app notification
   const { error } = await admin.from("notifications").insert({
     user_id: data.user_id,
     title: data.title,
@@ -26,25 +27,10 @@ export async function createNotification(data: {
   });
   if (error) return { error: error.message };
 
-  // Send email (non-blocking)
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("email")
-    .eq("id", data.user_id)
-    .single();
-
-  if (profile?.email) {
-    sendEmail({
-      to: profile.email,
-      subject: data.title,
-      body: data.body || data.title,
-    }).catch(() => {}); // fire-and-forget
-  }
-
   return { success: true };
 }
 
-/** Create notifications for all admins + send emails */
+/** Create notifications for all admins. */
 export async function notifyAdmins(data: {
   title: string;
   body?: string;
@@ -54,14 +40,13 @@ export async function notifyAdmins(data: {
   const admin = createAdminClient();
   const { data: admins } = await admin
     .from("profiles")
-    .select("id, email")
+    .select("id")
     .eq("role", "admin")
     .eq("is_active", true);
 
   if (!admins?.length) return { success: true };
 
-  // Insert in-app notifications
-  const rows = admins.map((a: { id: string; email: string | null }) => ({
+  const rows = admins.map((a: { id: string }) => ({
     user_id: a.id,
     title: data.title,
     body: data.body || null,
@@ -71,18 +56,6 @@ export async function notifyAdmins(data: {
 
   const { error } = await admin.from("notifications").insert(rows);
   if (error) return { error: error.message };
-
-  // Send emails (non-blocking, parallel)
-  const emails = admins
-    .filter((a: { email: string | null }) => a.email)
-    .map((a: { email: string | null }) =>
-      sendEmail({
-        to: a.email!,
-        subject: data.title,
-        body: data.body || data.title,
-      }).catch(() => {})
-    );
-  Promise.all(emails).catch(() => {});
 
   return { success: true };
 }

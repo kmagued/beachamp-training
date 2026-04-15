@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useCallback } from "react";
 import { Card, Input, Select, Label, Button, DatePicker, Textarea, Toast } from "@/components/ui";
-import { Loader2, Copy, Check, UserPlus, Eye } from "lucide-react";
+import { Loader2, Copy, Check, UserPlus, Eye, X } from "lucide-react";
 import Link from "next/link";
 import { addSinglePlayer } from "../actions";
 import { branding } from "@/lib/config/branding";
@@ -377,7 +377,14 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
       {/* Success Modal */}
       {result && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <Card className="w-full max-w-md mx-4">
+          <Card className="w-full max-w-md mx-4 relative">
+            <button
+              onClick={() => { setResult(null); setCopied(false); }}
+              aria-label="Close"
+              className="absolute top-3 right-3 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Check className="w-6 h-6 text-emerald-600" />

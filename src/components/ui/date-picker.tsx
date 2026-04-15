@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 
 interface DatePickerProps {
   value?: string;
+  defaultValue?: string;
   onChange?: (e: { target: { value: string } }) => void;
   placeholder?: string;
   className?: string;
@@ -29,6 +30,7 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 export function DatePicker({
   value,
+  defaultValue,
   onChange,
   placeholder = "Select date...",
   className,
@@ -42,12 +44,16 @@ export function DatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Parse the controlled value (YYYY-MM-DD)
+  const isControlled = onChange !== undefined;
+  const [internalValue, setInternalValue] = useState(value ?? defaultValue ?? "");
+  const currentValue = isControlled ? (value ?? "") : internalValue;
+
+  // Parse the current value (YYYY-MM-DD)
   const selectedDate = useMemo(() => {
-    if (!value) return null;
-    const [y, m, d] = value.split("-").map(Number);
+    if (!currentValue) return null;
+    const [y, m, d] = currentValue.split("-").map(Number);
     return { year: y, month: m - 1, day: d };
-  }, [value]);
+  }, [currentValue]);
 
   // When opening, navigate to the selected date's month
   useEffect(() => {
@@ -75,7 +81,12 @@ export function DatePicker({
   function selectDay(day: number) {
     const m = String(viewMonth + 1).padStart(2, "0");
     const d = String(day).padStart(2, "0");
-    onChange?.({ target: { value: `${viewYear}-${m}-${d}` } });
+    const next = `${viewYear}-${m}-${d}`;
+    if (isControlled) {
+      onChange?.({ target: { value: next } });
+    } else {
+      setInternalValue(next);
+    }
     setOpen(false);
   }
 
@@ -119,7 +130,7 @@ export function DatePicker({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      {name && <input type="hidden" name={name} value={value || ""} />}
+      {name && <input type="hidden" name={name} value={currentValue} />}
 
       {/* Trigger */}
       <button

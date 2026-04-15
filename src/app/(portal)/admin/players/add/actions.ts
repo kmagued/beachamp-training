@@ -147,6 +147,41 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
   };
 }
 
+function normalizeHand(v?: string | null): "left" | "right" | null {
+  const s = v?.trim().toLowerCase();
+  if (!s) return null;
+  if (["right", "r", "right hand", "right-handed", "righthanded", "right handed"].includes(s)) return "right";
+  if (["left", "l", "left hand", "left-handed", "lefthanded", "left handed"].includes(s)) return "left";
+  return null;
+}
+
+function normalizePosition(v?: string | null): "defender" | "blocker" | null {
+  const s = v?.trim().toLowerCase();
+  if (!s) return null;
+  if (["defender", "def", "d"].includes(s)) return "defender";
+  if (["blocker", "block", "b"].includes(s)) return "blocker";
+  return null;
+}
+
+function normalizeGender(v?: string | null): "male" | "female" | null {
+  const s = v?.trim().toLowerCase();
+  if (!s) return null;
+  if (["male", "m"].includes(s)) return "male";
+  if (["female", "f"].includes(s)) return "female";
+  return null;
+}
+
+/** Accept YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, or YYYY/MM/DD. Egypt locale → DD/MM. */
+function normalizeDate(v?: string | null): string | null {
+  const s = v?.trim();
+  if (!s) return null;
+  let m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(s);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(s);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
 export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerResult[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -209,13 +244,13 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
         last_name: row.last_name.trim(),
         email,
         phone: row.phone?.trim() || null,
-        date_of_birth: row.date_of_birth || null,
+        date_of_birth: normalizeDate(row.date_of_birth),
         area: row.area?.trim() || null,
-        gender: row.gender?.trim().toLowerCase() || null,
+        gender: normalizeGender(row.gender),
         height: row.height ?? null,
         weight: row.weight ?? null,
-        preferred_hand: row.preferred_hand?.trim().toLowerCase() || null,
-        preferred_position: row.preferred_position?.trim().toLowerCase() || null,
+        preferred_hand: normalizeHand(row.preferred_hand),
+        preferred_position: normalizePosition(row.preferred_position),
         health_conditions: row.health_conditions?.trim() || null,
         training_goals: row.training_goals?.trim() || null,
         guardian_name: row.guardian_name || null,

@@ -606,11 +606,11 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                 <DatePicker name="session_date" placeholder="Select date" />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="min-w-0">
                   <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
                   <Input name="start_time" type="time" required />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-xs font-medium text-slate-500 mb-1 block">End Time</label>
                   <Input name="end_time" type="time" required />
                 </div>
@@ -648,11 +648,11 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
                     <Input name="start_time" type="time" required defaultValue={editingSession.start_time?.slice(0, 5) || ""} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs font-medium text-slate-500 mb-1 block">End Time</label>
                     <Input name="end_time" type="time" required defaultValue={editingSession.end_time?.slice(0, 5) || ""} />
                   </div>
@@ -672,7 +672,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 mb-1 block">End Date</label>
-                  <DatePicker name="end_date" value={editingSession.end_date || ""} />
+                  <DatePicker name="end_date" defaultValue={editingSession.end_date || ""} />
                 </div>
                 <Button type="submit" fullWidth disabled={isPending}>
                   {isPending ? "Saving..." : "Update Session"}

@@ -364,27 +364,55 @@ export async function createAdminPayment(data: {
 
   const isCash = data.method === "cash";
 
-  // Create subscription
-  const { data: subscription, error: subError } = await admin
+  // If the player already has an unsettled pending_payment subscription for
+  // this same package (auto-created when they attended without an active sub),
+  // settle that one instead of creating a duplicate. Otherwise sessions_total
+  // for the new sub would be added on top of the already-deducted unpaid sessions.
+  const { data: existingPending } = await admin
     .from("subscriptions")
-    .insert({
-      player_id: data.player_id,
-      package_id: data.package_id,
-      sessions_remaining: pkg.session_count,
-      sessions_total: pkg.session_count,
-      start_date: startDate.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
-      status: isCash ? "active" : "pending",
-    })
     .select("id")
-    .single();
+    .eq("player_id", data.player_id)
+    .eq("package_id", data.package_id)
+    .eq("status", "pending_payment")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (subError) return { error: subError.message };
+  let subscriptionId: string;
+  if (existingPending) {
+    const { error: subError } = await admin
+      .from("subscriptions")
+      .update({
+        status: isCash ? "active" : "pending",
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+      })
+      .eq("id", existingPending.id);
+    if (subError) return { error: subError.message };
+    subscriptionId = existingPending.id;
+  } else {
+    const { data: subscription, error: subError } = await admin
+      .from("subscriptions")
+      .insert({
+        player_id: data.player_id,
+        package_id: data.package_id,
+        sessions_remaining: pkg.session_count,
+        sessions_total: pkg.session_count,
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+        status: isCash ? "active" : "pending",
+      })
+      .select("id")
+      .single();
+
+    if (subError) return { error: subError.message };
+    subscriptionId = subscription.id;
+  }
 
   // Create payment
   const { error: payError } = await admin.from("payments").insert({
     player_id: data.player_id,
-    subscription_id: subscription.id,
+    subscription_id: subscriptionId,
     amount: data.amount,
     method: data.method,
     status: isCash ? "confirmed" : "pending",

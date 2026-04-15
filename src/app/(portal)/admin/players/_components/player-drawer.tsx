@@ -5,14 +5,13 @@ import Link from "next/link";
 import { Badge, Card, Button, Input, Select, Label, DatePicker, Textarea } from "@/components/ui";
 import {
   X, Mail, Phone, MapPin, Calendar, Heart, Target, Dumbbell, User,
-  KeyRound, Pencil, Copy, Check, ExternalLink, Loader2, ArrowLeft, AlertTriangle,
+  Pencil, Check, ExternalLink, Loader2, ArrowLeft, AlertTriangle,
   Ruler, Hand, Shield, Users, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
-import { useRouter } from "next/navigation";
-import { updatePlayer, resetPlayerPassword, updateSubscriptionBalance, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
+import { updatePlayer, updateSubscriptionBalance, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import type { PlayerRow, ActivityStatus, SubscriptionStatus } from "./types";
 import { getActivityStatus, getSubscriptionStatus } from "./types";
@@ -113,12 +112,7 @@ function DrawerContent({
   onClose: () => void;
   onDataChange: () => void;
 }) {
-  const router = useRouter();
   const [view, setView] = useState<"detail" | "edit">("detail");
-  const [passwordResult, setPasswordResult] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [isResetting, startResetTransition] = useTransition();
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [editingSessions, setEditingSessions] = useState(false);
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
@@ -134,32 +128,12 @@ function DrawerContent({
   // Reset to detail view when player changes
   useEffect(() => {
     setView("detail");
-    setPasswordResult(null);
-    setPasswordError(null);
-    setCopied(false);
     setShowAddPayment(false);
     setEditingSessions(false);
     setConfirmDelete(false);
     setDeleteError(null);
     setSessionError(null);
   }, [player.id]);
-
-  function handleResetPassword() {
-    setPasswordError(null);
-    startResetTransition(async () => {
-      const res = await resetPlayerPassword(player.id);
-      if ("error" in res) setPasswordError(res.error ?? "Failed to reset password");
-      else if (res.password) setPasswordResult(res.password);
-    });
-  }
-
-  function handleCopy() {
-    if (passwordResult) {
-      navigator.clipboard.writeText(passwordResult);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
 
   if (view === "edit") {
     return (
@@ -639,26 +613,10 @@ function DrawerContent({
 
       {/* Footer actions */}
       <div className="px-5 py-4 border-t border-slate-100 space-y-3">
-        {passwordError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
-            {passwordError}
-          </div>
-        )}
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => setView("edit")}>
             <span className="flex items-center justify-center gap-1.5">
               <Pencil className="w-3.5 h-3.5" /> Edit
-            </span>
-          </Button>
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={handleResetPassword}
-            disabled={isResetting}
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              {isResetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
-              Reset Password
             </span>
           </Button>
           <button
@@ -688,51 +646,6 @@ function DrawerContent({
         prefillPlayerId={player.id}
         prefillPlayerName={`${player.first_name} ${player.last_name}`}
       />
-
-      {/* Password result modal */}
-      {passwordResult && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <Card className="w-full max-w-md mx-4">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <KeyRound className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900">Password Reset</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                New password for {player.first_name} {player.last_name}
-              </p>
-            </div>
-
-            <div className="bg-slate-50 rounded-lg p-4 mb-4">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-                New Password
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono bg-white px-3 py-2 rounded border border-slate-200 text-slate-900 select-all">
-                  {passwordResult}
-                </code>
-                <button
-                  onClick={handleCopy}
-                  className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-                  title="Copy"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">
-                Share this password with the player. They can change it later.
-              </p>
-            </div>
-
-            <Button
-              fullWidth
-              onClick={() => { setPasswordResult(null); setCopied(false); }}
-            >
-              Done
-            </Button>
-          </Card>
-        </div>
-      )}
 
       {/* Delete confirmation modal */}
       {confirmDelete && (

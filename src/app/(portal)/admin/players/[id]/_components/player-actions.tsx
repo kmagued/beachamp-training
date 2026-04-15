@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { Card, Input, Select, Label, Button, DatePicker, Textarea, Badge, Toast } from "@/components/ui";
-import { Pencil, KeyRound, MoreVertical, Loader2, Copy, Check, X, Trash2 } from "lucide-react";
+import { Pencil, Loader2, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
 import { useRouter } from "next/navigation";
-import { updatePlayer, resetPlayerPassword, deletePlayer } from "../actions";
+import { updatePlayer, deletePlayer } from "../actions";
 import type { PlayerProfile } from "./types";
 
 interface PlayerActionsProps {
@@ -15,51 +15,11 @@ interface PlayerActionsProps {
 
 export function PlayerActionsMenu({ player }: PlayerActionsProps) {
   const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [passwordResult, setPasswordResult] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
-  const menuRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const handleToastClose = useCallback(() => setToast(null), []);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  function handleResetPassword() {
-    setMenuOpen(false);
-    startTransition(async () => {
-      const res = await resetPlayerPassword(player.id);
-      if (res.password) {
-        setPasswordResult(res.password);
-      } else {
-        setToast({ message: res.error ?? "Failed to reset password", variant: "error" });
-      }
-    });
-  }
-
-  function handleCopy() {
-    if (passwordResult) {
-      navigator.clipboard.writeText(passwordResult);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  function handleDelete() {
-    setMenuOpen(false);
-    setConfirmDelete(true);
-  }
 
   function confirmDeletePlayer() {
     startDeleteTransition(async () => {
@@ -82,34 +42,13 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
             <Pencil className="w-3.5 h-3.5" /> Edit
           </span>
         </Button>
-
-        <div className="relative" ref={menuRef}>
-          <Button
-            variant="secondary"
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="px-2.5"
-          >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
-          </Button>
-          {menuOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg border border-slate-200 shadow-lg z-20 py-1">
-              <button
-                onClick={handleResetPassword}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
-              >
-                <KeyRound className="w-4 h-4 text-slate-400" />
-                Reset Password
-              </button>
-              <button
-                onClick={handleDelete}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
-              >
-                <Trash2 className="w-4 h-4 text-red-400" />
-                Delete Player
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="px-2.5 py-2 rounded-xl text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+          title="Delete Player"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
 
       {editing && (
@@ -117,50 +56,6 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
           player={player}
           onClose={() => setEditing(false)}
         />
-      )}
-
-      {passwordResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <Card className="w-full max-w-md mx-4">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <KeyRound className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900">Password Reset</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                New password for {player.first_name} {player.last_name}
-              </p>
-            </div>
-
-            <div className="bg-slate-50 rounded-lg p-4 mb-4">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-                New Password
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono bg-white px-3 py-2 rounded border border-slate-200 text-slate-900 select-all">
-                  {passwordResult}
-                </code>
-                <button
-                  onClick={handleCopy}
-                  className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-                  title="Copy"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">
-                Share this password with the player. They can change it later.
-              </p>
-            </div>
-
-            <Button
-              fullWidth
-              onClick={() => { setPasswordResult(null); setCopied(false); }}
-            >
-              Done
-            </Button>
-          </Card>
-        </div>
       )}
 
       {confirmDelete && (
