@@ -605,7 +605,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Date</label>
                 <DatePicker name="session_date" placeholder="Select date" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="min-w-0">
                   <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
                   <Input name="start_time" type="time" required />
@@ -647,7 +647,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                     {formError}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="min-w-0">
                     <label className="text-xs font-medium text-slate-500 mb-1 block">Start Time</label>
                     <Input name="start_time" type="time" required defaultValue={editingSession.start_time?.slice(0, 5) || ""} />

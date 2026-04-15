@@ -8,6 +8,7 @@ import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { MonthlyFinancialTable } from "./_components/monthly-financial-table";
 import { MetricsTable } from "./_components/metrics-table";
+import { cairoMonthKey, cairoNowYearMonth } from "@/lib/utils/cairo-time";
 
 export default async function AdminDashboard() {
   const currentUser = await getCurrentUser();
@@ -19,8 +20,7 @@ export default async function AdminDashboard() {
   // Stats queries in parallel
   const todayDow = new Date().getDay();
 
-  const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
-  const monthEndISO = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0];
+  const currentMonthKey = cairoMonthKey(new Date()); // "YYYY-MM" in Africa/Cairo
 
   const [
     { data: allPlayerProfiles, count: playerCount },
@@ -80,18 +80,18 @@ export default async function AdminDashboard() {
 
   // Derive everything else in JS — no extra queries
   const activeProfiles = allPlayerProfiles;
-  const monthStartTime = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
   const monthlyRevenuePayments = ((revenuePayments || []) as { amount: number; confirmed_at: string | null }[])
-    .filter((p) => p.confirmed_at && new Date(p.confirmed_at).getTime() >= monthStartTime);
+    .filter((p) => p.confirmed_at && cairoMonthKey(new Date(p.confirmed_at)) === currentMonthKey);
   const revenueData = monthlyRevenuePayments;
 
   // Active subscriptions for the chart
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeSubscriptions = ((allSubscriptions || []) as any[]).filter((s) => s.status === "active");
 
-  // Expense slices
+  // Expense slices — expense_date is a DATE (no timezone), so its YYYY-MM
+  // prefix is already the calendar month it was logged for.
   const oneTimeExpenseData = ((allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean }[])
-    .filter((e) => !e.is_recurring && e.expense_date >= monthStartISO && e.expense_date <= monthEndISO);
+    .filter((e) => !e.is_recurring && e.expense_date?.slice(0, 7) === currentMonthKey);
   const recurringExpenseData = ((allExpensesWithDates || []) as { amount: number; is_recurring: boolean; recurrence_type: string | null }[])
     .filter((e) => e.is_recurring);
   const allExpenseData = allExpensesWithDates;
@@ -154,42 +154,40 @@ export default async function AdminDashboard() {
   // --- Monthly financial table data ---
   type MonthlyRow = { month: string; key: string; income: number; expenses: number; profit: number };
 
-  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = (key: string) => {
     const [y, m] = key.split("-");
     return new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   };
 
-  // Income by month — uses confirmed_at exclusively
+  // Income by month — uses confirmed_at, grouped by Cairo month
   const incomeByMonth: Record<string, number> = {};
   for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null }[]) {
     if (!p.confirmed_at) continue;
     const d = new Date(p.confirmed_at);
     if (isNaN(d.getTime())) continue;
-    const k = monthKey(d);
+    const k = cairoMonthKey(d);
     incomeByMonth[k] = (incomeByMonth[k] || 0) + p.amount;
   }
 
   // Expenses by month
   const expenseByMonth: Record<string, number> = {};
-  const now = new Date();
+  const cairoNow = cairoNowYearMonth();
   for (const e of (allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null }[]) {
     if (!e.expense_date) continue;
     if (!e.is_recurring) {
-      const d = new Date(e.expense_date);
-      if (isNaN(d.getTime())) continue;
-      const k = monthKey(d);
+      // expense_date is DATE; use its YYYY-MM directly
+      const k = e.expense_date.slice(0, 7);
       expenseByMonth[k] = (expenseByMonth[k] || 0) + e.amount;
     } else {
-      const start = new Date(e.expense_date);
-      if (isNaN(start.getTime())) continue;
       const monthlyAmount = e.recurrence_type === "weekly" ? e.amount * 4 : e.amount;
-      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-      const end = new Date(now.getFullYear(), now.getMonth(), 1);
-      while (cursor <= end) {
-        const k = monthKey(cursor);
+      const [startY, startM] = e.expense_date.slice(0, 7).split("-").map(Number);
+      let y = startY;
+      let m = startM;
+      while (y < cairoNow.year || (y === cairoNow.year && m <= cairoNow.month)) {
+        const k = `${y}-${String(m).padStart(2, "0")}`;
         expenseByMonth[k] = (expenseByMonth[k] || 0) + monthlyAmount;
-        cursor.setMonth(cursor.getMonth() + 1);
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
       }
     }
   }
