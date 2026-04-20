@@ -6,6 +6,69 @@ import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
 import { createNotification, notifyAdmins } from "@/app/_actions/notifications";
 
+/**
+ * Compute the start date for a newly-activated subscription, chaining after
+ * the player's existing active sub. If the existing sub is depleted (no
+ * sessions remaining) before its end_date, the new sub starts the day after
+ * the player's last attended session instead of waiting for the expiry date.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function computeRenewalStartDate(supabase: any, playerId: string, excludeSubId?: string): Promise<Date> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let query = supabase
+    .from("subscriptions")
+    .select("end_date, sessions_remaining, sessions_total")
+    .eq("player_id", playerId)
+    .eq("status", "active")
+    .order("end_date", { ascending: false, nullsFirst: false })
+    .limit(5);
+  if (excludeSubId) query = query.neq("id", excludeSubId);
+  const { data: existingList } = await query;
+
+  // Skip single-session subs — they're open-ended and shouldn't push the renewal date out
+  const existing = (existingList || []).find(
+    (s: { sessions_total: number }) => s.sessions_total > 1,
+  );
+
+  if (!existing?.end_date) return today;
+
+  const activeEndDate = new Date(existing.end_date);
+  if (activeEndDate <= today) return today;
+
+  // Depleted early — chain from last attendance instead of expiry
+  if ((existing.sessions_remaining ?? 0) <= 0) {
+    const { data: lastAtt } = await supabase
+      .from("attendance")
+      .select("session_date")
+      .eq("player_id", playerId)
+      .eq("status", "present")
+      .order("session_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastAtt?.session_date) {
+      const lastDate = new Date(lastAtt.session_date);
+      const nextDay = new Date(lastDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      if (nextDay < today) return today;
+      if (nextDay > activeEndDate) {
+        const chained = new Date(activeEndDate);
+        chained.setDate(chained.getDate() + 1);
+        return chained;
+      }
+      return nextDay;
+    }
+    return today;
+  }
+
+  // Not depleted — chain after expiry
+  const chained = new Date(activeEndDate);
+  chained.setDate(chained.getDate() + 1);
+  return chained;
+}
+
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -50,36 +113,23 @@ export async function confirmPayment(paymentId: string) {
         .eq("id", payment.subscription_id);
       if (subError) return { error: subError.message };
     } else {
-      const { data: existingActiveSub } = await supabase
-        .from("subscriptions")
-        .select("end_date")
-        .eq("player_id", payment.player_id)
-        .eq("status", "active")
-        .neq("id", payment.subscription_id)
-        .order("end_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
+      const isSingleSession = pkg.session_count === 1;
 
-      const today = new Date();
-      let startDate = today;
-
-      if (existingActiveSub?.end_date) {
-        const activeEndDate = new Date(existingActiveSub.end_date);
-        if (activeEndDate > today) {
-          startDate = new Date(activeEndDate);
-          startDate.setDate(startDate.getDate() + 1);
-        }
-      }
-
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + pkg.validity_days);
+      const endDateStr = isSingleSession
+        ? null
+        : (() => {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + pkg.validity_days);
+            return d.toISOString().split("T")[0];
+          })();
 
       const { error: subError } = await supabase
         .from("subscriptions")
         .update({
           status: "active",
           start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
+          end_date: endDateStr,
         })
         .eq("id", payment.subscription_id);
 
@@ -158,7 +208,14 @@ export async function rejectPayment(paymentId: string, reason: string) {
 
 export async function updatePayment(
   paymentId: string,
-  updates: { amount?: number; method?: string; status?: string; confirmed_at?: string; payment_date?: string }
+  updates: {
+    amount?: number;
+    method?: string;
+    status?: string;
+    confirmed_at?: string;
+    payment_date?: string;
+    package_id?: string;
+  },
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -182,6 +239,48 @@ export async function updatePayment(
   if (updates.confirmed_at !== undefined) paymentUpdate.confirmed_at = new Date(updates.confirmed_at).toISOString();
   if (updates.payment_date !== undefined) paymentUpdate.confirmed_at = new Date(updates.payment_date).toISOString();
 
+  // Handle package change on the linked subscription
+  if (
+    updates.package_id !== undefined &&
+    payment.subscription_id &&
+    payment.subscriptions &&
+    updates.package_id !== payment.subscriptions.package_id
+  ) {
+    const { data: newPkg } = await supabase
+      .from("packages")
+      .select("id, session_count, validity_days")
+      .eq("id", updates.package_id)
+      .single();
+
+    if (!newPkg) return { error: "Selected package not found" };
+
+    const oldTotal = payment.subscriptions.sessions_total as number;
+    const oldRemaining = payment.subscriptions.sessions_remaining as number;
+    const consumed = Math.max(0, oldTotal - oldRemaining);
+    const newRemaining = Math.max(0, newPkg.session_count - consumed);
+
+    const subUpdate: Record<string, unknown> = {
+      package_id: newPkg.id,
+      sessions_total: newPkg.session_count,
+      sessions_remaining: newRemaining,
+    };
+
+    if (newPkg.session_count === 1) {
+      subUpdate.end_date = null;
+    } else if (payment.subscriptions.start_date) {
+      const startDate = new Date(payment.subscriptions.start_date);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + newPkg.validity_days);
+      subUpdate.end_date = endDate.toISOString().split("T")[0];
+    }
+
+    const { error: subErr } = await supabase
+      .from("subscriptions")
+      .update(subUpdate)
+      .eq("id", payment.subscription_id);
+    if (subErr) return { error: subErr.message };
+  }
+
   // Handle status change
   if (updates.status && updates.status !== payment.status) {
     paymentUpdate.status = updates.status;
@@ -203,34 +302,22 @@ export async function updatePayment(
               .update({ status: "active" })
               .eq("id", payment.subscription_id);
           } else {
-            const { data: existingActiveSub } = await supabase
-              .from("subscriptions")
-              .select("end_date")
-              .eq("player_id", payment.player_id)
-              .eq("status", "active")
-              .neq("id", payment.subscription_id)
-              .order("end_date", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            const today = new Date();
-            let startDate = today;
-            if (existingActiveSub?.end_date) {
-              const activeEndDate = new Date(existingActiveSub.end_date);
-              if (activeEndDate > today) {
-                startDate = new Date(activeEndDate);
-                startDate.setDate(startDate.getDate() + 1);
-              }
-            }
-            const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + pkg.validity_days);
+            const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
+            const isSingleSession = pkg.session_count === 1;
+            const endDateStr = isSingleSession
+              ? null
+              : (() => {
+                  const d = new Date(startDate);
+                  d.setDate(d.getDate() + pkg.validity_days);
+                  return d.toISOString().split("T")[0];
+                })();
 
             await supabase
               .from("subscriptions")
               .update({
                 status: "active",
                 start_date: startDate.toISOString().split("T")[0],
-                end_date: endDate.toISOString().split("T")[0],
+                end_date: endDateStr,
               })
               .eq("id", payment.subscription_id);
           }
@@ -260,14 +347,22 @@ export async function updatePayment(
     }
   }
 
-  if (Object.keys(paymentUpdate).length === 0) return { error: "No changes provided" };
+  const packageChanged =
+    updates.package_id !== undefined &&
+    payment.subscriptions &&
+    updates.package_id !== payment.subscriptions.package_id;
 
-  const { error } = await supabase
-    .from("payments")
-    .update(paymentUpdate)
-    .eq("id", paymentId);
+  if (Object.keys(paymentUpdate).length === 0 && !packageChanged) {
+    return { error: "No changes provided" };
+  }
 
-  if (error) return { error: error.message };
+  if (Object.keys(paymentUpdate).length > 0) {
+    const { error } = await supabase
+      .from("payments")
+      .update(paymentUpdate)
+      .eq("id", paymentId);
+    if (error) return { error: error.message };
+  }
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
@@ -333,34 +428,22 @@ export async function createAdminPayment(data: {
   if (pkgError || !pkg) return { error: "Package not found" };
 
   // Use provided date or smart start_date
-  const today = new Date();
   let startDate: Date;
 
   if (data.payment_date) {
     startDate = new Date(data.payment_date);
   } else {
-    startDate = today;
-
-    const { data: existingActiveSub } = await admin
-      .from("subscriptions")
-      .select("end_date")
-      .eq("player_id", data.player_id)
-      .eq("status", "active")
-      .order("end_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingActiveSub?.end_date) {
-      const activeEndDate = new Date(existingActiveSub.end_date);
-      if (activeEndDate > today) {
-        startDate = new Date(activeEndDate);
-        startDate.setDate(startDate.getDate() + 1);
-      }
-    }
+    startDate = await computeRenewalStartDate(admin, data.player_id);
   }
 
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + pkg.validity_days);
+  const isSingleSession = pkg.session_count === 1;
+  const endDateStr = isSingleSession
+    ? null
+    : (() => {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + pkg.validity_days);
+        return d.toISOString().split("T")[0];
+      })();
 
   const isCash = data.method === "cash";
 
@@ -385,7 +468,7 @@ export async function createAdminPayment(data: {
       .update({
         status: isCash ? "active" : "pending",
         start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
+        end_date: endDateStr,
       })
       .eq("id", existingPending.id);
     if (subError) return { error: subError.message };
@@ -399,7 +482,7 @@ export async function createAdminPayment(data: {
         sessions_remaining: pkg.session_count,
         sessions_total: pkg.session_count,
         start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
+        end_date: endDateStr,
         status: isCash ? "active" : "pending",
       })
       .select("id")

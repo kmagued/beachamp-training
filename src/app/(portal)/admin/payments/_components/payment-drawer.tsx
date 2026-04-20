@@ -202,6 +202,8 @@ function DrawerContent({
   const [editAmount, setEditAmount] = useState(payment.amount);
   const [editMethod, setEditMethod] = useState(payment.method);
   const [editStatus, setEditStatus] = useState(payment.status);
+  const [editPackageId, setEditPackageId] = useState<string>(payment.subscriptions?.package_id || "");
+  const [packages, setPackages] = useState<{ id: string; name: string; session_count: number; price: number }[]>([]);
   function getDisplayDate(p: PaymentRow): string {
     if (p.status === "pending") return "";
     if (p.confirmed_at) return new Date(p.confirmed_at).toISOString().split("T")[0];
@@ -223,9 +225,24 @@ function DrawerContent({
     setEditMethod(payment.method);
     setEditStatus(payment.status);
     setEditDate(getDisplayDate(payment));
+    setEditPackageId(payment.subscriptions?.package_id || "");
     setEditError(null);
     setConfirmDelete(false);
-  }, [payment.id, payment.amount, payment.method, payment.status, payment.confirmed_at, payment.subscriptions?.start_date]);
+  }, [payment.id, payment.amount, payment.method, payment.status, payment.confirmed_at, payment.subscriptions?.start_date, payment.subscriptions?.package_id]);
+
+  // Load active packages for the package picker
+  useEffect(() => {
+    if (!editing || !payment.subscription_id) return;
+    supabase
+      .from("packages")
+      .select("id, name, session_count, price")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data }) => {
+        if (data) setPackages(data as { id: string; name: string; session_count: number; price: number }[]);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, payment.subscription_id]);
 
   function handleSaveEdit() {
     if (editAmount <= 0) {
@@ -235,11 +252,16 @@ function DrawerContent({
     setEditError(null);
     startUpdateTransition(async () => {
       const currentDate = getDisplayDate(payment);
+      const currentPackageId = payment.subscriptions?.package_id || "";
       const res = await updatePayment(payment.id, {
         amount: editAmount,
         method: editMethod,
         status: editStatus !== payment.status ? editStatus : undefined,
         payment_date: editDate && editDate !== currentDate ? editDate : undefined,
+        package_id:
+          payment.subscription_id && editPackageId && editPackageId !== currentPackageId
+            ? editPackageId
+            : undefined,
       });
       if ("error" in res) {
         setEditError(res.error ?? "Failed to update payment");
@@ -274,6 +296,31 @@ function DrawerContent({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {editing ? (
           <div className="space-y-4">
+            {payment.subscription_id && (
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Package</label>
+                <Select
+                  value={editPackageId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setEditPackageId(id);
+                    const pkg = packages.find((p) => p.id === id);
+                    if (pkg) setEditAmount(pkg.price);
+                  }}
+                >
+                  {editPackageId && !packages.some((p) => p.id === editPackageId) && (
+                    <option value={editPackageId}>
+                      {payment.subscriptions?.packages?.name || "Current package"}
+                    </option>
+                  )}
+                  {packages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.name} — {pkg.price.toLocaleString()} EGP ({pkg.session_count} sessions)
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div>
               <label className="text-xs font-medium text-slate-500 mb-1 block">Amount (EGP)</label>
               <Input

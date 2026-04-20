@@ -32,6 +32,10 @@ export default async function PlayerSubscriptionsPage() {
     if (sub.status === "cancelled" && rejectedPayment) {
       return { label: "Rejected", variant: "danger" as const, reason: rejectedPayment.rejection_reason };
     }
+    // Depleted active sub (e.g. single-session that's been used) → "Completed"
+    if (sub.status === "active" && sub.sessions_remaining <= 0) {
+      return { label: "Completed", variant: "neutral" as const, reason: null };
+    }
     // Active subscription with future start_date → "Upcoming"
     if (sub.status === "active" && sub.start_date && new Date(sub.start_date) > new Date()) {
       return { label: "Upcoming", variant: "info" as const, reason: null };
@@ -54,7 +58,7 @@ export default async function PlayerSubscriptionsPage() {
     }
   }
 
-  const hasActive = subs.some((s) => s.status === "active");
+  const hasActive = subs.some((s) => s.status === "active" && s.sessions_remaining > 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">

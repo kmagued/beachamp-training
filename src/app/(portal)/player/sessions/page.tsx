@@ -26,6 +26,16 @@ export default async function PlayerSessionsPage() {
   const absentCount = records.filter((r) => r.status === "absent").length;
   const excusedCount = records.filter((r) => r.status === "excused").length;
 
+  function formatTime(time: string | null) {
+    if (!time) return "—";
+    const [h, m] = time.split(":");
+    const hour = parseInt(h, 10);
+    if (isNaN(hour)) return time;
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const h12 = hour % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  }
+
   const statusBadge = (status: string) => {
     switch (status) {
       case "present":
@@ -83,7 +93,7 @@ export default async function PlayerSessionsPage() {
                       {formatDate(record.session_date)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
-                      {record.session_time || "—"}
+                      {formatTime(record.session_time)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
                       {record.groups?.name || "—"}

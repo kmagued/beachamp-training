@@ -11,7 +11,7 @@ export interface PaymentRow {
   rejection_reason: string | null;
   note: string | null;
   profiles: { first_name: string; last_name: string } | null;
-  subscriptions: { start_date: string | null; end_date: string | null; packages: { name: string } } | null;
+  subscriptions: { start_date: string | null; end_date: string | null; package_id: string | null; packages: { id: string; name: string } } | null;
 }
 
 export type SortField = "date" | "amount" | "status";

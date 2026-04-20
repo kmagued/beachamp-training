@@ -97,7 +97,7 @@ function AdminPaymentsContent() {
   async function fetchPayments() {
     const { data } = await supabase
       .from("payments")
-      .select("*, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(start_date, end_date, packages(name))")
+      .select("*, profiles!payments_player_id_fkey(first_name, last_name), subscriptions!payments_subscription_id_fkey(start_date, end_date, package_id, packages(id, name))")
       .order("created_at", { ascending: false })
       .limit(5000);
     if (data) setPayments(data as unknown as PaymentRow[]);

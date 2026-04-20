@@ -92,6 +92,7 @@ function PlayerSubscribeContent() {
           .select("*, packages(*)")
           .eq("player_id", user.id)
           .eq("status", "active")
+          .gt("sessions_remaining", 0)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
