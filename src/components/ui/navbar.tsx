@@ -24,12 +24,12 @@ export function Navbar({ user, className }: NavbarProps) {
       <div className="flex items-center justify-between h-14 px-5 sm:px-6 max-w-6xl mx-auto">
         <Link href="/" className="flex items-center gap-2">
           <Image
-            src="/images/logo.png"
+            src="/images/logo-badge.png"
             alt={branding.name}
-            width={44}
-            height={34}
+            width={941}
+            height={636}
             priority
-            className="h-8 w-auto object-contain"
+            className="h-6 w-auto object-contain"
           />
           <span className="font-display text-lg tracking-wide text-primary-900 hidden sm:inline">
             {branding.name}

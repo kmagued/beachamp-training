@@ -103,11 +103,11 @@ export default async function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <Image
-              src="/images/logo.png"
+              src="/images/logo-badge.png"
               alt={branding.name}
-              width={40}
-              height={32}
-              className="object-contain"
+              width={941}
+              height={636}
+              className="h-7 w-auto object-contain"
             />
             <span className="font-display text-xl tracking-wide text-primary-900 hidden sm:inline">
               {branding.name}
