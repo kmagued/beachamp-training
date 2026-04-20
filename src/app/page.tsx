@@ -91,6 +91,7 @@ export default async function LandingPage() {
     .order("sort_order", { ascending: true })) as { data: Package[] | null };
 
   const packages = (dbPackages || []).map((p: Package) => ({
+    name: p.name,
     session_count: p.session_count,
     validity_days: p.validity_days,
     price: p.price,
@@ -403,19 +404,39 @@ export default async function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {packages.map((pkg) => {
-              const isPopular = pkg.session_count === 12;
+          {(() => {
+            const isPrivate = (name: string) =>
+              name.toLowerCase().includes("private");
+            const byCount = (a: { session_count: number }, b: { session_count: number }) =>
+              a.session_count - b.session_count;
+            const groupPkgs = packages
+              .filter((p) => !isPrivate(p.name))
+              .sort(byCount);
+            const privatePkgs = packages
+              .filter((p) => isPrivate(p.name))
+              .sort(byCount);
+
+            const renderCard = (
+              pkg: (typeof packages)[number],
+              variant: "group" | "private"
+            ) => {
+              const isPopular =
+                variant === "group" && pkg.session_count === 12;
               const perSession =
                 pkg.session_count > 0
                   ? Math.round(pkg.price / pkg.session_count)
                   : 0;
+              const isPrivateCard = variant === "private";
               return (
                 <div
-                  key={pkg.session_count}
+                  key={pkg.name + pkg.session_count}
                   className={cn(
-                    "relative rounded-2xl p-6 bg-white shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] transition-all hover:shadow-[0_8px_32px_-12px_rgba(18,75,93,0.18)]",
-                    isPopular && "ring-2 ring-accent bg-gradient-to-br from-white to-accent/5"
+                    "relative rounded-2xl p-6 transition-all",
+                    isPrivateCard
+                      ? "bg-gradient-to-br from-primary-900 to-primary-800 text-white shadow-[0_4px_24px_-12px_rgba(18,75,93,0.3)] hover:shadow-[0_8px_32px_-12px_rgba(18,75,93,0.5)]"
+                      : "bg-white shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] hover:shadow-[0_8px_32px_-12px_rgba(18,75,93,0.18)]",
+                    isPopular &&
+                      "ring-2 ring-accent bg-gradient-to-br from-white to-accent/5"
                   )}
                 >
                   {isPopular && (
@@ -423,37 +444,104 @@ export default async function LandingPage() {
                       Popular
                     </div>
                   )}
+                  {isPrivateCard && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-secondary text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
+                      Private
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      "text-sm font-semibold mb-3 min-h-[2.5rem] leading-snug",
+                      isPrivateCard ? "text-white" : "text-primary-900"
+                    )}
+                  >
+                    {pkg.name}
+                  </div>
                   <div
                     className={cn(
                       "font-display text-6xl leading-none",
-                      isPopular ? "text-accent-600" : "text-primary-900"
+                      isPrivateCard
+                        ? "text-accent"
+                        : isPopular
+                          ? "text-accent-600"
+                          : "text-primary-900"
                     )}
                   >
                     {pkg.session_count}
                   </div>
-                  <div className="mt-2 text-xs text-primary-700/60 uppercase tracking-wider font-semibold">
+                  <div
+                    className={cn(
+                      "mt-2 text-xs uppercase tracking-wider font-semibold",
+                      isPrivateCard ? "text-white/60" : "text-primary-700/60"
+                    )}
+                  >
                     {pkg.session_count === 1 ? "session" : "sessions"}
                   </div>
-                  <div className="mt-5 text-2xl font-semibold text-primary-900">
+                  <div
+                    className={cn(
+                      "mt-5 text-2xl font-semibold",
+                      isPrivateCard ? "text-white" : "text-primary-900"
+                    )}
+                  >
                     {pkg.price.toLocaleString("en-US")}{" "}
-                    <span className="text-sm font-medium text-primary-700/50">
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        isPrivateCard ? "text-white/50" : "text-primary-700/50"
+                      )}
+                    >
                       EGP
                     </span>
                   </div>
                   {pkg.session_count > 1 && (
-                    <div className="mt-1 text-xs text-secondary-dark font-semibold">
+                    <div
+                      className={cn(
+                        "mt-1 text-xs font-semibold",
+                        isPrivateCard ? "text-accent" : "text-secondary-dark"
+                      )}
+                    >
                       {perSession} EGP / session
                     </div>
                   )}
                   {pkg.validity_days > 1 && (
-                    <div className="mt-2 text-[11px] text-primary-700/40">
+                    <div
+                      className={cn(
+                        "mt-2 text-[11px]",
+                        isPrivateCard ? "text-white/40" : "text-primary-700/40"
+                      )}
+                    >
                       Valid for {pkg.validity_days} days
                     </div>
                   )}
                 </div>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <div className="space-y-12">
+                {groupPkgs.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-700/60 mb-5">
+                      Group Training
+                    </h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {groupPkgs.map((pkg) => renderCard(pkg, "group"))}
+                    </div>
+                  </div>
+                )}
+                {privatePkgs.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-700/60 mb-5">
+                      Private Sessions
+                    </h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {privatePkgs.map((pkg) => renderCard(pkg, "private"))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </section>
 
