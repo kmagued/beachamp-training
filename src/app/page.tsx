@@ -154,17 +154,8 @@ export default async function LandingPage() {
       </header>
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-sand/40">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.10] pointer-events-none"
-          style={{
-            backgroundImage: "url('/images/pattern.jpeg')",
-            backgroundSize: "600px",
-            backgroundRepeat: "repeat",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-sand/0 via-sand/10 to-white pointer-events-none" />
+      <section className="relative overflow-hidden bg-gradient-to-b from-sand/30 to-white">
+        <div className="absolute inset-0 bg-gradient-to-b from-sand/0 via-sand/5 to-white pointer-events-none" />
         <div
           aria-hidden
           className="absolute -top-40 -right-32 w-[480px] h-[480px] rounded-full bg-secondary/10 blur-3xl pointer-events-none"
@@ -461,10 +452,10 @@ export default async function LandingPage() {
       <section className="relative overflow-hidden bg-primary-900 text-white">
         <div
           aria-hidden
-          className="absolute inset-0 opacity-[0.08] pointer-events-none"
+          className="absolute inset-0 opacity-[0.04] pointer-events-none mix-blend-overlay"
           style={{
             backgroundImage: "url('/images/pattern.jpeg')",
-            backgroundSize: "500px",
+            backgroundSize: "900px",
             backgroundRepeat: "repeat",
           }}
         />

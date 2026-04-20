@@ -355,13 +355,13 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
       {/* Main content — desktop gets sidebar margin via CSS variable */}
       <style>{`:root { --sidebar-w: ${sidebarW}px; }`}</style>
-      <main className="relative flex-1 min-w-0 overflow-x-hidden pt-14 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/20">
+      <main className="relative flex-1 min-w-0 overflow-x-hidden pt-14 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10">
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-0 opacity-[0.06] z-0"
+          className="pointer-events-none fixed inset-0 opacity-[0.035] z-0"
           style={{
             backgroundImage: "url('/images/pattern.jpeg')",
-            backgroundSize: "640px",
+            backgroundSize: "1100px",
             backgroundRepeat: "repeat",
           }}
         />
