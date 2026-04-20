@@ -44,7 +44,7 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
         </Button>
         <button
           onClick={() => setConfirmDelete(true)}
-          className="px-2.5 py-2 rounded-xl text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+          className="px-2.5 py-2 rounded-xl text-danger border border-primary-200 hover:bg-danger/5 hover:border-danger/30 transition-colors"
           title="Delete Player"
         >
           <Trash2 className="w-4 h-4" />
@@ -59,15 +59,15 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary-900/50 backdrop-blur-sm">
           <Card className="w-full max-w-md mx-4">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Trash2 className="w-6 h-6 text-red-500" />
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-6 h-6 text-danger" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">Delete Player</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Are you sure you want to delete <span className="font-medium text-slate-700">{player.first_name} {player.last_name}</span>? This will permanently remove their profile, subscriptions, payments, and attendance records.
+              <h3 className="font-display text-2xl tracking-wide text-primary-900">Delete Player</h3>
+              <p className="text-sm text-primary-700/70 mt-2">
+                Are you sure you want to delete <span className="font-semibold text-primary-900">{player.first_name} {player.last_name}</span>? This will permanently remove their profile, subscriptions, payments, and attendance records.
               </p>
             </div>
 
@@ -83,7 +83,7 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
               <button
                 onClick={confirmDeletePlayer}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-danger hover:bg-danger/90 disabled:opacity-50 transition-colors"
               >
                 {isDeleting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -131,7 +131,7 @@ export function EditPlayerModal({ player, onClose, onSuccess }: { player: Player
       {/* Desktop: right side panel */}
       <div
         className={cn(
-          "fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-xl border-l border-slate-200 transition-transform duration-300 ease-out hidden sm:flex flex-col",
+          "fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-xl border-l border-primary-100 transition-transform duration-300 ease-out hidden sm:flex flex-col",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -141,12 +141,12 @@ export function EditPlayerModal({ player, onClose, onSuccess }: { player: Player
       {/* Mobile: bottom sheet */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 bg-white shadow-xl border-t border-slate-200 rounded-t-2xl transition-transform duration-300 ease-out sm:hidden max-h-[85vh] flex flex-col",
+          "fixed bottom-0 left-0 right-0 z-50 bg-white shadow-xl border-t border-primary-100 rounded-t-2xl transition-transform duration-300 ease-out sm:hidden max-h-[85vh] flex flex-col",
           open ? "translate-y-0" : "translate-y-full"
         )}
       >
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-slate-300" />
+          <div className="w-10 h-1 rounded-full bg-primary-200" />
         </div>
         <EditDrawerContent player={player} onClose={onClose} onSuccess={onSuccess} />
       </div>
@@ -215,11 +215,11 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <h2 className="font-semibold text-slate-900">Edit Player</h2>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-primary-100">
+        <h2 className="font-display text-2xl tracking-wide text-primary-900">Edit Player</h2>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          className="p-1.5 rounded-lg text-primary-700/50 hover:text-primary-900 hover:bg-primary-50 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -313,8 +313,8 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
                   }
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     selected
-                      ? "bg-primary-50 border-primary-300 text-primary-700"
-                      : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                      ? "bg-primary-50 border-primary-300 text-primary-800"
+                      : "bg-white border-primary-100 text-primary-700/70 hover:border-primary-200"
                   }`}
                 >
                   {goal}
@@ -368,7 +368,7 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
           const age = Math.floor((Date.now() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
           return age < 16;
         })() && (
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-amber-50/50 border border-amber-100">
+          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-accent/10 border border-accent/30">
             <div>
               <Label required>Guardian Name</Label>
               <Input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="Parent/guardian name" />
@@ -381,14 +381,14 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
         )}
 
         {error && (
-          <div className="px-4 py-3 bg-red-50 rounded-lg text-sm text-red-600">
+          <div className="px-4 py-3 bg-danger/5 border border-danger/20 rounded-lg text-sm text-danger">
             {error}
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-slate-100 flex items-center gap-3">
+      <div className="px-5 py-4 border-t border-primary-100 flex items-center gap-3">
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel
         </Button>

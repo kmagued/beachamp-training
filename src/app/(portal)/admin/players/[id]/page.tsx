@@ -86,20 +86,22 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   const totalPaid = pays.filter((p) => p.status === "confirmed").reduce((sum, p) => sum + p.amount, 0);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-      <Link
-        href="/admin/players"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Players
-      </Link>
+    <div className="min-h-screen bg-sand/10">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+        <Link
+          href="/admin/players"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-700/60 hover:text-primary-900 transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Players
+        </Link>
 
-      <PlayerHeader player={player} hasActiveSubscription={activeSubs.length > 0} actions={<PlayerActionsMenu player={player} />} />
-      <ProfileCard player={player} />
-      <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
-      <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />
-      <SessionHistory attendance={attendanceRows} feedback={feedbackRows} />
+        <PlayerHeader player={player} hasActiveSubscription={activeSubs.length > 0} actions={<PlayerActionsMenu player={player} />} />
+        <ProfileCard player={player} />
+        <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
+        <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />
+        <SessionHistory attendance={attendanceRows} feedback={feedbackRows} />
+      </div>
     </div>
   );
 }

@@ -126,25 +126,25 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
     }).length;
 
     return [
-      { label: "Attendance Rate", value: `${attendanceRate}%`, detail: `${presentAtt} / ${expectedAtt} expected`, color: attendanceRate >= 70 ? "text-emerald-600" : attendanceRate >= 50 ? "text-amber-600" : "text-red-600" },
-      { label: "Retention Rate", value: `${retentionRate}%`, detail: null, color: retentionRate >= 80 ? "text-emerald-600" : retentionRate >= 60 ? "text-amber-600" : "text-red-600" },
-      { label: "Capacity", value: `${capacityRate}%`, detail: `${totalGroupPlayers} / ${totalCapacity} slots`, color: capacityRate >= 80 ? "text-red-600" : capacityRate >= 50 ? "text-amber-600" : "text-emerald-600" },
-      { label: "Monthly Churn", value: `${churnRate}%`, detail: `${churnedCount} left`, color: churnRate <= 5 ? "text-emerald-600" : churnRate <= 15 ? "text-amber-600" : "text-red-600" },
-      { label: "New Members", value: String(newMembers), detail: null, color: "text-blue-600" },
+      { label: "Attendance Rate", value: `${attendanceRate}%`, detail: `${presentAtt} / ${expectedAtt} expected`, color: attendanceRate >= 70 ? "text-success" : attendanceRate >= 50 ? "text-accent-600" : "text-danger" },
+      { label: "Retention Rate", value: `${retentionRate}%`, detail: null, color: retentionRate >= 80 ? "text-success" : retentionRate >= 60 ? "text-accent-600" : "text-danger" },
+      { label: "Capacity", value: `${capacityRate}%`, detail: `${totalGroupPlayers} / ${totalCapacity} slots`, color: capacityRate >= 80 ? "text-danger" : capacityRate >= 50 ? "text-accent-600" : "text-success" },
+      { label: "Monthly Churn", value: `${churnRate}%`, detail: `${churnedCount} left`, color: churnRate <= 5 ? "text-success" : churnRate <= 15 ? "text-accent-600" : "text-danger" },
+      { label: "New Members", value: String(newMembers), detail: null, color: "text-secondary-dark" },
     ];
   }, [selectedMonth, attendanceRecords, subscriptions, profiles, groupPlayers, groups]);
 
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-slate-400" />
+        <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-secondary" />
           Key Metrics
         </h2>
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className="text-xs border border-primary-200 rounded-lg px-2.5 py-1.5 bg-white text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-800/20 focus:border-primary-800"
         >
           <option value="all">All Time</option>
           {monthOptions.map((key) => (
@@ -156,18 +156,18 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
       <div className="overflow-x-auto -mx-6 px-6">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200">
-              <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Metric</th>
-              <th className="text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Value</th>
-              <th className="text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Details</th>
+            <tr className="border-b border-primary-100">
+              <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Metric</th>
+              <th className="text-right text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Value</th>
+              <th className="text-right text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Details</th>
             </tr>
           </thead>
           <tbody>
             {metrics.map((m) => (
-              <tr key={m.label} className="border-b border-slate-100 last:border-0">
-                <td className="py-2.5 text-slate-700 font-medium">{m.label}</td>
+              <tr key={m.label} className="border-b border-primary-100/60 last:border-0">
+                <td className="py-2.5 text-primary-800 font-medium">{m.label}</td>
                 <td className={`py-2.5 text-right font-bold ${m.color}`}>{m.value}</td>
-                <td className="py-2.5 text-right text-slate-400 text-xs">{m.detail || "—"}</td>
+                <td className="py-2.5 text-right text-primary-700/50 text-xs">{m.detail || "—"}</td>
               </tr>
             ))}
           </tbody>

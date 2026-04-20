@@ -15,7 +15,7 @@ export default function ImportPaymentsPage() {
           <ArrowLeft className="w-4 h-4" />
           Back to Payments
         </Link>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Import Payments</h1>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Import Payments</h1>
         <p className="text-slate-500 text-sm mt-1">
           Upload a CSV file to bulk import historical payment and subscription data.
         </p>

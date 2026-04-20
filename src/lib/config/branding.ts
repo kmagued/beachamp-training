@@ -10,6 +10,8 @@ export const branding = {
     description: "Volleyball academy management — player portals, coach tools, and admin dashboards all in one place.",
   },
   colors: {
+    // Core palette: #124b5d (primary), #5cacb0 (secondary), #f7ac40 (accent), #f6efda (sand)
+    // Dark tones:   #0c313a,           #1596b5,             #e8901a,          #eddcb2
     primary: {
       50: "#E7F0F3",
       100: "#C4D8DE",
@@ -20,7 +22,7 @@ export const branding = {
       600: "#1D5868",
       700: "#174F60",
       800: "#124B5D",
-      900: "#0A3949",
+      900: "#0C313A",
       DEFAULT: "#124B5D",
     },
     accent: {
@@ -30,16 +32,19 @@ export const branding = {
       300: "#F9C677",
       400: "#F8B958",
       500: "#F7AC40",
-      600: "#E89826",
+      600: "#E8901A",
       700: "#C47C19",
       DEFAULT: "#F7AC40",
     },
-    secondary: "#5CACB0",
+    secondary: {
+      DEFAULT: "#5CACB0",
+      dark: "#1596B5",
+    },
     success: "#10B981",
     warning: "#F7AC40",
     danger: "#EF4444",
     sand: "#F6EFDA",
-    sandDark: "#E8DEBE",
+    sandDark: "#EDDCB2",
     sidebar: "#124B5D",
     brand: {
       player: "#124B5D",
@@ -52,12 +57,12 @@ export const branding = {
       border: "#C4D8DE",
     },
     text: {
-      primary: "#0A3949",
+      primary: "#0C313A",
       muted: "#5A6B73",
     },
     gradient: {
       primary: "from-[#124B5D] to-[#5CACB0]",
-      dark: "from-[#0A3949] to-[#124B5D]",
+      dark: "from-[#0C313A] to-[#124B5D]",
     },
   },
   areas: ["Maadi", "Zamalek", "New Cairo", "6th October", "Heliopolis", "Nasr City", "Mohandessin", "El Shorouk"],

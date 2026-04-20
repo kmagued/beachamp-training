@@ -146,7 +146,7 @@ function AdminUsersContent() {
       <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={handleToastClose} />
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Admins</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Admins</h1>
           <p className="text-slate-500 text-sm">
             {admins.length} admin{admins.length !== 1 ? "s" : ""}
           </p>

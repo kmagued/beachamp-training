@@ -242,7 +242,7 @@ function AdminExpensesContent() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Expenses</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Expenses</h1>
           <p className="text-slate-500 text-sm">
             Track court reservations, salaries, and other costs
           </p>

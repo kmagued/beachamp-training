@@ -230,7 +230,7 @@ export default async function AdminDashboard() {
             <p className="text-[11px] font-semibold text-secondary uppercase tracking-[0.18em]">
               {today}
             </p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary-900 mt-1.5 tracking-tight">
+            <h1 className="font-display text-3xl sm:text-4xl text-primary-900 mt-1.5 tracking-tight">
               Welcome back, {currentUser.profile.first_name}.
             </h1>
             <p className="text-primary-700/60 text-sm mt-1">
@@ -257,7 +257,7 @@ export default async function AdminDashboard() {
           <StatCard
             label={`Expenses (${currentMonth})`}
             value={`${monthlyExpenses.toLocaleString()} EGP`}
-            accentColor="bg-red-500"
+            accentColor="bg-danger"
             icon={<Receipt className="w-5 h-5" />}
             subtitle={`All Time: ${allTimeExpenses.toLocaleString()} EGP`}
             href="/admin/expenses"
@@ -265,7 +265,7 @@ export default async function AdminDashboard() {
           <StatCard
             label={`Profit (${currentMonth})`}
             value={`${monthlyProfit.toLocaleString()} EGP`}
-            accentColor={monthlyProfit >= 0 ? "bg-emerald-500" : "bg-red-500"}
+            accentColor={monthlyProfit >= 0 ? "bg-success" : "bg-danger"}
             icon={<TrendingUp className="w-5 h-5" />}
             subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
           />
@@ -301,8 +301,8 @@ export default async function AdminDashboard() {
           <div className="mb-8">
             <div className="bg-white rounded-2xl border border-primary-100 p-5 sm:p-6">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="font-bold text-primary-900 flex items-center gap-2 text-base">
-                  <BarChart3 className="w-4 h-4 text-secondary" />
+                <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-secondary" />
                   Players by Group
                 </h2>
                 <span className="text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider">

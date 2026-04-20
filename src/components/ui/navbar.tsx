@@ -22,15 +22,18 @@ export function Navbar({ user, className }: NavbarProps) {
       )}
     >
       <div className="flex items-center justify-between h-14 px-5 sm:px-6 max-w-6xl mx-auto">
-        <Link href="/" className="flex items-center">
+        <Link href="/" className="flex items-center gap-2">
           <Image
-            src="/images/teal-logo.png"
+            src="/images/logo.png"
             alt={branding.name}
-            width={96}
-            height={32}
+            width={44}
+            height={34}
             priority
             className="h-8 w-auto object-contain"
           />
+          <span className="font-display text-lg tracking-wide text-primary-900 hidden sm:inline">
+            {branding.name}
+          </span>
         </Link>
         <div className="flex items-center gap-1">
           {user ? (
@@ -45,7 +48,7 @@ export function Navbar({ user, className }: NavbarProps) {
               </Link>
               <Link
                 href="/register"
-                className="bg-primary-800 hover:bg-primary-900 text-white text-[13px] font-semibold px-4 py-1.5 rounded-md transition-colors"
+                className="bg-accent hover:bg-accent-600 text-primary-900 text-[13px] font-semibold px-4 py-1.5 rounded-md transition-colors"
               >
                 Join
               </Link>

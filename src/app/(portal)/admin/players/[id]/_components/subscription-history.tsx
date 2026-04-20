@@ -101,8 +101,8 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
   return (
     <Card className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-          <Package className="w-4 h-4 text-slate-400" />
+        <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
+          <Package className="w-5 h-5 text-secondary" />
           Subscription History
         </h2>
         <Button size="sm" onClick={() => setShowAddPayment(true)}>
@@ -114,7 +114,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
+        <div className="bg-danger/5 border border-danger/30 text-danger text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
           <X className="w-4 h-4 mt-0.5 shrink-0" />
           {error}
         </div>
@@ -126,14 +126,14 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
           <div className="hidden sm:block overflow-x-auto -mx-6 px-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Package</th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Sessions</th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Start</th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">End</th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Status</th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Payment</th>
-                  <th className="text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider py-2">Actions</th>
+                <tr className="border-b border-primary-100">
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Package</th>
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Sessions</th>
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Start</th>
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">End</th>
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Status</th>
+                  <th className="text-left text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Payment</th>
+                  <th className="text-right text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -146,9 +146,9 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                   const effectiveStatus = getEffectiveStatus(sub);
 
                   return (
-                    <tr key={sub.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-3 font-medium text-slate-900">{sub.packages?.name || "—"}</td>
-                      <td className="py-3 text-slate-700">
+                    <tr key={sub.id} className="border-b border-primary-100/60 last:border-0">
+                      <td className="py-3 font-semibold text-primary-900">{sub.packages?.name || "—"}</td>
+                      <td className="py-3 text-primary-800">
                         {isEditing ? (
                           <div className="flex items-center gap-1.5">
                             <input
@@ -156,26 +156,26 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                               min={0}
                               value={editRemaining}
                               onChange={(e) => setEditRemaining(Math.max(0, Number(e.target.value)))}
-                              className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                              className="w-12 px-1.5 py-0.5 text-sm border border-primary-200 rounded text-center"
                             />
-                            <span className="text-slate-400">/</span>
+                            <span className="text-primary-700/50">/</span>
                             <input
                               type="number"
                               min={1}
                               value={editTotal}
                               onChange={(e) => setEditTotal(Math.max(1, Number(e.target.value)))}
-                              className="w-12 px-1.5 py-0.5 text-sm border border-slate-300 rounded text-center"
+                              className="w-12 px-1.5 py-0.5 text-sm border border-primary-200 rounded text-center"
                             />
                             <button
                               onClick={() => saveEdit(sub.id)}
                               disabled={isSaving}
-                              className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
+                              className="p-0.5 rounded text-success hover:bg-success/10"
                             >
                               {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                             </button>
                             <button
                               onClick={cancelEdit}
-                              className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                              className="p-0.5 rounded text-primary-700/50 hover:text-primary-900 hover:bg-primary-50"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -185,7 +185,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                             <span>{sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`}</span>
                             <button
                               onClick={() => startEdit(sub)}
-                              className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                              className="p-0.5 rounded text-primary-700/40 hover:text-primary-900 hover:bg-primary-50 transition-colors"
                               title="Edit sessions"
                             >
                               <Pencil className="w-3 h-3" />
@@ -193,18 +193,18 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                           </div>
                         )}
                       </td>
-                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.start_date ? formatDate(sub.start_date) : "—"}</td>
-                      <td className="py-3 text-slate-500 whitespace-nowrap">{sub.end_date ? formatDate(sub.end_date) : "—"}</td>
+                      <td className="py-3 text-primary-700/70 whitespace-nowrap">{sub.start_date ? formatDate(sub.start_date) : "—"}</td>
+                      <td className="py-3 text-primary-700/70 whitespace-nowrap">{sub.end_date ? formatDate(sub.end_date) : "—"}</td>
                       <td className="py-3"><SubStatusBadge status={effectiveStatus} /></td>
                       <td className="py-3">
                         {displayPayment ? (
                           <div className="flex items-center gap-2">
-                            <span className="text-slate-700">{displayPayment.amount.toLocaleString()} EGP</span>
-                            <span className="text-slate-400 capitalize text-xs">{displayPayment.method.replace(/_/g, " ")}</span>
+                            <span className="text-primary-800 font-medium">{displayPayment.amount.toLocaleString()} EGP</span>
+                            <span className="text-primary-700/50 capitalize text-xs">{displayPayment.method.replace(/_/g, " ")}</span>
                             <PaymentStatusBadge status={displayPayment.status} />
                           </div>
                         ) : (
-                          <span className="text-slate-300">—</span>
+                          <span className="text-primary-700/30">—</span>
                         )}
                       </td>
                       <td className="py-3 text-right">
@@ -213,7 +213,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                             <button
                               onClick={() => handleFreeze(sub.id)}
                               disabled={isFreezing}
-                              className="p-1 rounded text-blue-500 hover:bg-blue-50 transition-colors"
+                              className="p-1 rounded text-secondary-dark hover:bg-secondary/10 transition-colors"
                               title="Freeze"
                             >
                               {isFreezing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Snowflake className="w-3.5 h-3.5" />}
@@ -223,7 +223,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                             <button
                               onClick={() => handleUnfreeze(sub.id)}
                               disabled={isFreezing}
-                              className="p-1 rounded text-emerald-500 hover:bg-emerald-50 transition-colors"
+                              className="p-1 rounded text-success hover:bg-success/10 transition-colors"
                               title="Unfreeze"
                             >
                               {isFreezing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -249,16 +249,16 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
               const effectiveStatus = getEffectiveStatus(sub);
 
               return (
-                <div key={sub.id} className="border border-slate-100 rounded-lg p-3">
+                <div key={sub.id} className="border border-primary-100 rounded-xl p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-slate-900 text-sm">{sub.packages?.name || "—"}</span>
+                    <span className="font-semibold text-primary-900 text-sm">{sub.packages?.name || "—"}</span>
                     <div className="flex items-center gap-1.5">
                       <SubStatusBadge status={effectiveStatus} />
                       {(effectiveStatus === "active" || effectiveStatus === "pending") && sub.sessions_total > 1 && (
                         <button
                           onClick={() => handleFreeze(sub.id)}
                           disabled={isFreezing}
-                          className="p-1 rounded text-blue-500 hover:bg-blue-50 transition-colors"
+                          className="p-1 rounded text-secondary-dark hover:bg-secondary/10 transition-colors"
                           title="Freeze"
                         >
                           <Snowflake className="w-3.5 h-3.5" />
@@ -268,7 +268,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                         <button
                           onClick={() => handleUnfreeze(sub.id)}
                           disabled={isFreezing}
-                          className="p-1 rounded text-emerald-500 hover:bg-emerald-50 transition-colors"
+                          className="p-1 rounded text-success hover:bg-success/10 transition-colors"
                           title="Unfreeze"
                         >
                           <Play className="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-slate-400">Sessions</span>
+                      <span className="text-primary-700/50 font-semibold uppercase tracking-wider text-[10px]">Sessions</span>
                       {isEditing ? (
                         <div className="flex items-center gap-1 mt-0.5">
                           <input
@@ -286,38 +286,38 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                             min={0}
                             value={editRemaining}
                             onChange={(e) => setEditRemaining(Math.max(0, Number(e.target.value)))}
-                            className="w-10 px-1 py-0.5 text-xs border border-slate-300 rounded text-center"
+                            className="w-10 px-1 py-0.5 text-xs border border-primary-200 rounded text-center"
                           />
-                          <span className="text-slate-400">/</span>
+                          <span className="text-primary-700/50">/</span>
                           <input
                             type="number"
                             min={1}
                             value={editTotal}
                             onChange={(e) => setEditTotal(Math.max(1, Number(e.target.value)))}
-                            className="w-10 px-1 py-0.5 text-xs border border-slate-300 rounded text-center"
+                            className="w-10 px-1 py-0.5 text-xs border border-primary-200 rounded text-center"
                           />
                           <button
                             onClick={() => saveEdit(sub.id)}
                             disabled={isSaving}
-                            className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
+                            className="p-0.5 rounded text-success hover:bg-success/10"
                           >
                             {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="p-0.5 rounded text-slate-400 hover:text-slate-600"
+                            className="p-0.5 rounded text-primary-700/50 hover:text-primary-900"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <p className="text-slate-700 font-medium">
+                          <p className="text-primary-900 font-semibold">
                             {sub.sessions_total === 1 ? sub.sessions_remaining : `${sub.sessions_remaining}/${sub.sessions_total}`}
                           </p>
                           <button
                             onClick={() => startEdit(sub)}
-                            className="p-0.5 rounded text-slate-400 hover:text-slate-600"
+                            className="p-0.5 rounded text-primary-700/40 hover:text-primary-900"
                             title="Edit"
                           >
                             <Pencil className="w-2.5 h-2.5" />
@@ -326,17 +326,17 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                       )}
                     </div>
                     <div>
-                      <span className="text-slate-400">Period</span>
-                      <p className="text-slate-700 font-medium">
+                      <span className="text-primary-700/50 font-semibold uppercase tracking-wider text-[10px]">Period</span>
+                      <p className="text-primary-900 font-medium">
                         {sub.start_date ? formatDate(sub.start_date) : "—"} — {sub.end_date ? formatDate(sub.end_date) : "—"}
                       </p>
                     </div>
                     {displayPayment && (
                       <div className="col-span-2">
-                        <span className="text-slate-400">Payment</span>
+                        <span className="text-primary-700/50 font-semibold uppercase tracking-wider text-[10px]">Payment</span>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-slate-700 font-medium">{displayPayment.amount.toLocaleString()} EGP</span>
-                          <span className="text-slate-400 capitalize">{displayPayment.method.replace(/_/g, " ")}</span>
+                          <span className="text-primary-900 font-semibold">{displayPayment.amount.toLocaleString()} EGP</span>
+                          <span className="text-primary-700/50 capitalize">{displayPayment.method.replace(/_/g, " ")}</span>
                           <PaymentStatusBadge status={displayPayment.status} />
                         </div>
                       </div>

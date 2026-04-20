@@ -6,7 +6,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["DM Sans", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["var(--font-montserrat)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-bebas-neue)", "var(--font-montserrat)", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       colors: {

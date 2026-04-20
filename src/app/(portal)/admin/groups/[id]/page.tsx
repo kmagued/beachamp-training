@@ -227,7 +227,7 @@ export default function AdminGroupDetailPage() {
         </Link>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{group.name}</h1>
+            <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">{group.name}</h1>
             <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
           </div>
           <div className="flex items-center gap-2">

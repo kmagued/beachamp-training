@@ -97,69 +97,172 @@ export default async function LandingPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-sand/10 text-primary-900">
-      {/* ── Hero ── */}
-      <section className="relative isolate overflow-hidden  min-h-[80vh] flex items-center">
-        <Image
-          src="/images/team-photo.jpg"
-          alt="Beachamp Academy team training"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover -z-10"
-        />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-primary-900/90 via-primary-900/70 to-primary-900/40" />
+    <div className="min-h-screen bg-white text-primary-900">
+      {/* ── Top Nav ── */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-primary-100/60">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image
+              src="/images/logo.png"
+              alt={branding.name}
+              width={40}
+              height={32}
+              className="object-contain"
+            />
+            <span className="font-display text-xl tracking-wide text-primary-900 hidden sm:inline">
+              {branding.name}
+            </span>
+          </Link>
+          <nav className="flex items-center gap-2 sm:gap-3">
+            <a
+              href="#packages"
+              className="hidden sm:inline-flex text-sm font-medium text-primary-800/80 hover:text-primary-900 px-3 py-2"
+            >
+              Packages
+            </a>
+            <a
+              href="#programs"
+              className="hidden sm:inline-flex text-sm font-medium text-primary-800/80 hover:text-primary-900 px-3 py-2"
+            >
+              Programs
+            </a>
+            {currentUser ? (
+              <Link
+                href="/player/dashboard"
+                className="inline-flex items-center justify-center bg-primary-800 hover:bg-primary-900 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center justify-center text-sm font-semibold text-primary-900 hover:bg-primary-50 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  Join now
+                </Link>
+              </>
+            )}
+          </nav>
+        </div>
+      </header>
 
-        <div className="max-w-6xl mx-auto w-full px-6 py-24 sm:py-32">
-          <div className="max-w-2xl text-white">
-            <span className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden bg-sand/40">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.10] pointer-events-none"
+          style={{
+            backgroundImage: "url('/images/pattern.jpeg')",
+            backgroundSize: "600px",
+            backgroundRepeat: "repeat",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-sand/0 via-sand/10 to-white pointer-events-none" />
+        <div
+          aria-hidden
+          className="absolute -top-40 -right-32 w-[480px] h-[480px] rounded-full bg-secondary/10 blur-3xl pointer-events-none"
+        />
+        <div
+          aria-hidden
+          className="absolute -bottom-32 -left-32 w-[400px] h-[400px] rounded-full bg-accent/10 blur-3xl pointer-events-none"
+        />
+
+        <div className="relative max-w-6xl mx-auto px-6 py-20 sm:py-28 grid lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-7">
+            <span className="inline-flex items-center gap-2 bg-white/80 backdrop-blur border border-primary-100 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-800">
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               Now accepting registrations
             </span>
-            <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
-              Elevate your{" "}
+            <h1 className="font-display mt-6 text-6xl sm:text-7xl lg:text-8xl tracking-tight leading-[0.95] text-primary-900">
+              Elevate your
+              <br />
               <span className="text-accent">{branding.sport.toLowerCase()}</span>{" "}
               game.
             </h1>
-            <p className="mt-6 text-lg text-white/80 max-w-xl leading-relaxed">
+            <p className="mt-6 text-lg text-primary-800/70 max-w-xl leading-relaxed">
               {branding.description}
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               {currentUser ? (
                 <Link
                   href="/player/dashboard"
-                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3.5 rounded-lg transition-colors"
                 >
                   Go to Dashboard
                 </Link>
               ) : (
-                <Link
-                  href="/register"
-                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3 rounded-lg transition-colors"
-                >
-                  Start Training Today
-                </Link>
+                <>
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3.5 rounded-lg transition-colors shadow-sm"
+                  >
+                    Start Training Today
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center bg-white border border-primary-200 hover:border-primary-400 hover:bg-primary-50 text-primary-900 font-semibold px-7 py-3.5 rounded-lg transition-colors"
+                  >
+                    Log in to your account
+                  </Link>
+                </>
               )}
-              <Link
-                href="#packages"
-                className="inline-flex items-center justify-center border border-white/40 hover:border-white text-white font-semibold px-7 py-3 rounded-lg transition-colors"
-              >
-                View Packages
-              </Link>
+            </div>
+            <div className="mt-10 flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-primary-700/60">
+              <div className="flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-secondary" />
+                All skill levels
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-secondary" />
+                Expert coaches
+              </div>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="w-1 h-1 rounded-full bg-secondary" />
+                Flexible packages
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-sm aspect-square">
+              <div className="absolute inset-0 rounded-full bg-accent/10 blur-3xl" />
+              <Image
+                src="/images/logo.png"
+                alt={`${branding.name} logo`}
+                fill
+                priority
+                sizes="(max-width: 1024px) 80vw, 400px"
+                className="object-contain relative"
+              />
             </div>
           </div>
         </div>
       </section>
 
       {/* ── Stats ── */}
-      <section className="">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-primary-900">
+      <section className="border-y border-primary-100/60 bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 sm:grid-cols-4 gap-8 divide-y sm:divide-y-0 sm:divide-x divide-primary-100/60">
+          {stats.map((stat, i) => (
+            <div
+              key={stat.label}
+              className="text-center px-4 pt-6 sm:pt-0 first:pt-0"
+            >
+              <div
+                className={cn(
+                  "font-display text-5xl sm:text-6xl leading-none",
+                  i % 2 === 0 ? "text-primary-900" : "text-accent-600"
+                )}
+              >
                 {stat.value}
               </div>
-              <div className="mt-1 text-sm text-primary-700/60">
+              <div className="mt-2 text-xs font-semibold uppercase tracking-wider text-primary-700/60">
                 {stat.label}
               </div>
             </div>
@@ -168,11 +271,14 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Programs ── */}
-      <section className="">
+      <section id="programs" className="scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-primary-900">
+            <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
               What we offer
+            </span>
+            <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
+              Training built around you
             </h2>
             <p className="mt-3 text-primary-700/70">
               Structured volleyball training designed to take your game to the
@@ -181,25 +287,44 @@ export default async function LandingPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {programs.map((program) => (
-              <div key={program.title} className="bg-white rounded-2xl p-8 shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)]">
-                <h3 className="text-lg font-semibold text-primary-900 mb-2">
-                  {program.title}
-                </h3>
-                <p className="text-sm text-primary-700/70 leading-relaxed">
-                  {program.description}
-                </p>
-              </div>
-            ))}
+            {programs.map((program, i) => {
+              const accentColors = [
+                "bg-accent",
+                "bg-secondary",
+                "bg-primary-800",
+              ];
+              return (
+                <div
+                  key={program.title}
+                  className="group relative bg-white border border-primary-100/70 rounded-2xl p-7 hover:border-primary-200 hover:shadow-[0_4px_24px_-12px_rgba(18,75,93,0.14)] transition-all"
+                >
+                  <div
+                    className={cn(
+                      "w-10 h-1 rounded-full mb-5",
+                      accentColors[i % accentColors.length]
+                    )}
+                  />
+                  <h3 className="font-display text-2xl tracking-wide text-primary-900 mb-2">
+                    {program.title}
+                  </h3>
+                  <p className="text-sm text-primary-700/70 leading-relaxed">
+                    {program.description}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ── Levels ── */}
-      <section className=" bg-sand/30">
+      <section className="bg-sand/30">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-primary-900">
+            <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
+              Every skill level
+            </span>
+            <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
               Find your level
             </h2>
             <p className="mt-3 text-primary-700/70">
@@ -209,49 +334,67 @@ export default async function LandingPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {levels.map((level) => (
-              <div
-                key={level.name}
-                className="bg-white rounded-2xl p-7 shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)]"
-              >
-                <h3 className="text-xl font-semibold text-primary-900">
-                  {level.name}
-                </h3>
-                <p className="mt-1 text-sm text-primary-700/60">
-                  {level.description}
-                </p>
-                <ul className="mt-5 space-y-2.5">
-                  {level.includes.map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-start gap-2.5 text-sm text-primary-800"
-                    >
-                      <svg
-                        className="w-4 h-4 mt-0.5 flex-shrink-0 text-secondary"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+            {levels.map((level, i) => {
+              const badgeStyles = [
+                "bg-secondary/15 text-primary-900",
+                "bg-accent/20 text-primary-900",
+                "bg-primary-800 text-white",
+              ];
+              return (
+                <div
+                  key={level.name}
+                  className="bg-white rounded-2xl p-7 shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] hover:shadow-[0_8px_32px_-12px_rgba(18,75,93,0.16)] transition-shadow"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full mb-4",
+                      badgeStyles[i]
+                    )}
+                  >
+                    Level {i + 1}
+                  </span>
+                  <h3 className="font-display text-3xl tracking-wide text-primary-900">
+                    {level.name}
+                  </h3>
+                  <p className="mt-1 text-sm text-primary-700/60">
+                    {level.description}
+                  </p>
+                  <ul className="mt-5 space-y-2.5">
+                    {level.includes.map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-2.5 text-sm text-primary-800"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                        <svg
+                          className="w-4 h-4 mt-0.5 flex-shrink-0 text-secondary"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ── Packages ── */}
-      <section id="packages" className=" scroll-mt-20">
+      <section id="packages" className="scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-primary-900">
+            <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
+              Pricing
+            </span>
+            <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
               Training packages
             </h2>
             <p className="mt-3 text-primary-700/70">
@@ -271,19 +414,24 @@ export default async function LandingPage() {
                 <div
                   key={pkg.session_count}
                   className={cn(
-                    "relative rounded-2xl p-6 bg-white shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)]",
-                    isPopular && "ring-2 ring-primary-800"
+                    "relative rounded-2xl p-6 bg-white shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] transition-all hover:shadow-[0_8px_32px_-12px_rgba(18,75,93,0.18)]",
+                    isPopular && "ring-2 ring-accent bg-gradient-to-br from-white to-accent/5"
                   )}
                 >
                   {isPopular && (
-                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-primary-800 text-white text-[10px] font-semibold uppercase tracking-wider px-3 py-0.5 rounded-full">
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-accent text-primary-900 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
                       Popular
                     </div>
                   )}
-                  <div className="text-4xl font-bold text-primary-900">
+                  <div
+                    className={cn(
+                      "font-display text-6xl leading-none",
+                      isPopular ? "text-accent-600" : "text-primary-900"
+                    )}
+                  >
                     {pkg.session_count}
                   </div>
-                  <div className="mt-1 text-xs text-primary-700/60 uppercase tracking-wider">
+                  <div className="mt-2 text-xs text-primary-700/60 uppercase tracking-wider font-semibold">
                     {pkg.session_count === 1 ? "session" : "sessions"}
                   </div>
                   <div className="mt-5 text-2xl font-semibold text-primary-900">
@@ -293,7 +441,7 @@ export default async function LandingPage() {
                     </span>
                   </div>
                   {pkg.session_count > 1 && (
-                    <div className="mt-1 text-xs text-secondary font-medium">
+                    <div className="mt-1 text-xs text-secondary-dark font-semibold">
                       {perSession} EGP / session
                     </div>
                   )}
@@ -310,10 +458,23 @@ export default async function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="bg-primary-800 text-white">
-        <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold">
-            Ready to hit the court?
+      <section className="relative overflow-hidden bg-primary-900 text-white">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.08] pointer-events-none"
+          style={{
+            backgroundImage: "url('/images/pattern.jpeg')",
+            backgroundSize: "500px",
+            backgroundRepeat: "repeat",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-secondary-dark/20 blur-3xl pointer-events-none"
+        />
+        <div className="relative max-w-4xl mx-auto px-6 py-20 text-center">
+          <h2 className="font-display text-5xl sm:text-6xl tracking-tight">
+            Ready to hit the <span className="text-accent">court?</span>
           </h2>
           <p className="mt-4 text-white/70 max-w-lg mx-auto">
             Join our community of volleyball players. Register today, pick a
@@ -323,7 +484,7 @@ export default async function LandingPage() {
             {currentUser ? (
               <Link
                 href="/player/dashboard"
-                className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3 rounded-lg transition-colors"
+                className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3.5 rounded-lg transition-colors"
               >
                 Go to Dashboard
               </Link>
@@ -331,15 +492,15 @@ export default async function LandingPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
                   href="/register"
-                  className="inline-flex items-center justify-center w-full sm:w-auto bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center w-full sm:w-auto bg-accent hover:bg-accent-600 text-primary-900 font-semibold px-7 py-3.5 rounded-lg transition-colors"
                 >
                   Join {branding.name}
                 </Link>
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center w-full sm:w-auto border border-white/30 hover:border-white/60 text-white font-semibold px-7 py-3 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center w-full sm:w-auto border border-white/30 hover:border-white/60 text-white font-semibold px-7 py-3.5 rounded-lg transition-colors"
                 >
-                  Sign In
+                  Log in
                 </Link>
               </div>
             )}
@@ -348,17 +509,17 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-sand/10">
+      <footer className="bg-white border-t border-primary-100/60">
         <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Image
-              src="/images/teal-logo.png"
+              src="/images/logo.png"
               alt={branding.name}
-              width={32}
-              height={32}
+              width={36}
+              height={28}
               className="object-contain"
             />
-            <span className="text-sm font-semibold text-primary-900">
+            <span className="font-display text-lg tracking-wide text-primary-900">
               {branding.name}
             </span>
           </div>

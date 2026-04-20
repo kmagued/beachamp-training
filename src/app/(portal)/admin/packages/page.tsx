@@ -87,7 +87,7 @@ export default function AdminPackagesPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Packages</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Packages</h1>
           <p className="text-slate-500 text-sm">Manage training packages</p>
         </div>
         <Button onClick={() => { setShowForm(true); setEditingId(null); }} size="sm">

@@ -185,7 +185,7 @@ export default function CoachGroupDetailPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Back to My Groups
         </Link>
         <div className="flex items-center gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{group.name}</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">{group.name}</h1>
           <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
         </div>
         {group.description && <p className="text-slate-500 text-sm mt-1">{group.description}</p>}

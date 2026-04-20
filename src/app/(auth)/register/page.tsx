@@ -89,7 +89,7 @@ export default function RegisterPage() {
               className="h-24 w-auto object-contain mx-auto"
             />
           </Link>
-          <h1 className="text-3xl sm:text-4xl font-bold text-primary-900 tracking-tight">
+          <h1 className="font-display text-5xl sm:text-6xl tracking-tight text-primary-900">
             Create your account
           </h1>
           <p className="text-primary-700/60 text-sm sm:text-base mt-2 max-w-md mx-auto">

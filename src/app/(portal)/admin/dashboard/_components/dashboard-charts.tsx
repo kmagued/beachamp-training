@@ -32,25 +32,25 @@ interface DashboardChartsProps {
 }
 
 const COLORS = {
-  primary: "#0891B2",
-  emerald: "#10B981",
-  amber: "#F59E0B",
-  red: "#EF4444",
-  blue: "#3B82F6",
-  purple: "#8B5CF6",
-  indigo: "#6366F1",
+  primary: "#124B5D",
+  primaryDark: "#0C313A",
+  secondary: "#5CACB0",
+  secondaryDark: "#1596B5",
+  accent: "#F7AC40",
+  accentDark: "#E8901A",
+  sand: "#EDDCB2",
 };
 
-const PACKAGE_COLORS = [COLORS.primary, COLORS.emerald, COLORS.blue, COLORS.amber, COLORS.purple, COLORS.indigo];
+const PACKAGE_COLORS = [COLORS.primary, COLORS.secondary, COLORS.accent, COLORS.secondaryDark, COLORS.accentDark, COLORS.sand];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-sm">
-      <p className="text-slate-500 text-xs mb-1">{label}</p>
+    <div className="bg-white border border-primary-200 rounded-lg shadow-lg px-3 py-2 text-sm">
+      <p className="text-primary-700/60 text-xs mb-1">{label}</p>
       {payload.map((p: { name: string; value: number; color: string }, i: number) => (
-        <p key={i} className="font-medium" style={{ color: p.color }}>
+        <p key={i} className="font-semibold" style={{ color: p.color }}>
           {p.name}: {p.value.toLocaleString()}
         </p>
       ))}
@@ -140,20 +140,20 @@ export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardCha
       {/* Revenue Trend */}
       <Card className="sm:col-span-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-slate-400" />
+          <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-secondary" />
             Revenue
           </h2>
-          <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+          <div className="flex gap-1 bg-sand/50 rounded-lg p-0.5">
             {REVENUE_VIEWS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRevenueView(key)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                  "px-2.5 py-1 rounded-md text-xs font-semibold transition-colors",
                   revenueView === key
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white text-primary-900 shadow-sm"
+                    : "text-primary-700/60 hover:text-primary-900"
                 )}
               >
                 {label}
@@ -166,19 +166,19 @@ export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardCha
             <AreaChart data={revenueChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
+                  <stop offset="5%" stopColor={COLORS.secondary} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={COLORS.secondary} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#EDDCB2" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#5A6B73" }}
                 tickLine={false}
-                axisLine={{ stroke: "#e2e8f0" }}
+                axisLine={{ stroke: "#C4D8DE" }}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#5A6B73" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
@@ -189,40 +189,40 @@ export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardCha
                 dataKey="amount"
                 name="Revenue (EGP)"
                 stroke={COLORS.primary}
-                strokeWidth={2}
+                strokeWidth={2.5}
                 fill="url(#revenueGrad)"
               />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-sm text-slate-400 text-center py-12">No revenue data for this period</p>
+          <p className="text-sm text-primary-700/50 text-center py-12">No revenue data for this period</p>
         )}
       </Card>
 
       {/* Subscriptions by Package */}
       <Card className="sm:col-span-2">
-        <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
-          <Package className="w-4 h-4 text-slate-400" />
+        <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2 mb-4">
+          <Package className="w-5 h-5 text-secondary" />
           Active Subscriptions
         </h2>
         {subsByPackage.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={subsByPackage} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#EDDCB2" vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#5A6B73" }}
                 tickLine={false}
-                axisLine={{ stroke: "#e2e8f0" }}
+                axisLine={{ stroke: "#C4D8DE" }}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#5A6B73" }}
                 tickLine={false}
                 axisLine={false}
                 allowDecimals={false}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Subscriptions" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="count" name="Subscriptions" radius={[6, 6, 0, 0]}>
                 {subsByPackage.map((_, i) => (
                   <Cell key={i} fill={PACKAGE_COLORS[i % PACKAGE_COLORS.length]} />
                 ))}
@@ -230,7 +230,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardCha
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-sm text-slate-400 text-center py-12">No active subscriptions</p>
+          <p className="text-sm text-primary-700/50 text-center py-12">No active subscriptions</p>
         )}
       </Card>
     </div>

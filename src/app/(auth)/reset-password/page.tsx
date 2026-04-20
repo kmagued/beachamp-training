@@ -8,7 +8,7 @@ import { resetPasswordWithOtp } from "@/lib/actions/auth";
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-pulse text-slate-400">Loading...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-sand/10 flex items-center justify-center"><div className="animate-pulse text-primary-700/60">Loading...</div></div>}>
       <ResetPasswordContent />
     </Suspense>
   );
@@ -96,22 +96,22 @@ function ResetPasswordContent() {
   const isComplete = otp.every((d) => d !== "") && newPassword && confirmPassword;
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-6">
+    <div className="min-h-screen bg-sand/10 flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-6">
-          <svg className="w-8 h-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="w-8 h-8 text-primary-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">
+        <h1 className="font-display text-5xl sm:text-6xl tracking-tight text-primary-900 mb-3">
           Reset your password
         </h1>
-        <p className="text-slate-500 text-sm leading-relaxed mb-2">
+        <p className="text-primary-700/60 text-sm leading-relaxed mb-2">
           Enter the 6-digit code sent to
         </p>
         {emailFromParams && (
-          <p className="text-sm font-semibold text-slate-900 mb-8">
+          <p className="text-sm font-semibold text-primary-900 mb-8">
             {emailFromParams}
           </p>
         )}
@@ -128,7 +128,7 @@ function ResetPasswordContent() {
               value={digit}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold border border-slate-300 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-slate-900"
+              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold border border-primary-200 rounded-lg focus:border-primary-800 focus:ring-2 focus:ring-primary-800/20 outline-none transition-all text-primary-900"
             />
           ))}
         </div>
@@ -169,7 +169,7 @@ function ResetPasswordContent() {
         <div className="mt-6">
           <Link
             href="/login"
-            className="text-slate-400 text-sm hover:text-slate-600"
+            className="text-primary-800 text-sm hover:text-primary-900"
           >
             Back to Sign In
           </Link>

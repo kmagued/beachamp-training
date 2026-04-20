@@ -169,7 +169,7 @@ export default function AdminGroupsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Training Groups</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Training Groups</h1>
           <p className="text-slate-500 text-sm">Manage groups, players, and schedules</p>
         </div>
         {groups.length > 0 && (

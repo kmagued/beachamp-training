@@ -187,7 +187,7 @@ function AdminCoachesContent() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Coaches</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Coaches</h1>
           <p className="text-slate-500 text-sm">
             {coaches.length} total coaches
             {hasActiveFilters && ` · ${filteredCoaches.length} matching`}

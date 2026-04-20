@@ -8,7 +8,7 @@ import { verifyEmailOtp, resendVerificationEmail } from "@/lib/actions/auth";
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-pulse text-slate-400">Loading...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-sand/10 flex items-center justify-center"><div className="animate-pulse text-primary-700/60">Loading...</div></div>}>
       <VerifyEmailContent />
     </Suspense>
   );
@@ -111,22 +111,22 @@ function VerifyEmailContent() {
   const isComplete = otp.every((d) => d !== "");
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-6">
+    <div className="min-h-screen bg-sand/10 flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-6">
-          <svg className="w-8 h-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="w-8 h-8 text-primary-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">
+        <h1 className="font-display text-5xl sm:text-6xl tracking-tight text-primary-900 mb-3">
           Verify your email
         </h1>
-        <p className="text-slate-500 text-sm leading-relaxed mb-2">
+        <p className="text-primary-700/60 text-sm leading-relaxed mb-2">
           We&apos;ve sent a 6-digit verification code to
         </p>
         {emailFromParams && (
-          <p className="text-sm font-semibold text-slate-900 mb-8">
+          <p className="text-sm font-semibold text-primary-900 mb-8">
             {emailFromParams}
           </p>
         )}
@@ -143,7 +143,7 @@ function VerifyEmailContent() {
               value={digit}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold border border-slate-300 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-slate-900"
+              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold border border-primary-200 rounded-lg focus:border-primary-800 focus:ring-2 focus:ring-primary-800/20 outline-none transition-all text-primary-900"
             />
           ))}
         </div>
@@ -160,14 +160,14 @@ function VerifyEmailContent() {
         </Button>
 
         {/* Resend */}
-        <div className="border-t border-slate-100 pt-6">
-          <p className="text-slate-500 text-sm mb-3">
+        <div className="border-t border-primary-100 pt-6">
+          <p className="text-primary-700/60 text-sm mb-3">
             Didn&apos;t receive the code? Check your spam folder or
           </p>
           <button
             onClick={handleResend}
             disabled={resending || resent}
-            className="text-primary font-semibold text-sm hover:underline disabled:opacity-50 disabled:no-underline"
+            className="text-primary-800 font-semibold text-sm hover:text-primary-900 hover:underline disabled:opacity-50 disabled:no-underline"
           >
             {resending ? "Sending..." : resent ? "Code sent!" : "Resend code"}
           </button>
@@ -181,7 +181,7 @@ function VerifyEmailContent() {
         <div className="mt-6">
           <Link
             href="/login"
-            className="text-slate-400 text-sm hover:text-slate-600"
+            className="text-primary-800 text-sm hover:text-primary-900"
           >
             Back to Sign In
           </Link>

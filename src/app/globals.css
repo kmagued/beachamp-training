@@ -1,13 +1,16 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-montserrat), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+  font-family: var(--font-bebas-neue), var(--font-montserrat), sans-serif;
+  letter-spacing: 0.01em;
 }
 
 /* iOS Safari ignores width:100% on native date/time inputs and renders them

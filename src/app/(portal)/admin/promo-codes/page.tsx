@@ -148,7 +148,7 @@ export default function AdminPromoCodesPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Promo Codes</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Promo Codes</h1>
           <p className="text-slate-500 text-sm">Manage discount codes for subscriptions</p>
         </div>
         <Button onClick={openCreateDrawer} size="sm">

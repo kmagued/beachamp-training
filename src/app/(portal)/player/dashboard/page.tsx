@@ -22,7 +22,6 @@ export default async function PlayerDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  // Fetch active subscription with package info
   const { data: subscription } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
@@ -32,7 +31,6 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string; session_count: number } }) | null };
 
-  // Check for pending subscription (admin confirmation or payment needed)
   const { data: pendingSubscription } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
@@ -42,7 +40,6 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
 
-  // Fetch latest feedback
   const { data: latestFeedback } = await supabase
     .from("feedback")
     .select("*, coach:profiles!feedback_coach_id_fkey(first_name, last_name)")
@@ -51,7 +48,6 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle();
 
-  // Calculate days remaining with dynamic thresholds
   let daysRemaining: number | null = null;
   let isExpired = false;
   let isExpiringSoon = false;
@@ -63,7 +59,6 @@ export default async function PlayerDashboard() {
     isExpired = daysRemaining <= 0;
     isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
 
-    // Dynamic "expiring soon" based on package length
     if (!isExpired && !isExpiringSoon && subscription.start_date) {
       const packageDays = Math.max(1, Math.ceil(
         (end.getTime() - new Date(subscription.start_date).getTime()) / (1000 * 60 * 60 * 24)
@@ -72,7 +67,6 @@ export default async function PlayerDashboard() {
       if (timeRatio <= 0.3) isExpiringSoon = true;
     }
   }
-  // Session-based warnings (dynamic: 30% of total)
   const sessionsRatio = subscription && subscription.sessions_total > 0
     ? subscription.sessions_remaining / subscription.sessions_total : 1;
   const sessionsLow = subscription && sessionsRatio <= 0.3;
@@ -83,10 +77,10 @@ export default async function PlayerDashboard() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+        <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-primary-900">
           Welcome back, {currentUser.profile.first_name}!
         </h1>
-        <p className="text-slate-500 text-sm">
+        <p className="text-primary-700/60 text-sm mt-1">
           Here&apos;s an overview of your training progress.
         </p>
       </div>
@@ -98,7 +92,7 @@ export default async function PlayerDashboard() {
             label="Sessions Remaining"
             value={subscription.sessions_remaining}
             subtitle={`of ${subscription.sessions_total} total`}
-            accentColor={sessionsOut ? "bg-red-500" : sessionsLow ? "bg-amber-500" : "bg-primary"}
+            accentColor={sessionsOut ? "bg-danger" : sessionsLow ? "bg-accent" : "bg-primary-800"}
             icon={<CalendarDays className="w-5 h-5" />}
           />
           <StatCard
@@ -110,31 +104,31 @@ export default async function PlayerDashboard() {
                 : "—"
             }
             subtitle={daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days remaining` : undefined}
-            accentColor={isExpired ? "bg-red-500" : isExpiringSoon ? "bg-amber-500" : "bg-emerald-500"}
+            accentColor={isExpired ? "bg-danger" : isExpiringSoon ? "bg-accent" : "bg-secondary"}
             icon={<Clock className="w-5 h-5" />}
           />
           <StatCard
             label="Package"
             value={subscription.packages?.name || "—"}
-            accentColor="bg-primary"
+            accentColor="bg-primary-800"
             icon={<Package className="w-5 h-5" />}
           />
           <StatCard
             label="Level"
             value={currentUser.profile.playing_level || "—"}
-            accentColor="bg-violet-500"
+            accentColor="bg-secondary-dark"
             icon={<TrendingUp className="w-5 h-5" />}
           />
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <StatCard label="Sessions Remaining" value="—" accentColor="bg-slate-300" icon={<CalendarDays className="w-5 h-5" />} />
-          <StatCard label="Valid Until" value="—" accentColor="bg-slate-300" icon={<Clock className="w-5 h-5" />} />
-          <StatCard label="Package" value="None" accentColor="bg-slate-300" icon={<Package className="w-5 h-5" />} />
+          <StatCard label="Sessions Remaining" value="—" accentColor="bg-primary-200" icon={<CalendarDays className="w-5 h-5" />} />
+          <StatCard label="Valid Until" value="—" accentColor="bg-primary-200" icon={<Clock className="w-5 h-5" />} />
+          <StatCard label="Package" value="None" accentColor="bg-primary-200" icon={<Package className="w-5 h-5" />} />
           <StatCard
             label="Level"
             value={currentUser.profile.playing_level || "—"}
-            accentColor="bg-violet-500"
+            accentColor="bg-secondary-dark"
             icon={<TrendingUp className="w-5 h-5" />}
           />
         </div>
@@ -144,39 +138,39 @@ export default async function PlayerDashboard() {
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
         {/* Subscription Status */}
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Package className="w-4 h-4 text-slate-400" />
+          <h2 className="font-display text-xl tracking-wide text-primary-900 mb-4 flex items-center gap-2">
+            <Package className="w-4 h-4 text-primary-700/50" />
             Subscription Status
           </h2>
           {subscription ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500">Status</span>
+                <span className="text-sm text-primary-700/60">Status</span>
                 <Badge variant="success">Active</Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500">Package</span>
-                <span className="text-sm font-medium text-slate-900">{subscription.packages?.name}</span>
+                <span className="text-sm text-primary-700/60">Package</span>
+                <span className="text-sm font-semibold text-primary-900">{subscription.packages?.name}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500">Sessions</span>
-                <span className="text-sm font-medium text-slate-900">
+                <span className="text-sm text-primary-700/60">Sessions</span>
+                <span className="text-sm font-semibold text-primary-900">
                   {subscription.sessions_total === 1 ? subscription.sessions_remaining : `${subscription.sessions_remaining} / ${subscription.sessions_total}`}
                 </span>
               </div>
               {subscription.start_date && (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Started</span>
-                  <span className="text-sm text-slate-700">
+                  <span className="text-sm text-primary-700/60">Started</span>
+                  <span className="text-sm text-primary-800">
                     {formatDate(subscription.start_date)}
                   </span>
                 </div>
               )}
               <Link
                 href="/player/subscriptions"
-                className="block text-center text-sm font-medium text-primary hover:underline pt-2"
+                className="block text-center text-sm font-semibold text-primary-800 hover:text-primary-900 pt-2"
               >
-                View Details
+                View Details →
               </Link>
             </div>
           ) : pendingSubscription ? (
@@ -184,7 +178,7 @@ export default async function PlayerDashboard() {
               <Badge variant="warning" className="mb-2">
                 {pendingSubscription.status === "pending_payment" ? "Payment Required" : "Pending Confirmation"}
               </Badge>
-              <p className="text-sm text-slate-500 mt-2">
+              <p className="text-sm text-primary-700/70 mt-2">
                 {pendingSubscription.status === "pending_payment"
                   ? `You have an unpaid session for ${pendingSubscription.packages?.name}. Please make your payment.`
                   : `Your payment for ${pendingSubscription.packages?.name} is being reviewed.`}
@@ -192,9 +186,9 @@ export default async function PlayerDashboard() {
               {pendingSubscription.status === "pending_payment" && (
                 <Link
                   href="/player/subscribe"
-                  className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+                  className="text-sm font-semibold text-primary-800 hover:text-primary-900 mt-2 inline-block"
                 >
-                  Pay Now
+                  Pay Now →
                 </Link>
               )}
             </div>
@@ -206,7 +200,7 @@ export default async function PlayerDashboard() {
               action={
                 <Link
                   href="/player/packages"
-                  className="text-sm font-medium text-primary hover:underline"
+                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
                 >
                   Browse Packages
                 </Link>
@@ -217,48 +211,48 @@ export default async function PlayerDashboard() {
 
         {/* Latest Feedback */}
         <Card>
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-slate-400" />
+          <h2 className="font-display text-xl tracking-wide text-primary-900 mb-4 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-primary-700/50" />
             Latest Feedback
           </h2>
           {latestFeedback ? (
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-full bg-brand-coach/10 flex items-center justify-center text-[10px] font-bold text-brand-coach">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-secondary/15 flex items-center justify-center text-[11px] font-bold text-secondary-dark">
                   {(latestFeedback.coach?.first_name?.[0] || "C")}
                   {(latestFeedback.coach?.last_name?.[0] || "")}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">
+                  <p className="text-sm font-semibold text-primary-900">
                     {latestFeedback.coach?.first_name} {latestFeedback.coach?.last_name}
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-primary-700/50">
                     {formatDate(latestFeedback.session_date)}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-0.5 mb-2">
+              <div className="flex gap-0.5 mb-3">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
                     className={`w-4 h-4 ${
                       i < latestFeedback.rating
-                        ? "text-amber-400 fill-amber-400"
-                        : "text-slate-200"
+                        ? "text-accent fill-accent"
+                        : "text-primary-200"
                     }`}
                   />
                 ))}
               </div>
               {latestFeedback.comment && (
-                <p className="text-sm text-slate-600 leading-relaxed">
+                <p className="text-sm text-primary-800/80 leading-relaxed">
                   {latestFeedback.comment}
                 </p>
               )}
               <Link
                 href="/player/feedback"
-                className="text-sm font-medium text-primary hover:underline mt-3 inline-block"
+                className="text-sm font-semibold text-primary-800 hover:text-primary-900 mt-3 inline-block"
               >
-                View all feedback
+                View all feedback →
               </Link>
             </div>
           ) : (
@@ -273,82 +267,82 @@ export default async function PlayerDashboard() {
 
       {/* Renewal / Warning Banners */}
       {isExpired && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">
+            <p className="text-sm font-semibold text-danger">
               Your subscription has expired
             </p>
-            <p className="text-xs text-red-600 mt-0.5">
+            <p className="text-xs text-danger/80 mt-0.5">
               Renew your subscription to continue attending training sessions.
             </p>
           </div>
           <Link
             href="/player/subscribe"
-            className="text-sm font-semibold text-red-700 hover:text-red-900 whitespace-nowrap"
+            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
           >
-            Renew Now
+            Renew Now →
           </Link>
         </div>
       )}
       {!isExpired && sessionsOut && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">
+            <p className="text-sm font-semibold text-danger">
               You have no sessions remaining
             </p>
-            <p className="text-xs text-red-600 mt-0.5">
+            <p className="text-xs text-danger/80 mt-0.5">
               Renew your subscription to continue training.
             </p>
           </div>
           <Link
             href="/player/subscribe"
-            className="text-sm font-semibold text-red-700 hover:text-red-900 whitespace-nowrap"
+            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
           >
-            Renew Now
+            Renew Now →
           </Link>
         </div>
       )}
       {!isExpired && !sessionsOut && (isExpiringSoon || sessionsLow) && (
-        <div className={`${isExpiringSoon ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"} border rounded-xl p-4 flex items-center gap-3`}>
-          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-red-500" : "text-amber-500"} flex-shrink-0`} />
+        <div className={`${isExpiringSoon ? "bg-danger/5 border-danger/30" : "bg-accent/10 border-accent/40"} border rounded-xl p-4 flex items-center gap-3`}>
+          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-danger" : "text-accent-600"} flex-shrink-0`} />
           <div className="flex-1">
-            <p className={`text-sm font-medium ${isExpiringSoon ? "text-red-800" : "text-amber-800"}`}>
+            <p className={`text-sm font-semibold ${isExpiringSoon ? "text-danger" : "text-accent-700"}`}>
               {isExpiringSoon && sessionsLow
                 ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
                 : isExpiringSoon
                 ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
                 : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`}
             </p>
-            <p className={`text-xs ${isExpiringSoon ? "text-red-600" : "text-amber-600"} mt-0.5`}>
+            <p className={`text-xs ${isExpiringSoon ? "text-danger/80" : "text-accent-700/80"} mt-0.5`}>
               Renew now to avoid interruption to your training.
             </p>
           </div>
           <Link
             href="/player/subscribe"
-            className={`text-sm font-semibold ${isExpiringSoon ? "text-red-700 hover:text-red-900" : "text-amber-700 hover:text-amber-900"} whitespace-nowrap`}
+            className={`text-sm font-semibold ${isExpiringSoon ? "text-danger hover:text-danger/80" : "text-accent-700 hover:text-accent-600"} whitespace-nowrap`}
           >
-            Renew Now
+            Renew Now →
           </Link>
         </div>
       )}
       {!isExpired && !sessionsOut && !isExpiringSoon && !sessionsLow && expiringBySessions && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+        <div className="bg-accent/10 border border-accent/40 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-accent-600 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">
+            <p className="text-sm font-semibold text-accent-700">
               Your sessions are running low ({subscription?.sessions_remaining} remaining)
             </p>
-            <p className="text-xs text-amber-600 mt-0.5">
+            <p className="text-xs text-accent-700/80 mt-0.5">
               Renew now to avoid interruption to your training.
             </p>
           </div>
           <Link
             href="/player/subscribe"
-            className="text-sm font-semibold text-amber-700 hover:text-amber-900 whitespace-nowrap"
+            className="text-sm font-semibold text-accent-700 hover:text-accent-600 whitespace-nowrap"
           >
-            Renew Now
+            Renew Now →
           </Link>
         </div>
       )}

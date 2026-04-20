@@ -39,13 +39,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-sidebar flex items-center justify-center px-4">
+    <div className="min-h-screen bg-sand/10 flex items-center justify-center px-4">
       <Toast message={toast} variant="warning" onClose={clearToast} />
 
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-[0_8px_40px_-20px_rgba(18,75,93,0.15)] p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="font-display text-5xl sm:text-6xl tracking-tight text-primary-900">Welcome Back</h1>
+          <p className="text-primary-700/60 text-sm mt-2">
             Sign in to your account
           </p>
         </div>
@@ -81,14 +81,14 @@ export default function LoginPage() {
         </form>
 
         <div className="text-center mt-4">
-          <Link href="/forgot-password" className="text-sm text-slate-400 hover:text-primary">
+          <Link href="/forgot-password" className="text-sm text-primary-800 hover:text-primary-900">
             Forgot your password?
           </Link>
         </div>
 
-        <p className="text-center mt-4 text-sm text-slate-500">
+        <p className="text-center mt-4 text-sm text-primary-700/60">
           New player?{" "}
-          <Link href="/register" className="text-primary font-semibold hover:underline">
+          <Link href="/register" className="text-primary-800 font-semibold hover:text-primary-900 hover:underline">
             Register here
           </Link>
         </p>
