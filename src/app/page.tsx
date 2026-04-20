@@ -155,6 +155,15 @@ export default async function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-sand/30 to-white">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.05] pointer-events-none"
+          style={{
+            backgroundImage: "url('/images/pattern.jpeg')",
+            backgroundSize: "1000px",
+            backgroundRepeat: "repeat",
+          }}
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-sand/0 via-sand/5 to-white pointer-events-none" />
         <div
           aria-hidden
