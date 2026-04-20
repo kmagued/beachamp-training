@@ -1,6 +1,16 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Card, Button, Input, Drawer } from "@/components/ui";
 import { X, Loader2, Trash2 } from "lucide-react";
 import type { PaymentRow } from "./types";
+
+function usePortalReady() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  return mounted;
+}
 
 interface RejectModalProps {
   rejectingId: string | null;
@@ -21,9 +31,10 @@ export function RejectModal({
   isPending,
   actionId,
 }: RejectModalProps) {
-  if (!rejectingId) return null;
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  const mounted = usePortalReady();
+  if (!rejectingId || !mounted) return null;
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <h3 className="font-semibold text-slate-900 mb-3">Reject Payment</h3>
         <p className="text-sm text-slate-500 mb-4">
@@ -57,7 +68,8 @@ export function RejectModal({
           </Button>
         </div>
       </Card>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -144,10 +156,11 @@ export function ConfirmDeleteDrawer({
 }
 
 export function ScreenshotLightbox({ url, onClose }: ScreenshotLightboxProps) {
-  if (!url) return null;
-  return (
+  const mounted = usePortalReady();
+  if (!url || !mounted) return null;
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div className="max-w-2xl max-h-[80vh] relative">
@@ -164,6 +177,7 @@ export function ScreenshotLightbox({ url, onClose }: ScreenshotLightboxProps) {
           className="max-w-full max-h-[80vh] rounded-lg object-contain"
         />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

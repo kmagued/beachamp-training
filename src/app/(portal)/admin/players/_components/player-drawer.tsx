@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Badge, Card, Button, Input, Select, Label, DatePicker, Textarea } from "@/components/ui";
 import {
@@ -51,6 +52,11 @@ interface PlayerDrawerProps {
 
 export function PlayerDrawer({ player, onClose, onDataChange }: PlayerDrawerProps) {
   const open = !!player;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleEsc = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose();
@@ -66,13 +72,15 @@ export function PlayerDrawer({ player, onClose, onDataChange }: PlayerDrawerProp
     };
   }, [open, handleEsc]);
 
-  return (
-    <>
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] pointer-events-none">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/30 transition-opacity duration-300",
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
+          "absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+          open ? "opacity-100 pointer-events-auto" : "opacity-0"
         )}
         onClick={onClose}
       />
@@ -80,7 +88,7 @@ export function PlayerDrawer({ player, onClose, onDataChange }: PlayerDrawerProp
       {/* Desktop: right side panel */}
       <div
         className={cn(
-          "fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-xl border-l border-slate-200 transition-transform duration-300 ease-out hidden sm:flex flex-col",
+          "absolute top-0 right-0 h-full w-full max-w-md bg-white shadow-xl border-l border-slate-200 transition-transform duration-300 ease-out hidden sm:flex flex-col pointer-events-auto",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -90,7 +98,7 @@ export function PlayerDrawer({ player, onClose, onDataChange }: PlayerDrawerProp
       {/* Mobile: bottom sheet */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 bg-white shadow-xl border-t border-slate-200 rounded-t-2xl transition-transform duration-300 ease-out sm:hidden max-h-[85vh] flex flex-col",
+          "absolute bottom-0 left-0 right-0 bg-white shadow-xl border-t border-slate-200 rounded-t-2xl transition-transform duration-300 ease-out sm:hidden max-h-[85vh] flex flex-col pointer-events-auto",
           open ? "translate-y-0" : "translate-y-full"
         )}
       >
@@ -99,7 +107,8 @@ export function PlayerDrawer({ player, onClose, onDataChange }: PlayerDrawerProp
         </div>
         {player && <DrawerContent player={player} onClose={onClose} onDataChange={onDataChange} />}
       </div>
-    </>
+    </div>,
+    document.body
   );
 }
 

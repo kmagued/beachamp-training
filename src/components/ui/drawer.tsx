@@ -58,7 +58,7 @@ export function Drawer({ open, onClose, title, children, footer, className, widt
       {/* Backdrop */}
       <div
         className={cn(
-          "absolute inset-0 bg-black/40 transition-opacity duration-300",
+          "absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
           visible ? "opacity-100" : "opacity-0"
         )}
         onClick={handleBackdropClick}

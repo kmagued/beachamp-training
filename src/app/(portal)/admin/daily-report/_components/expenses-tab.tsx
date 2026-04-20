@@ -42,7 +42,7 @@ export function ExpensesTab({ date }: { date: string }) {
         .order("name"),
       supabase
         .from("schedule_sessions")
-        .select("id, start_time, end_time, location, groups(name)")
+        .select("id, start_time, end_time, location, end_date, created_at, groups(name)")
         .eq("day_of_week", dayOfWeek)
         .eq("is_active", true)
         .order("start_time"),
@@ -51,13 +51,22 @@ export function ExpensesTab({ date }: { date: string }) {
     setCategories((categoryData || []) as unknown as CategoryRow[]);
     setCourtSessions(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionData || []).map((s: any) => ({
-        id: s.id,
-        start_time: s.start_time,
-        end_time: s.end_time,
-        group_name: s.groups?.name || "Unknown",
-        location: s.location,
-      }))
+      (sessionData || [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((s: any) => {
+          if (s.end_date && s.end_date < date) return false;
+          const createdDate = (s.created_at as string).slice(0, 10);
+          if (createdDate > date) return false;
+          return true;
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((s: any) => ({
+          id: s.id,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          group_name: s.groups?.name || "Unknown",
+          location: s.location,
+        })),
     );
     setLoading(false);
   }
