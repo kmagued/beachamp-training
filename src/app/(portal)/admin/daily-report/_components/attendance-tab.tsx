@@ -15,6 +15,7 @@ interface ScheduleSession {
   end_time: string;
   location: string | null;
   end_date: string | null;
+  created_at: string;
   groups: {
     id: string;
     name: string;
@@ -83,14 +84,19 @@ export function AttendanceTab({ date }: { date: string }) {
       // Fetch schedule sessions for this day
       const { data: scheduleSessions } = await supabase
         .from("schedule_sessions")
-        .select("id, group_id, start_time, end_time, location, end_date, groups(id, name, level)")
+        .select("id, group_id, start_time, end_time, location, end_date, created_at, groups(id, name, level)")
         .eq("day_of_week", dayOfWeek)
         .eq("is_active", true)
         .order("start_time");
 
-      // Filter out sessions that have ended before the selected date
+      // Filter out sessions that have ended before the selected date, or were created after it
       const sessionsData = ((scheduleSessions || []) as unknown as ScheduleSession[]).filter(
-        (s) => !s.end_date || s.end_date >= date
+        (s) => {
+          if (s.end_date && s.end_date < date) return false;
+          const createdDate = s.created_at.slice(0, 10);
+          if (createdDate > date) return false;
+          return true;
+        }
       );
       setSessions(sessionsData);
 
