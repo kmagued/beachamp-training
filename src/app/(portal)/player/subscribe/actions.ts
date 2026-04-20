@@ -25,13 +25,11 @@ export async function submitSubscription(formData: FormData) {
   }
 
   // Save training info if provided (first-time subscribers)
-  const playingLevel = formData.get("playing_level") as string | null;
   const trainingGoals = formData.get("training_goals") as string | null;
   const healthConditions = formData.get("health_conditions") as string | null;
 
-  if (playingLevel || trainingGoals || healthConditions) {
+  if (trainingGoals || healthConditions) {
     const updates: Record<string, unknown> = { profile_completed: true };
-    if (playingLevel) updates.playing_level = playingLevel;
     if (trainingGoals) updates.training_goals = trainingGoals;
     if (healthConditions) updates.health_conditions = healthConditions;
 

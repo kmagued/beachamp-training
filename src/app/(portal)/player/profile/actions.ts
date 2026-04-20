@@ -22,7 +22,6 @@ export async function updateProfile(formData: FormData) {
       date_of_birth: (formData.get("date_of_birth") as string) || null,
       area: (formData.get("area") as string) || null,
       gender: (formData.get("gender") as string) || null,
-      playing_level: (formData.get("playing_level") as string) || null,
       training_goals: (formData.get("training_goals") as string) || null,
       health_conditions: (formData.get("health_conditions") as string) || null,
     })

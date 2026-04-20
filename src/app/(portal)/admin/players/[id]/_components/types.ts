@@ -53,8 +53,6 @@ export interface AttendanceRow {
 
 export interface FeedbackRow {
   id: string;
-  session_date: string;
-  rating: number;
   comment: string | null;
   created_at: string;
   coach: { first_name: string; last_name: string } | null;

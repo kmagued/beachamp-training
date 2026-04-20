@@ -146,18 +146,6 @@ export default function PlayerProfilePage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Playing Level</label>
-                <Select name="playing_level" defaultValue={profile.playing_level || ""}>
-                  <option value="">Select level</option>
-                  {branding.levels.map((level) => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Training Goals</label>
                 <MultiSelect
                   options={branding.trainingGoals}

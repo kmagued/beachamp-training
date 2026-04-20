@@ -135,7 +135,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
       coach_id: (formData.get("coach_id") as string) || undefined,
       requested_day_of_week: dayOfWeek,
       requested_time: time,
-      duration_minutes: Number(formData.get("duration_minutes")) || 60,
+      duration_minutes: 90,
       notes: (formData.get("notes") as string) || undefined,
     };
 
@@ -285,15 +285,6 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
                 </div>
               </div>
             )}
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Duration</label>
-              <Select name="duration_minutes" defaultValue="60">
-                <option value="30">30 min</option>
-                <option value="60">60 min</option>
-                <option value="90">90 min</option>
-                <option value="120">120 min</option>
-              </Select>
-            </div>
             <div>
               <label className="text-xs font-medium text-slate-500 mb-1 block">Notes (optional)</label>
               <Textarea name="notes" placeholder="Any special requests or details..." rows={3} />

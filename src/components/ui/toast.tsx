@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils/cn";
 
 type ToastVariant = "error" | "success" | "warning" | "info";
@@ -28,6 +29,11 @@ interface ToastProps {
 
 export function Toast({ message, variant = "error", duration = 5000, onClose }: ToastProps) {
   const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (message) {
@@ -42,12 +48,12 @@ export function Toast({ message, variant = "error", duration = 5000, onClose }: 
     }
   }, [message, duration, onClose]);
 
-  if (!message) return null;
+  if (!message || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className={cn(
-        "fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full mx-4 px-4 py-3 rounded-xl shadow-lg",
+        "fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-full mx-4 px-4 py-3 rounded-xl shadow-lg",
         "flex items-center gap-3 transition-all duration-300",
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2",
         variantClasses[variant]
@@ -63,6 +69,7 @@ export function Toast({ message, variant = "error", duration = 5000, onClose }: 
           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }

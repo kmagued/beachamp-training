@@ -90,6 +90,7 @@ const adminNav: NavItem[] = [
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
+  { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
 

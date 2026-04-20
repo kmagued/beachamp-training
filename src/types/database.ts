@@ -339,8 +339,8 @@ export interface Database {
           player_id: string;
           coach_id: string;
           group_id: string | null;
-          session_date: string;
-          rating: number;
+          session_date: string | null;
+          rating: number | null;
           comment: string | null;
           created_at: string;
         };
@@ -349,8 +349,8 @@ export interface Database {
           player_id: string;
           coach_id: string;
           group_id?: string | null;
-          session_date: string;
-          rating: number;
+          session_date?: string | null;
+          rating?: number | null;
           comment?: string | null;
           created_at?: string;
         };
@@ -359,8 +359,8 @@ export interface Database {
           player_id?: string;
           coach_id?: string;
           group_id?: string | null;
-          session_date?: string;
-          rating?: number;
+          session_date?: string | null;
+          rating?: number | null;
           comment?: string | null;
           created_at?: string;
         };

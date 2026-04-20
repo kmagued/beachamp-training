@@ -15,8 +15,6 @@ export default async function CoachSessionDetailPage({ params }: PageProps) {
   return (
     <SessionDetail
       scheduleSessionId={id}
-      coachId={currentUser.id}
-      isAdmin={false}
       basePath="/coach"
     />
   );

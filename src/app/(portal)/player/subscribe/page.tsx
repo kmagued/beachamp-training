@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Alert, Input, Select, Textarea, MultiSelect, Skeleton } from "@/components/ui";
+import { Card, Badge, Button, Alert, Input, Textarea, MultiSelect, Skeleton } from "@/components/ui";
 import { Check, Upload, CreditCard, Tag } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
@@ -48,7 +48,6 @@ function PlayerSubscribeContent() {
   const [activeSubscription, setActiveSubscription] = useState<(Subscription & { packages: Package }) | null>(null);
   const [needsTrainingInfo, setNeedsTrainingInfo] = useState(false);
   const [trainingInfo, setTrainingInfo] = useState({
-    playing_level: "",
     training_goals: "",
     health_conditions: "",
   });
@@ -101,13 +100,13 @@ function PlayerSubscribeContent() {
         // Check if training info is filled
         const { data: profile } = await supabase
           .from("profiles")
-          .select("playing_level, training_goals, health_conditions")
+          .select("training_goals, health_conditions")
           .eq("id", user.id)
           .single();
 
         if (profile) {
-          const p = profile as Pick<Profile, "playing_level" | "training_goals" | "health_conditions">;
-          if (!p.playing_level && !p.training_goals && !p.health_conditions) {
+          const p = profile as Pick<Profile, "training_goals" | "health_conditions">;
+          if (!p.training_goals && !p.health_conditions) {
             setNeedsTrainingInfo(true);
           }
         }
@@ -175,7 +174,6 @@ function PlayerSubscribeContent() {
 
     // Include training info if needed
     if (needsTrainingInfo) {
-      if (trainingInfo.playing_level) formData.set("playing_level", trainingInfo.playing_level);
       if (trainingInfo.training_goals) formData.set("training_goals", trainingInfo.training_goals);
       if (trainingInfo.health_conditions.trim()) formData.set("health_conditions", trainingInfo.health_conditions);
     }
@@ -376,19 +374,7 @@ function PlayerSubscribeContent() {
             <p className="text-xs text-slate-500 mb-4">
               Tell us about your experience so we can personalize your training.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Playing Level</label>
-                <Select
-                  value={trainingInfo.playing_level}
-                  onChange={(e) => setTrainingInfo((prev) => ({ ...prev, playing_level: e.target.value }))}
-                >
-                  <option value="">Select level...</option>
-                  {branding.levels.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Training Goals</label>
                 <MultiSelect
@@ -398,7 +384,7 @@ function PlayerSubscribeContent() {
                   onChange={(value) => setTrainingInfo((prev) => ({ ...prev, training_goals: value }))}
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Health Conditions</label>
                 <Textarea
                   value={trainingInfo.health_conditions}

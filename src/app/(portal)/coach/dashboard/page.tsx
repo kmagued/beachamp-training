@@ -64,7 +64,7 @@ export default async function CoachDashboard() {
     // Recent feedback by this coach
     supabase
       .from("feedback")
-      .select("id, session_date, rating, comment, player_id, profiles!feedback_player_id_fkey(first_name, last_name)")
+      .select("id, created_at, comment, player_id, profiles!feedback_player_id_fkey(first_name, last_name)")
       .eq("coach_id", userId)
       .order("created_at", { ascending: false })
       .limit(5),
@@ -236,21 +236,18 @@ export default async function CoachDashboard() {
               <div className="space-y-2">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {recentFeedback.map((fb: any) => (
-                  <div key={fb.id} className="flex items-center justify-between py-1.5 text-sm">
-                    <div>
+                  <div key={fb.id} className="py-1.5 text-sm">
+                    <div className="flex items-center justify-between">
                       <span className="font-medium text-slate-900">
                         {fb.profiles?.first_name} {fb.profiles?.last_name}
                       </span>
-                      <span className="text-xs text-slate-400 ml-2">{fb.session_date}</span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(fb.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`w-3 h-3 ${s <= fb.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"}`}
-                        />
-                      ))}
-                    </div>
+                    {fb.comment && (
+                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{fb.comment}</p>
+                    )}
                   </div>
                 ))}
               </div>

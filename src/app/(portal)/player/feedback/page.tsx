@@ -2,17 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, EmptyState } from "@/components/ui";
-import { MessageSquare, Star, Users, Calendar } from "lucide-react";
+import { MessageSquare, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 
 interface FeedbackRow {
   id: string;
-  session_date: string;
-  rating: number;
   comment: string | null;
   created_at: string;
   coach: { first_name: string; last_name: string } | null;
-  group: { name: string; level: string } | null;
 }
 
 export default async function PlayerFeedbackPage() {
@@ -24,11 +21,9 @@ export default async function PlayerFeedbackPage() {
 
   const { data: feedback } = (await supabase
     .from("feedback")
-    .select(
-      "*, coach:profiles!feedback_coach_id_fkey(first_name, last_name), group:groups!feedback_group_id_fkey(name, level)",
-    )
+    .select("id, comment, created_at, coach:profiles!feedback_coach_id_fkey(first_name, last_name)")
     .eq("player_id", currentUser.id)
-    .order("session_date", { ascending: false })) as { data: FeedbackRow[] | null };
+    .order("created_at", { ascending: false })) as { data: FeedbackRow[] | null };
 
   const records = feedback || [];
 
@@ -36,7 +31,7 @@ export default async function PlayerFeedbackPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Feedback</h1>
-        <p className="text-slate-500 text-sm">Coach feedback from your training sessions</p>
+        <p className="text-slate-500 text-sm">Feedback from your coaches</p>
       </div>
 
       {records.length > 0 ? (
@@ -55,25 +50,14 @@ export default async function PlayerFeedbackPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mb-2">
                     <span className="inline-flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {formatDate(fb.session_date)}
+                      {formatDate(fb.created_at)}
                     </span>
-                    {fb.group && (
-                      <span className="inline-flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {fb.group.name}
-                        <span className="capitalize">· {fb.group.level}</span>
-                      </span>
-                    )}
                   </div>
-                  <div className="flex gap-0.5 mb-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${i < fb.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"}`}
-                      />
-                    ))}
-                  </div>
-                  {fb.comment && <p className="text-sm text-slate-600 leading-relaxed">{fb.comment}</p>}
+                  {fb.comment && (
+                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      {fb.comment}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
@@ -84,7 +68,7 @@ export default async function PlayerFeedbackPage() {
           <EmptyState
             icon={<MessageSquare className="w-10 h-10" />}
             title="No Feedback Yet"
-            description="Your coaches will leave feedback after your training sessions."
+            description="Your coaches will share feedback with you here."
           />
         </Card>
       )}

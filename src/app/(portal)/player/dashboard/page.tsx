@@ -227,21 +227,9 @@ export default async function PlayerDashboard() {
                     {latestFeedback.coach?.first_name} {latestFeedback.coach?.last_name}
                   </p>
                   <p className="text-[11px] text-primary-700/50">
-                    {formatDate(latestFeedback.session_date)}
+                    {formatDate(latestFeedback.created_at)}
                   </p>
                 </div>
-              </div>
-              <div className="flex gap-0.5 mb-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-4 h-4 ${
-                      i < latestFeedback.rating
-                        ? "text-accent fill-accent"
-                        : "text-primary-200"
-                    }`}
-                  />
-                ))}
               </div>
               {latestFeedback.comment && (
                 <p className="text-sm text-primary-800/80 leading-relaxed">

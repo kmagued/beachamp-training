@@ -8,6 +8,7 @@ import { ProfileCard } from "./_components/profile-cards";
 import { PlayerStats } from "./_components/player-stats";
 import { SubscriptionHistory } from "./_components/subscription-history";
 import { SessionHistory } from "./_components/session-history";
+import { FeedbackHistory } from "./_components/feedback-history";
 import { PlayerActionsMenu } from "./_components/player-actions";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,9 +47,9 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
       .limit(50),
     supabase
       .from("feedback")
-      .select("id, session_date, rating, comment, created_at, profiles!feedback_coach_id_fkey(first_name, last_name)")
+      .select("id, comment, created_at, profiles!feedback_coach_id_fkey(first_name, last_name)")
       .eq("player_id", id)
-      .order("session_date", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(50),
   ]);
 
@@ -67,10 +68,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
     group: a.groups,
     marked_by_profile: a.profiles,
   })) as AttendanceRow[];
-  const feedbackRows = ((feedback || []) as { id: string; session_date: string; rating: number; comment: string | null; created_at: string; profiles: { first_name: string; last_name: string } | null }[]).map((f) => ({
+  const feedbackRows = ((feedback || []) as { id: string; comment: string | null; created_at: string; profiles: { first_name: string; last_name: string } | null }[]).map((f) => ({
     id: f.id,
-    session_date: f.session_date,
-    rating: f.rating,
     comment: f.comment,
     created_at: f.created_at,
     coach: f.profiles,
@@ -99,7 +98,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
       <ProfileCard player={player} />
       <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
       <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />
-      <SessionHistory attendance={attendanceRows} feedback={feedbackRows} />
+      <SessionHistory attendance={attendanceRows} />
+      <FeedbackHistory feedback={feedbackRows} />
     </div>
   );
 }

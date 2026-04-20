@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
-import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, MessageSquare } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
-import { FeedbackTab } from "./FeedbackTab";
 
 interface SessionInfo {
   id: string;
@@ -26,14 +25,11 @@ interface SessionInfo {
 
 interface SessionDetailProps {
   scheduleSessionId: string;
-  coachId: string;
-  isAdmin: boolean;
   basePath: string; // "/admin" or "/coach"
 }
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
-  { key: "feedback", label: "Feedback", icon: MessageSquare },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -55,7 +51,7 @@ function getLevelVariant(level: string): "success" | "warning" | "danger" | "inf
   }
 }
 
-export function SessionDetail({ scheduleSessionId, coachId, isAdmin, basePath }: SessionDetailProps) {
+export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProps) {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
@@ -211,16 +207,6 @@ export function SessionDetail({ scheduleSessionId, coachId, isAdmin, basePath }:
             sessionDate={dateParam}
             startTime={session.start_time}
             endTime={session.end_time}
-          />
-        )}
-
-        {activeTab === "feedback" && (
-          <FeedbackTab
-            scheduleSessionId={session.id}
-            groupId={session.group_id}
-            sessionDate={dateParam}
-            coachId={coachId}
-            isAdmin={isAdmin}
           />
         )}
       </Card>
