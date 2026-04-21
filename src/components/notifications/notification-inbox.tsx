@@ -1,8 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, Badge, EmptyState, Button } from "@/components/ui";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, ChevronRight } from "lucide-react";
 import { markNotificationRead, markAllNotificationsRead } from "@/app/_actions/notifications";
 
 interface NotificationItem {
@@ -41,6 +43,7 @@ function typeBadge(type: string) {
 
 export function NotificationInbox({ notifications }: { notifications: NotificationItem[] }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   function handleMarkRead(id: string) {
@@ -55,6 +58,20 @@ export function NotificationInbox({ notifications }: { notifications: Notificati
       await markAllNotificationsRead();
       window.dispatchEvent(new Event("notifications-updated"));
     });
+  }
+
+  function handleNotificationClick(n: NotificationItem, e: React.MouseEvent) {
+    if (!n.link) return;
+    // Let middle-click / cmd-click open in a new tab; otherwise we handle the nav
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    if (!n.is_read) {
+      // Fire-and-forget so navigation is instant
+      markNotificationRead(n.id).then(() => {
+        window.dispatchEvent(new Event("notifications-updated"));
+      });
+    }
+    router.push(n.link);
   }
 
   return (
@@ -78,11 +95,9 @@ export function NotificationInbox({ notifications }: { notifications: Notificati
         />
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => (
-            <Card
-              key={n.id}
-              className={`p-4 transition-colors ${!n.is_read ? "bg-blue-50/50 border-blue-100" : ""}`}
-            >
+          {notifications.map((n) => {
+            const hasLink = !!n.link;
+            const content = (
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -95,18 +110,41 @@ export function NotificationInbox({ notifications }: { notifications: Notificati
                   <p className="text-sm font-medium text-slate-900">{n.title}</p>
                   {n.body && <p className="text-xs text-slate-500 mt-0.5">{n.body}</p>}
                 </div>
-                {!n.is_read && (
-                  <button
-                    onClick={() => handleMarkRead(n.id)}
-                    disabled={isPending}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 shrink-0 mt-1"
-                  >
-                    Mark read
-                  </button>
-                )}
+                <div className="flex items-center gap-3 shrink-0 mt-1">
+                  {!n.is_read && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarkRead(n.id); }}
+                      disabled={isPending}
+                      className="text-[10px] text-slate-400 hover:text-slate-600"
+                    >
+                      Mark read
+                    </button>
+                  )}
+                  {hasLink && <ChevronRight className="w-4 h-4 text-slate-300" />}
+                </div>
               </div>
-            </Card>
-          ))}
+            );
+
+            const cardClasses = `p-4 transition-colors ${!n.is_read ? "bg-blue-50/50 border-blue-100" : ""} ${hasLink ? "hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer" : ""}`;
+
+            if (hasLink) {
+              return (
+                <Link
+                  key={n.id}
+                  href={n.link!}
+                  onClick={(e) => handleNotificationClick(n, e)}
+                  className="block"
+                >
+                  <Card className={cardClasses}>{content}</Card>
+                </Link>
+              );
+            }
+            return (
+              <Card key={n.id} className={cardClasses}>
+                {content}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
