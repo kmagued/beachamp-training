@@ -10,7 +10,9 @@ import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/ac
 
 interface ScheduleSession {
   id: string;
-  group_id: string;
+  session_type: "group" | "private";
+  group_id: string | null;
+  player_id: string | null;
   start_time: string;
   end_time: string;
   location: string | null;
@@ -20,7 +22,14 @@ interface ScheduleSession {
     id: string;
     name: string;
     level: string;
-  };
+  } | null;
+  private_players: {
+    profiles: {
+      id: string;
+      first_name: string;
+      last_name: string;
+    } | null;
+  }[];
 }
 
 interface GroupPlayer {
@@ -81,17 +90,21 @@ export function AttendanceTab({ date }: { date: string }) {
       // Get day of week (0=Sunday, 6=Saturday)
       const dayOfWeek = new Date(date + "T00:00:00").getDay();
 
-      // Fetch schedule sessions for this day
+      // Fetch schedule sessions for this day (group + private)
       const { data: scheduleSessions } = await supabase
         .from("schedule_sessions")
-        .select("id, group_id, start_time, end_time, location, end_date, created_at, groups(id, name, level)")
+        .select("id, session_type, group_id, player_id, start_time, end_time, location, end_date, created_at, groups(id, name, level), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(id, first_name, last_name))")
         .eq("day_of_week", dayOfWeek)
         .eq("is_active", true)
         .order("start_time");
 
-      // Filter out sessions that have ended before the selected date, or were created after it
+      // Filter out sessions that have ended before the selected date, or were created after it.
+      // Private sessions are one-off: only include when end_date matches the selected date.
       const sessionsData = ((scheduleSessions || []) as unknown as ScheduleSession[]).filter(
         (s) => {
+          if (s.session_type === "private") {
+            return s.end_date === date;
+          }
           if (s.end_date && s.end_date < date) return false;
           const createdDate = s.created_at.slice(0, 10);
           if (createdDate > date) return false;
@@ -106,14 +119,18 @@ export function AttendanceTab({ date }: { date: string }) {
       }
 
       // Fetch group players + existing attendance in parallel (both depend only on step 1)
-      const groupIds = [...new Set(sessionsData.map((s) => s.group_id))];
+      const groupIds = [...new Set(
+        sessionsData.filter((s) => s.group_id).map((s) => s.group_id as string)
+      )];
       const sessionIds = sessionsData.map((s) => s.id);
       const [{ data: allGroupPlayers }, { data: existingAttPrefetch }] = await Promise.all([
-        supabase
-          .from("group_players")
-          .select("player_id, group_id, profiles!group_players_player_id_fkey(id, first_name, last_name)")
-          .in("group_id", groupIds)
-          .eq("is_active", true),
+        groupIds.length > 0
+          ? supabase
+              .from("group_players")
+              .select("player_id, group_id, profiles!group_players_player_id_fkey(id, first_name, last_name)")
+              .in("group_id", groupIds)
+              .eq("is_active", true)
+          : Promise.resolve({ data: [] as unknown[] }),
         supabase
           .from("attendance")
           .select("player_id, status, schedule_session_id")
@@ -121,6 +138,9 @@ export function AttendanceTab({ date }: { date: string }) {
           .in("schedule_session_id", sessionIds),
       ]);
 
+      // Build a per-session player list. For group sessions: all active group_players.
+      // For private sessions: just the one player attached to the session.
+      const playersBySession: Record<string, GroupPlayer[]> = {};
       const playersByGroup: Record<string, GroupPlayer[]> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (allGroupPlayers || []).forEach((gp: any) => {
@@ -131,10 +151,35 @@ export function AttendanceTab({ date }: { date: string }) {
           profiles: gp.profiles,
         });
       });
-      setSessionPlayers(playersByGroup);
+      for (const s of sessionsData) {
+        if (s.session_type === "private") {
+          const rows = (s.private_players || [])
+            .map((pp) => pp.profiles)
+            .filter((pr): pr is { id: string; first_name: string; last_name: string } => Boolean(pr))
+            .map((pr) => ({
+              player_id: pr.id,
+              profiles: { id: pr.id, first_name: pr.first_name, last_name: pr.last_name },
+            }));
+          playersBySession[s.id] = rows;
+        } else if (s.group_id) {
+          playersBySession[s.id] = playersByGroup[s.group_id] || [];
+        } else {
+          playersBySession[s.id] = [];
+        }
+      }
+      setSessionPlayers(playersBySession);
 
       // Fetch active/pending subscriptions for all players with package info
-      const allPlayerIds = [...new Set((allGroupPlayers || []).map((gp: { player_id: string }) => gp.player_id))];
+      const privatePlayerIds = sessionsData
+        .filter((s) => s.session_type === "private")
+        .flatMap((s) => (s.private_players || [])
+          .map((pp) => pp.profiles?.id)
+          .filter((id): id is string => Boolean(id))
+        );
+      const allPlayerIds = [...new Set([
+        ...((allGroupPlayers || []) as { player_id: string }[]).map((gp) => gp.player_id),
+        ...privatePlayerIds,
+      ])];
       if (allPlayerIds.length > 0) {
         const { data: subs } = await supabase
           .from("subscriptions")
@@ -207,8 +252,8 @@ export function AttendanceTab({ date }: { date: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  function markAll(sessionId: string, groupId: string, status: "present" | "absent") {
-    const players = sessionPlayers[groupId] || [];
+  function markAll(sessionId: string, _groupId: string | null, status: "present" | "absent") {
+    const players = sessionPlayers[sessionId] || [];
     setAttendanceState((prev) => {
       const sessionState: SessionAttendanceState = {};
       players.forEach((p) => { sessionState[p.player_id] = status; });
@@ -224,7 +269,7 @@ export function AttendanceTab({ date }: { date: string }) {
   function getZeroBalancePresentPlayers(session: ScheduleSession) {
     const state = attendanceState[session.id] || {};
     const saved = savedAttendanceState[session.id] || {};
-    const players = sessionPlayers[session.group_id] || [];
+    const players = sessionPlayers[session.id] || [];
 
     return players.filter((gp) => {
       const status = state[gp.player_id];
@@ -240,7 +285,7 @@ export function AttendanceTab({ date }: { date: string }) {
   function getMultiSubPresentPlayers(session: ScheduleSession) {
     const state = attendanceState[session.id] || {};
     const saved = savedAttendanceState[session.id] || {};
-    const players = sessionPlayers[session.group_id] || [];
+    const players = sessionPlayers[session.id] || [];
 
     return players.filter((gp) => {
       const status = state[gp.player_id];
@@ -482,7 +527,7 @@ export function AttendanceTab({ date }: { date: string }) {
         onClose={() => setToast(null)}
       />
       {sessions.map((session) => {
-        const players = sessionPlayers[session.group_id] || [];
+        const players = sessionPlayers[session.id] || [];
         const state = attendanceState[session.id] || {};
         const loggedCount = Object.values(state).filter((s) => s !== undefined).length;
         const presentCount = Object.values(state).filter((s) => s === "present").length;
@@ -537,9 +582,20 @@ export function AttendanceTab({ date }: { date: string }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-semibold text-slate-900">
-                        {session.groups.name}
+                        {session.session_type === "private"
+                          ? (() => {
+                              const names = (session.private_players || [])
+                                .map((pp) => pp.profiles)
+                                .filter((p): p is { id: string; first_name: string; last_name: string } => Boolean(p));
+                              if (names.length === 0) return "Private";
+                              if (names.length === 1) return `${names[0].first_name} ${names[0].last_name}`;
+                              return `${names[0].first_name} ${names[0].last_name} +${names.length - 1}`;
+                            })()
+                          : session.groups?.name}
                       </h3>
-                      <Badge variant="neutral">{session.groups.level}</Badge>
+                      <Badge variant={session.session_type === "private" ? "info" : "neutral"}>
+                        {session.session_type === "private" ? "private" : session.groups?.level}
+                      </Badge>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}

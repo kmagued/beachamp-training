@@ -422,10 +422,6 @@ export default async function LandingPage() {
             ) => {
               const isPopular =
                 variant === "group" && pkg.session_count === 12;
-              const perSession =
-                pkg.session_count > 0
-                  ? Math.round(pkg.price / pkg.session_count)
-                  : 0;
               const isPrivateCard = variant === "private";
               return (
                 <div
@@ -493,16 +489,6 @@ export default async function LandingPage() {
                       EGP
                     </span>
                   </div>
-                  {pkg.session_count > 1 && (
-                    <div
-                      className={cn(
-                        "mt-1 text-xs font-semibold",
-                        isPrivateCard ? "text-accent" : "text-secondary-dark"
-                      )}
-                    >
-                      {perSession} EGP / session
-                    </div>
-                  )}
                   {pkg.validity_days > 1 && (
                     <div
                       className={cn(

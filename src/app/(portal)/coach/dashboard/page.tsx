@@ -32,6 +32,8 @@ export default async function CoachDashboard() {
   const supabase = (await createClient()) as any;
   const userId = currentUser.id;
   const todayDow = new Date().getDay();
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   // Parallel queries
   const [
@@ -40,10 +42,10 @@ export default async function CoachDashboard() {
     { data: recentAttendance },
     { data: recentFeedback },
   ] = await Promise.all([
-    // Today's sessions for this coach
+    // Today's sessions for this coach (group + private)
     supabase
       .from("schedule_sessions")
-      .select("id, group_id, start_time, end_time, location, day_of_week, groups(id, name, level)")
+      .select("id, session_type, group_id, player_id, start_time, end_time, location, day_of_week, end_date, groups(id, name, level), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(first_name, last_name))")
       .eq("coach_id", userId)
       .eq("day_of_week", todayDow)
       .eq("is_active", true)
@@ -70,19 +72,36 @@ export default async function CoachDashboard() {
       .limit(5),
   ]);
 
-  // Compute stats
-  const todaySessionCount = todaySessions?.length || 0;
+  // Filter out private sessions that aren't for today's exact date
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filteredTodaySessions = (todaySessions || []).filter((s: any) => {
+    if (s.session_type === "private") return s.end_date === todayStr;
+    if (s.end_date && s.end_date < todayStr) return false;
+    return true;
+  });
 
-  // Get player counts for today's groups
+  // Compute stats
+  const todaySessionCount = filteredTodaySessions.length;
+
+  // Get player counts for today's groups (+ 1 for each private session)
   let todayPlayerCount = 0;
-  if (todaySessions && todaySessions.length > 0) {
-    const groupIds = todaySessions.map((s: { group_id: string }) => s.group_id);
-    const { count } = await supabase
-      .from("group_players")
-      .select("*", { count: "exact", head: true })
-      .in("group_id", groupIds)
-      .eq("is_active", true);
-    todayPlayerCount = count || 0;
+  if (filteredTodaySessions.length > 0) {
+    const groupIds = (filteredTodaySessions as { group_id: string | null; session_type?: string }[])
+      .filter((s) => s.group_id)
+      .map((s) => s.group_id as string);
+    if (groupIds.length > 0) {
+      const { count } = await supabase
+        .from("group_players")
+        .select("*", { count: "exact", head: true })
+        .in("group_id", groupIds)
+        .eq("is_active", true);
+      todayPlayerCount = count || 0;
+    }
+    for (const s of filteredTodaySessions as { session_type?: string; private_players?: unknown[] }[]) {
+      if (s.session_type === "private") {
+        todayPlayerCount += (s.private_players || []).length;
+      }
+    }
   }
 
   // Aggregate recent attendance into session summaries
@@ -157,10 +176,10 @@ export default async function CoachDashboard() {
             </Link>
           </div>
 
-          {todaySessions && todaySessions.length > 0 ? (
+          {filteredTodaySessions.length > 0 ? (
             <div className="space-y-3">
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {todaySessions.map((session: any) => (
+              {filteredTodaySessions.map((session: any) => (
                 <Link
                   key={session.id}
                   href={`/coach/sessions/${session.id}?date=${new Date().toISOString().split("T")[0]}`}
@@ -169,10 +188,21 @@ export default async function CoachDashboard() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-slate-900">
-                        {session.groups?.name}
+                        {session.session_type === "private"
+                          ? (() => {
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              const names = (session.private_players || [])
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                .map((pp: any) => pp.profiles)
+                                .filter(Boolean);
+                              if (names.length === 0) return "Private";
+                              if (names.length === 1) return `${names[0].first_name} ${names[0].last_name}`;
+                              return `${names.length} players`;
+                            })()
+                          : session.groups?.name}
                       </p>
-                      <Badge variant={getLevelVariant(session.groups?.level || "mixed")}>
-                        {session.groups?.level}
+                      <Badge variant={session.session_type === "private" ? "info" : getLevelVariant(session.groups?.level || "mixed")}>
+                        {session.session_type === "private" ? "private" : session.groups?.level}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">

@@ -9,11 +9,20 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
 
+interface PrivatePlayer {
+  id: string;
+  first_name: string;
+  last_name: string;
+  avatar_url: string | null;
+}
+
 interface SessionInfo {
   id: string;
-  group_id: string;
+  session_type: "group" | "private";
+  group_id: string | null;
   group_name: string;
   group_level: string;
+  private_players: PrivatePlayer[];
   coach_id: string | null;
   coach_name: string | null;
   day_of_week: number;
@@ -47,6 +56,7 @@ function getLevelVariant(level: string): "success" | "warning" | "danger" | "inf
     case "beginner": return "success";
     case "intermediate": return "warning";
     case "advanced": return "danger";
+    case "private": return "info";
     default: return "info";
   }
 }
@@ -78,7 +88,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
     async function load() {
       const { data } = await supabase
         .from("schedule_sessions")
-        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+        .select("id, session_type, group_id, player_id, coach_id, day_of_week, start_time, end_time, location, groups(id, name, level), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(id, first_name, last_name, avatar_url)), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
         .eq("id", scheduleSessionId)
         .single();
 
@@ -89,26 +99,47 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = data as any;
+      const isPrivate = d.session_type === "private";
+      const privatePlayers: PrivatePlayer[] = isPrivate
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? (d.private_players || [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((pp: any) => pp.profiles)
+            .filter(Boolean)
+        : [];
 
-      // Get player count
-      const { count } = await supabase
-        .from("group_players")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", d.group_id)
-        .eq("is_active", true);
+      let count = 0;
+      if (!isPrivate && d.group_id) {
+        const { count: c } = await supabase
+          .from("group_players")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", d.group_id)
+          .eq("is_active", true);
+        count = c || 0;
+      } else if (isPrivate) {
+        count = privatePlayers.length;
+      }
+
+      const privateDisplay = privatePlayers.length === 0
+        ? "Private Session"
+        : privatePlayers.length === 1
+          ? `${privatePlayers[0].first_name} ${privatePlayers[0].last_name}`
+          : `${privatePlayers.length} Players`;
 
       setSession({
         id: d.id,
+        session_type: (d.session_type || "group") as "group" | "private",
         group_id: d.group_id,
-        group_name: d.groups?.name || "Unknown",
-        group_level: d.groups?.level || "mixed",
+        group_name: isPrivate ? privateDisplay : (d.groups?.name || "Unknown"),
+        group_level: isPrivate ? "private" : (d.groups?.level || "mixed"),
+        private_players: privatePlayers,
         coach_id: d.coach_id,
         coach_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : null,
         day_of_week: d.day_of_week,
         start_time: d.start_time,
         end_time: d.end_time,
         location: d.location,
-        player_count: count || 0,
+        player_count: count,
       });
       setLoading(false);
     }
@@ -207,6 +238,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
             sessionDate={dateParam}
             startTime={session.start_time}
             endTime={session.end_time}
+            privatePlayers={session.session_type === "private" ? session.private_players : null}
           />
         )}
       </Card>

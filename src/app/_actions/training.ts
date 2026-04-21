@@ -553,7 +553,7 @@ export async function cancelScheduleSessionDate(scheduleSessionId: string, date:
 // ═══════════════════════════════════════
 
 export async function submitAttendance(data: {
-  group_id: string;
+  group_id: string | null;
   schedule_session_id: string;
   session_date: string;
   records: { player_id: string; status: "present" | "absent" | "excused"; notes?: string; subscription_id?: string }[];
@@ -623,7 +623,7 @@ export async function submitAttendance(data: {
 }
 
 export async function removeAttendanceRecords(data: {
-  group_id: string;
+  group_id: string | null;
   schedule_session_id: string;
   session_date: string;
   player_ids: string[];
@@ -637,14 +637,19 @@ export async function removeAttendanceRecords(data: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Find existing attendance records for these players
-  const { data: existing, error: fetchErr } = await admin
+  // Find existing attendance records for these players (match via schedule_session_id)
+  let existingQuery = admin
     .from("attendance")
     .select("id, player_id, status")
-    .eq("group_id", data.group_id)
     .eq("schedule_session_id", data.schedule_session_id)
     .eq("session_date", data.session_date)
     .in("player_id", data.player_ids);
+  if (data.group_id) {
+    existingQuery = existingQuery.eq("group_id", data.group_id);
+  } else {
+    existingQuery = existingQuery.is("group_id", null);
+  }
+  const { data: existing, error: fetchErr } = await existingQuery;
 
   if (fetchErr) return { error: fetchErr.message };
   if (!existing || existing.length === 0) return { success: true };

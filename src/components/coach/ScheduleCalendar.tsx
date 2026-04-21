@@ -14,9 +14,11 @@ const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface ScheduleBlock {
   id: string;
-  group_id: string;
+  session_type: "group" | "private";
+  group_id: string | null;
   group_name: string;
   group_level: string;
+  player_id: string | null;
   coach_id: string | null;
   coach_name: string | null;
   day_of_week: number;
@@ -49,6 +51,7 @@ function getLevelColor(level: string) {
     case "beginner": return "border-l-emerald-500 bg-emerald-50";
     case "intermediate": return "border-l-amber-500 bg-amber-50";
     case "advanced": return "border-l-red-500 bg-red-50";
+    case "private": return "border-l-purple-500 bg-purple-50";
     default: return "border-l-blue-500 bg-blue-50";
   }
 }
@@ -152,11 +155,11 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
 
       let query = supabase
         .from("schedule_sessions")
-        .select("id, group_id, coach_id, day_of_week, start_time, end_time, location, end_date, created_at, groups(id, name, level), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+        .select("id, session_type, group_id, player_id, coach_id, day_of_week, start_time, end_time, location, end_date, created_at, groups(id, name, level), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(first_name, last_name)), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
         .eq("is_active", true);
 
       if (!showAll) {
-        // Get groups assigned to this coach
+        // Coach view: their assigned groups' sessions + any private sessions assigned to them
         const { data: coachGroups } = await supabase
           .from("coach_groups")
           .select("group_id")
@@ -164,12 +167,10 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           .eq("is_active", true);
 
         const groupIds = (coachGroups || []).map((cg: { group_id: string }) => cg.group_id);
-        if (groupIds.length === 0) {
-          setSessions([]);
-          setLoading(false);
-          return;
-        }
-        query = query.in("group_id", groupIds);
+        const groupFilter = groupIds.length > 0 ? `group_id.in.(${groupIds.join(",")})` : null;
+        const privateFilter = `and(session_type.eq.private,coach_id.eq.${coachId})`;
+        const orClause = groupFilter ? `${groupFilter},${privateFilter}` : privateFilter;
+        query = query.or(orClause);
       }
 
       const { data } = await query.order("start_time");
@@ -179,8 +180,12 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         return;
       }
 
-      // Get player counts per group — single batched query
-      const groupIds = [...new Set(data.map((s: { group_id: string }) => s.group_id))] as string[];
+      // Player counts per group (only for group sessions)
+      const groupIds = [...new Set(
+        data
+          .filter((s: { group_id: string | null }) => s.group_id)
+          .map((s: { group_id: string }) => s.group_id)
+      )] as string[];
       const playerCounts = new Map<string, number>();
 
       if (groupIds.length > 0) {
@@ -232,12 +237,28 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         // Find the date for this session in the current week
         const dayDate = weekDates.find((d) => d.getDay() === s.day_of_week);
         const dateStr = dayDate ? formatLocalDate(dayDate) : "";
+        const isPrivate = s.session_type === "private";
+        const privatePlayers: { first_name: string; last_name: string }[] =
+          (s.private_players || [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((pp: any) => pp.profiles)
+            .filter(Boolean);
+        const privateCount = privatePlayers.length;
+        const displayName = isPrivate
+          ? (privateCount === 0
+              ? "Private"
+              : privateCount === 1
+                ? `${privatePlayers[0].first_name} ${privatePlayers[0].last_name}`
+                : `${privatePlayers[0].first_name} ${privatePlayers[0].last_name} +${privateCount - 1}`)
+          : (s.groups?.name || "Unknown");
 
         return {
           id: s.id,
+          session_type: (s.session_type || "group") as "group" | "private",
           group_id: s.group_id,
-          group_name: s.groups?.name || "Unknown",
-          group_level: s.groups?.level || "mixed",
+          group_name: displayName,
+          group_level: isPrivate ? "private" : (s.groups?.level || "mixed"),
+          player_id: s.player_id,
           coach_id: s.coach_id,
           coach_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : null,
           day_of_week: s.day_of_week,
@@ -246,7 +267,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
           location: s.location,
           end_date: s.end_date,
           created_at: s.created_at,
-          player_count: playerCounts.get(s.group_id) || 0,
+          player_count: isPrivate ? privateCount : (playerCounts.get(s.group_id) || 0),
           has_attendance: attendanceSet.has(`${s.id}_${dateStr}`),
           is_cancelled: cancellationSet.has(`${s.id}_${dateStr}`),
         };
@@ -329,18 +350,24 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   for (const s of sessions) {
     // Find the actual date for this day_of_week in the current week view
     const dayDate = weekDates.find((d) => d.getDay() === s.day_of_week);
-    if (dayDate && s.end_date) {
-      const endDate = new Date(s.end_date + "T23:59:59");
-      if (dayDate > endDate) continue; // skip expired sessions
+    // Private sessions are one-off: only show on the exact end_date
+    if (s.session_type === "private") {
+      if (!dayDate || !s.end_date) continue;
+      if (formatLocalDate(dayDate) !== s.end_date) continue;
+    } else {
+      if (dayDate && s.end_date) {
+        const endDate = new Date(s.end_date + "T23:59:59");
+        if (dayDate > endDate) continue; // skip expired sessions
+      }
+      // Skip sessions for dates before the session was created
+      if (dayDate && s.created_at) {
+        const createdDate = new Date(s.created_at);
+        createdDate.setHours(0, 0, 0, 0);
+        if (dayDate < createdDate) continue;
+      }
     }
     // Skip cancelled sessions for this specific date
     if (s.is_cancelled) continue;
-    // Skip sessions for dates before the session was created
-    if (dayDate && s.created_at) {
-      const createdDate = new Date(s.created_at);
-      createdDate.setHours(0, 0, 0, 0);
-      if (dayDate < createdDate) continue;
-    }
     const existing = sessionsByDay.get(s.day_of_week) || [];
     existing.push(s);
     existing.sort((a, b) => a.start_time.localeCompare(b.start_time));

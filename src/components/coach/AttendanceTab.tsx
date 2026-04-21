@@ -48,11 +48,17 @@ interface AttendanceRecord {
 
 interface AttendanceTabProps {
   scheduleSessionId: string;
-  groupId: string;
+  groupId: string | null;
   groupName: string;
   sessionDate: string;
   startTime: string;
   endTime: string;
+  privatePlayers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    avatar_url: string | null;
+  }[] | null;
 }
 
 function formatTime(time: string) {
@@ -70,6 +76,7 @@ export function AttendanceTab({
   sessionDate,
   startTime,
   endTime,
+  privatePlayers = null,
 }: AttendanceTabProps) {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [records, setRecords] = useState<Map<string, AttendanceRecord>>(new Map());
@@ -96,16 +103,30 @@ export function AttendanceTab({
       setLoadingPlayers(true);
       setResult(null);
 
-      // Get active players in the group
-      const { data: groupPlayers } = await supabase
-        .from("group_players")
-        .select("player_id, profiles!group_players_player_id_fkey(id, first_name, last_name, avatar_url)")
-        .eq("group_id", groupId)
-        .eq("is_active", true);
-
-      if (!groupPlayers) {
-        setLoadingPlayers(false);
-        return;
+      // Get the player list for this session (group players OR the private players)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let groupPlayers: any[] = [];
+      if (privatePlayers && privatePlayers.length > 0) {
+        groupPlayers = privatePlayers.map((p) => ({
+          player_id: p.id,
+          profiles: {
+            id: p.id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            avatar_url: p.avatar_url,
+          },
+        }));
+      } else if (groupId) {
+        const { data } = await supabase
+          .from("group_players")
+          .select("player_id, profiles!group_players_player_id_fkey(id, first_name, last_name, avatar_url)")
+          .eq("group_id", groupId)
+          .eq("is_active", true);
+        if (!data) {
+          setLoadingPlayers(false);
+          return;
+        }
+        groupPlayers = data;
       }
 
       // Get subscriptions for these players
@@ -141,12 +162,13 @@ export function AttendanceTab({
       }
 
       // Check for existing attendance on this date + session
-      const { data: existingAtt } = await supabase
+      let existingAttQuery = supabase
         .from("attendance")
         .select("player_id, status")
-        .eq("group_id", groupId)
         .eq("session_date", sessionDate)
         .eq("schedule_session_id", scheduleSessionId);
+      if (groupId) existingAttQuery = existingAttQuery.eq("group_id", groupId);
+      const { data: existingAtt } = await existingAttQuery;
 
       const existingMap = new Map<string, string>();
       if (existingAtt) {
@@ -201,7 +223,7 @@ export function AttendanceTab({
 
     loadPlayers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, sessionDate, scheduleSessionId]);
+  }, [groupId, sessionDate, scheduleSessionId, privatePlayers]);
 
   function setPlayerStatus(playerId: string, status: AttendanceStatus) {
     setRecords((prev) => {

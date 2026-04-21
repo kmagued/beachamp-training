@@ -396,7 +396,9 @@ export interface Database {
       schedule_sessions: {
         Row: {
           id: string;
-          group_id: string;
+          session_type: "group" | "private";
+          group_id: string | null;
+          player_id: string | null;
           coach_id: string | null;
           day_of_week: number;
           start_time: string;
@@ -409,7 +411,9 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          group_id: string;
+          session_type?: "group" | "private";
+          group_id?: string | null;
+          player_id?: string | null;
           coach_id?: string | null;
           day_of_week: number;
           start_time: string;
@@ -422,7 +426,9 @@ export interface Database {
         };
         Update: {
           id?: string;
-          group_id?: string;
+          session_type?: "group" | "private";
+          group_id?: string | null;
+          player_id?: string | null;
           coach_id?: string | null;
           day_of_week?: number;
           start_time?: string;
@@ -432,6 +438,27 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      schedule_session_players: {
+        Row: {
+          id: string;
+          schedule_session_id: string;
+          player_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          schedule_session_id: string;
+          player_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          schedule_session_id?: string;
+          player_id?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -563,6 +590,7 @@ export interface Database {
           admin_notes: string | null;
           confirmed_by: string | null;
           confirmed_at: string | null;
+          schedule_session_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -579,6 +607,7 @@ export interface Database {
           admin_notes?: string | null;
           confirmed_by?: string | null;
           confirmed_at?: string | null;
+          schedule_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -595,6 +624,7 @@ export interface Database {
           admin_notes?: string | null;
           confirmed_by?: string | null;
           confirmed_at?: string | null;
+          schedule_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

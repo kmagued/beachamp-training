@@ -19,6 +19,8 @@ export default async function AdminDashboard() {
 
   // Stats queries in parallel
   const todayDow = new Date().getDay();
+  const _now = new Date();
+  const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
 
   const currentMonthKey = cairoMonthKey(new Date()); // "YYYY-MM" in Africa/Cairo
 
@@ -49,7 +51,8 @@ export default async function AdminDashboard() {
       .from("schedule_sessions")
       .select("*", { count: "exact", head: true })
       .eq("day_of_week", todayDow)
-      .eq("is_active", true),
+      .eq("is_active", true)
+      .or(`session_type.eq.group,end_date.eq.${todayStr}`),
     supabase
       .from("payments")
       .select("amount, confirmed_at")
