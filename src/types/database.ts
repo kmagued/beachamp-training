@@ -366,6 +366,63 @@ export interface Database {
         };
         Relationships: [];
       };
+      coach_feedback: {
+        Row: {
+          id: string;
+          player_id: string;
+          coach_id: string;
+          rating: number | null;
+          comment: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          coach_id: string;
+          rating?: number | null;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          coach_id?: string;
+          rating?: number | null;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      schedule_photos: {
+        Row: {
+          id: string;
+          group_id: string;
+          storage_path: string;
+          caption: string | null;
+          sort_order: number;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          storage_path: string;
+          caption?: string | null;
+          sort_order?: number;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          storage_path?: string;
+          caption?: string | null;
+          sort_order?: number;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       coach_groups: {
         Row: {
           id: string;
@@ -769,6 +826,8 @@ export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type GroupPlayer = Database["public"]["Tables"]["group_players"]["Row"];
 export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
+export type CoachFeedback = Database["public"]["Tables"]["coach_feedback"]["Row"];
+export type SchedulePhoto = Database["public"]["Tables"]["schedule_photos"]["Row"];
 export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
 export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
 export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]["Row"];

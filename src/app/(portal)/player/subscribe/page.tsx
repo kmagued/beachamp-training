@@ -431,19 +431,9 @@ function PlayerSubscribeContent() {
           {/* Instapay account info */}
           {selectedMethod === "instapay" && (
             <Card className="mb-8 bg-primary-50/50 border-primary-200">
-              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
+              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to this Instapay address:</p>
               <p className="text-base font-bold text-primary select-all">ahmed1.fahmy1@instapay</p>
-              <a
-                href="https://ipn.eg/S/ahmed1.fahmy1/instapay/7jMlOQ"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
-              >
-                Open Instapay Link
-                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
-                </svg>
-              </a>
+              <p className="text-xs text-slate-500 mt-2">Open your Instapay app, choose &quot;Send&quot;, paste this address, and complete the transfer.</p>
             </Card>
           )}
 

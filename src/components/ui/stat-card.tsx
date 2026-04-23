@@ -16,11 +16,11 @@ interface StatCardProps {
 export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800", icon, className, href }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-center gap-3 sm:gap-4 h-full">
+      <div className="flex items-center gap-2.5 sm:gap-4 h-full">
         {icon && (
           <div
             className={cn(
-              "shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white",
+              "shrink-0 w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white",
               accentColor
             )}
           >
@@ -28,14 +28,14 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider truncate">
+          <p className="text-[10px] sm:text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider leading-tight line-clamp-2">
             {label}
           </p>
-          <p className="text-sm sm:text-xl font-bold text-primary-900 mt-0.5 capitalize truncate">
+          <p className="text-base sm:text-xl font-bold text-primary-900 mt-0.5 capitalize break-words">
             {value}
           </p>
           {subtitle && (
-            <p className="text-[11px] text-primary-700/50 mt-0.5 truncate">{subtitle}</p>
+            <p className="text-[11px] text-primary-700/50 mt-0.5 break-words">{subtitle}</p>
           )}
         </div>
         {href && (

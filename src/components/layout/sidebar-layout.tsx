@@ -28,6 +28,7 @@ import {
   UserCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  ImageIcon,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -58,6 +59,7 @@ const iconMap = {
   "promo-codes": Ticket,
   "daily-report": ClipboardList,
   "private-sessions": UserCheck,
+  "schedule-photos": ImageIcon,
 } as const;
 
 type NavItem = { key: string; label: string; href: string; section?: string };
@@ -75,6 +77,7 @@ const coachNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
   { key: "schedule", label: "Schedule", href: "/coach/schedule" },
   { key: "my-groups", label: "My Groups", href: "/coach/groups" },
+  { key: "feedback", label: "Feedback", href: "/coach/feedback" },
 ];
 
 const adminNav: NavItem[] = [
@@ -87,6 +90,7 @@ const adminNav: NavItem[] = [
   { key: "packages", label: "Packages", href: "/admin/packages", section: "Finance" },
   { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes", section: "Finance" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
+  { key: "schedule-photos", label: "Schedule Photos", href: "/admin/schedule-photos", section: "Training" },
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
@@ -222,18 +226,25 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       {/* Top navbar */}
       <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-14 transition-[left] duration-200">
         <div className="flex items-center justify-between h-full px-4">
-          {/* Left: brand on mobile */}
-          <div className="flex items-center gap-3 md:hidden">
+          {/* Left: hamburger on mobile + logo */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="text-primary-800 p-1 -ml-1"
+              className="md:hidden text-primary-800 p-1 -ml-1"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
+            <Link href="/" aria-label={branding.name} className="flex items-center">
+              <Image
+                src="/images/logo.png"
+                alt={branding.name}
+                width={120}
+                height={40}
+                priority
+                className="h-9 w-auto object-contain"
+              />
+            </Link>
           </div>
-
-          {/* Spacer on desktop */}
-          <div className="hidden md:block" />
 
           {/* Right: notifications + user */}
           <div className="flex items-center gap-2">

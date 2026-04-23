@@ -5,6 +5,7 @@ import { branding } from "@/lib/config/branding";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import type { Package } from "@/types/database";
+import { TrainingGroupCarousel } from "./_components/training-groups-carousel";
 
 const programs = [
   {
@@ -96,6 +97,41 @@ export default async function LandingPage() {
     validity_days: p.validity_days,
     price: p.price,
   }));
+
+  const { data: scheduleRows } = await supabase
+    .from("schedule_sessions")
+    .select("group_id")
+    .eq("is_active", true);
+  const groupIdsWithSchedule = Array.from(
+    new Set<string>((scheduleRows || []).map((r: { group_id: string }) => r.group_id)),
+  );
+
+  interface PhotoRow {
+    id: string;
+    group_id: string;
+    storage_path: string;
+    caption: string | null;
+    sort_order: number;
+    groups: { id: string; name: string; level: string | null } | null;
+  }
+
+  const { data: photoRows } = groupIdsWithSchedule.length > 0
+    ? ((await supabase
+        .from("schedule_photos")
+        .select("id, group_id, storage_path, caption, sort_order, groups(id, name, level)")
+        .in("group_id", groupIdsWithSchedule)
+        .order("sort_order", { ascending: true })) as { data: PhotoRow[] | null })
+    : { data: [] as PhotoRow[] };
+
+  const photosByGroupMap = new Map<string, { name: string; level: string | null; items: { id: string; url: string; caption: string | null }[] }>();
+  for (const p of photoRows || []) {
+    if (!p.groups) continue;
+    const url = supabase.storage.from("schedule-photos").getPublicUrl(p.storage_path).data.publicUrl as string;
+    const entry = photosByGroupMap.get(p.group_id) || { name: p.groups.name, level: p.groups.level, items: [] };
+    entry.items.push({ id: p.id, url, caption: p.caption });
+    photosByGroupMap.set(p.group_id, entry);
+  }
+  const groupedPhotos = Array.from(photosByGroupMap.values()).filter((g) => g.items.length > 0);
 
   return (
     <div className="min-h-screen bg-white text-primary-900">
@@ -317,6 +353,53 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Training Groups Gallery ── */}
+      {groupedPhotos.length > 0 && (
+        <section id="groups" className="scroll-mt-20 relative overflow-hidden bg-gradient-to-b from-white via-sand/10 to-white">
+          <div
+            aria-hidden
+            className="absolute -top-32 -right-32 w-[420px] h-[420px] rounded-full bg-accent/10 blur-3xl pointer-events-none"
+          />
+          <div
+            aria-hidden
+            className="absolute -bottom-32 -left-32 w-[380px] h-[380px] rounded-full bg-secondary/10 blur-3xl pointer-events-none"
+          />
+
+          <div className="relative max-w-6xl mx-auto px-6 py-20 sm:py-24">
+            <div className="max-w-2xl mb-14 text-center mx-auto">
+              <span className="inline-flex items-center gap-2 bg-white/80 backdrop-blur border border-primary-100 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                In action
+              </span>
+              <h2 className="font-display mt-5 text-4xl sm:text-5xl tracking-tight text-primary-900">
+                Our training groups
+              </h2>
+              <p className="mt-4 text-primary-700/70 leading-relaxed">
+                A look inside our active groups. See the drills, the energy, and the community before you join.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+              {groupedPhotos.map((g) => (
+                <div key={g.name} className="flex flex-col">
+                  <div className="mb-4 text-center">
+                    {g.level && (
+                      <span className="inline-flex text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-600 mb-1">
+                        {g.level}
+                      </span>
+                    )}
+                    <h3 className="font-display text-xl sm:text-2xl tracking-wide text-primary-900">
+                      {g.name}
+                    </h3>
+                  </div>
+                  <TrainingGroupCarousel groupName={g.name} photos={g.items} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Levels ── */}
       <section className="bg-sand/30">
