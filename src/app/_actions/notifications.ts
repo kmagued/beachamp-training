@@ -3,10 +3,23 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { revalidatePath } from "next/cache";
+import { sendEmail } from "@/lib/email/send";
 import type { NotificationType } from "@/types/database";
 
-// Email delivery is wired from a DB trigger (trg_notification_email) so every
-// notification — whether inserted from JS or from a DB trigger — emails too.
+// JS-side helpers always send the email directly so admins receive mail
+// without depending on the optional DB webhook trigger setup. DB-triggered
+// notifications (subscription expiring, etc.) still go through trg_notification_email.
+
+async function emailUser(userId: string, title: string, body: string | null) {
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .single();
+  if (!profile?.email) return;
+  await sendEmail({ to: profile.email, subject: title, body: body || title });
+}
 
 /** Create a notification for a specific user. */
 export async function createNotification(data: {
@@ -27,6 +40,11 @@ export async function createNotification(data: {
   });
   if (error) return { error: error.message };
 
+  // Fire-and-forget email so the action stays responsive
+  emailUser(data.user_id, data.title, data.body || null).catch((err) =>
+    console.error("[notifications] email send failed:", err),
+  );
+
   return { success: true };
 }
 
@@ -40,7 +58,7 @@ export async function notifyAdmins(data: {
   const admin = createAdminClient();
   const { data: admins } = await admin
     .from("profiles")
-    .select("id")
+    .select("id, email")
     .eq("role", "admin")
     .eq("is_active", true);
 
@@ -56,6 +74,14 @@ export async function notifyAdmins(data: {
 
   const { error } = await admin.from("notifications").insert(rows);
   if (error) return { error: error.message };
+
+  // Fire-and-forget emails to every admin with an address on file
+  for (const a of admins as { id: string; email: string | null }[]) {
+    if (!a.email) continue;
+    sendEmail({ to: a.email, subject: data.title, body: data.body || data.title }).catch(
+      (err) => console.error("[notifications] admin email send failed:", err),
+    );
+  }
 
   return { success: true };
 }
