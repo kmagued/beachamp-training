@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useState, useEffect, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Alert, Input, Textarea, MultiSelect, Skeleton } from "@/components/ui";
-import { Check, Upload, CreditCard, Tag } from "lucide-react";
+import { Check, Upload, CreditCard, Tag, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
@@ -68,6 +69,9 @@ function PlayerSubscribeContent() {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [infoPackage, setInfoPackage] = useState<Package | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -297,34 +301,99 @@ function PlayerSubscribeContent() {
       <h2 className="font-semibold text-slate-900 mb-3">1. Choose Package <span className="text-red-400">*</span></h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {packages.map((pkg) => (
-          <button
+          <div
             key={pkg.id}
-            onClick={() => {
-              setSelectedPackage(pkg.id);
-              setPromoResult(null);
-            }}
             className={cn(
-              "border rounded-xl p-4 text-left transition-all",
+              "relative border rounded-xl transition-all",
               selectedPackage === pkg.id
                 ? "border-primary ring-2 ring-primary/20 bg-primary-50/50"
                 : "border-slate-200 bg-white hover:border-slate-300"
             )}
           >
-            <p className="text-sm font-semibold text-slate-900 mb-1">{pkg.name}</p>
-            <p className="text-lg font-bold text-slate-900">{pkg.session_count}</p>
-            <p className="text-xs text-slate-500 mb-2">
-              {pkg.session_count === 1 ? "session" : "sessions"}
-            </p>
-            <p className="text-sm font-bold text-slate-900">{pkg.price.toLocaleString("en-US")} EGP</p>
-            <p className="text-[11px] text-slate-400">{pkg.validity_days} days validity</p>
-            {selectedPackage === pkg.id && (
-              <div className="mt-2">
-                <Badge variant="info">Selected</Badge>
-              </div>
+            {pkg.description && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInfoPackage(pkg);
+                }}
+                aria-label={`More info about ${pkg.name}`}
+                className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full text-slate-400 hover:text-primary hover:bg-primary-50 flex items-center justify-center transition-colors"
+              >
+                <Info className="w-4 h-4" />
+              </button>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedPackage(pkg.id);
+                setPromoResult(null);
+              }}
+              className="w-full text-left p-4"
+            >
+              <p className="text-sm font-semibold text-slate-900 mb-1 pr-7">{pkg.name}</p>
+              <p className="text-lg font-bold text-slate-900">{pkg.session_count}</p>
+              <p className="text-xs text-slate-500 mb-2">
+                {pkg.session_count === 1 ? "session" : "sessions"}
+              </p>
+              <p className="text-sm font-bold text-slate-900">{pkg.price.toLocaleString("en-US")} EGP</p>
+              <p className="text-[11px] text-slate-400">{pkg.validity_days} days validity</p>
+              {selectedPackage === pkg.id && (
+                <div className="mt-2">
+                  <Badge variant="info">Selected</Badge>
+                </div>
+              )}
+            </button>
+          </div>
         ))}
       </div>
+
+      {/* Package description modal */}
+      {portalReady && infoPackage && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setInfoPackage(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-6 animate-in zoom-in-95 duration-150"
+          >
+            <button
+              type="button"
+              onClick={() => setInfoPackage(null)}
+              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 pr-8">{infoPackage.name}</h3>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span>
+                {infoPackage.session_count} {infoPackage.session_count === 1 ? "session" : "sessions"}
+              </span>
+              <span>{infoPackage.validity_days} days validity</span>
+              <span className="font-semibold text-slate-900">
+                {infoPackage.price.toLocaleString("en-US")} EGP
+              </span>
+            </div>
+            <p className="mt-4 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+              {infoPackage.description}
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => {
+                  setSelectedPackage(infoPackage.id);
+                  setPromoResult(null);
+                  setInfoPackage(null);
+                }}
+              >
+                Select this package
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Promo Code */}
       {selectedPackage && (
@@ -431,9 +500,19 @@ function PlayerSubscribeContent() {
           {/* Instapay account info */}
           {selectedMethod === "instapay" && (
             <Card className="mb-8 bg-primary-50/50 border-primary-200">
-              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to this Instapay address:</p>
+              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
               <p className="text-base font-bold text-primary select-all">ahmed1.fahmy1@instapay</p>
-              <p className="text-xs text-slate-500 mt-2">Open your Instapay app, choose &quot;Send&quot;, paste this address, and complete the transfer.</p>
+              <a
+                href="https://ipn.eg/S/ahmed1.fahmy1/instapay/7LeGVE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
+              >
+                Open Instapay Link
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
+                </svg>
+              </a>
             </Card>
           )}
 

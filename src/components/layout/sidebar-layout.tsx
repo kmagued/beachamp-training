@@ -224,27 +224,33 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       </aside>
 
       {/* Top navbar */}
-      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-14 transition-[left] duration-200">
-        <div className="flex items-center justify-between h-full px-4">
-          {/* Left: hamburger on mobile + logo */}
-          <div className="flex items-center gap-2">
+      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-20 transition-[left] duration-200">
+        <div className="relative flex items-center justify-between h-full px-4">
+          {/* Left: hamburger on mobile */}
+          <div className="flex items-center">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden text-primary-800 p-1 -ml-1"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link href="/" aria-label={branding.name} className="flex items-center">
-              <Image
-                src="/images/logo.png"
-                alt={branding.name}
-                width={120}
-                height={40}
-                priority
-                className="h-9 w-auto object-contain"
-              />
-            </Link>
           </div>
+
+          {/* Center: logo */}
+          <Link
+            href="/"
+            aria-label={branding.name}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center"
+          >
+            <Image
+              src="/images/logo.png"
+              alt={branding.name}
+              width={240}
+              height={80}
+              priority
+              className="h-16 w-auto object-contain"
+            />
+          </Link>
 
           {/* Right: notifications + user */}
           <div className="flex items-center gap-2">
@@ -367,7 +373,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
       {/* Main content — desktop gets sidebar margin via CSS variable */}
       <style>{`:root { --sidebar-w: ${sidebarW}px; }`}</style>
-      <main className="relative flex-1 min-w-0 overflow-x-hidden pt-14 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10">
+      <main className="relative flex-1 min-w-0 overflow-x-hidden pt-20 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 opacity-[0.035] z-0"
