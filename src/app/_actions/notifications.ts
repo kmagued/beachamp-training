@@ -10,7 +10,15 @@ import type { NotificationType } from "@/types/database";
 // without depending on the optional DB webhook trigger setup. DB-triggered
 // notifications (subscription expiring, etc.) still go through trg_notification_email.
 
-async function emailUser(userId: string, title: string, body: string | null) {
+function buildCtaUrl(link: string | null | undefined): string | undefined {
+  if (!link) return undefined;
+  if (/^https?:\/\//i.test(link)) return link;
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+  if (!base) return undefined;
+  return `${base}${link.startsWith("/") ? "" : "/"}${link}`;
+}
+
+async function emailUser(userId: string, title: string, body: string | null, link: string | null | undefined) {
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("profiles")
@@ -18,7 +26,14 @@ async function emailUser(userId: string, title: string, body: string | null) {
     .eq("id", userId)
     .single();
   if (!profile?.email) return;
-  await sendEmail({ to: profile.email, subject: title, body: body || title });
+  const ctaUrl = buildCtaUrl(link);
+  await sendEmail({
+    to: profile.email,
+    subject: title,
+    body: body || title,
+    ctaLabel: ctaUrl ? "Open in Beachamp" : undefined,
+    ctaUrl,
+  });
 }
 
 /** Create a notification for a specific user. */
@@ -41,7 +56,7 @@ export async function createNotification(data: {
   if (error) return { error: error.message };
 
   // Fire-and-forget email so the action stays responsive
-  emailUser(data.user_id, data.title, data.body || null).catch((err) =>
+  emailUser(data.user_id, data.title, data.body || null, data.link || null).catch((err) =>
     console.error("[notifications] email send failed:", err),
   );
 
@@ -76,11 +91,16 @@ export async function notifyAdmins(data: {
   if (error) return { error: error.message };
 
   // Fire-and-forget emails to every admin with an address on file
+  const ctaUrl = buildCtaUrl(data.link || null);
   for (const a of admins as { id: string; email: string | null }[]) {
     if (!a.email) continue;
-    sendEmail({ to: a.email, subject: data.title, body: data.body || data.title }).catch(
-      (err) => console.error("[notifications] admin email send failed:", err),
-    );
+    sendEmail({
+      to: a.email,
+      subject: data.title,
+      body: data.body || data.title,
+      ctaLabel: ctaUrl ? "Open in Beachamp" : undefined,
+      ctaUrl,
+    }).catch((err) => console.error("[notifications] admin email send failed:", err));
   }
 
   return { success: true };
