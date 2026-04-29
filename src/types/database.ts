@@ -639,6 +639,7 @@ export interface Database {
           player_id: string;
           coach_id: string | null;
           requested_day_of_week: number;
+          requested_date: string | null;
           requested_time: string;
           duration_minutes: number;
           location: string | null;
@@ -656,6 +657,7 @@ export interface Database {
           player_id: string;
           coach_id?: string | null;
           requested_day_of_week: number;
+          requested_date?: string | null;
           requested_time: string;
           duration_minutes?: number;
           location?: string | null;
@@ -673,6 +675,7 @@ export interface Database {
           player_id?: string;
           coach_id?: string | null;
           requested_day_of_week?: number;
+          requested_date?: string | null;
           requested_time?: string;
           duration_minutes?: number;
           location?: string | null;

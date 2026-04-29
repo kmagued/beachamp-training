@@ -43,6 +43,7 @@ export default async function PlayerPrivateSessionsPage() {
   const items = (requests || []) as (Record<string, unknown> & {
     id: string;
     requested_day_of_week: number;
+    requested_date: string | null;
     requested_time: string;
     duration_minutes: number;
     status: string;
@@ -51,6 +52,15 @@ export default async function PlayerPrivateSessionsPage() {
     location: string | null;
     profiles: { first_name: string; last_name: string } | null;
   })[];
+
+  const whenLabel = (r: { requested_date: string | null; requested_day_of_week: number }) =>
+    r.requested_date
+      ? new Date(r.requested_date + "T00:00:00").toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })
+      : DAY_NAMES[r.requested_day_of_week];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -83,7 +93,7 @@ export default async function PlayerPrivateSessionsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Day</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">When</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Time</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Coach</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Status</th>
@@ -94,7 +104,7 @@ export default async function PlayerPrivateSessionsPage() {
                 <tbody>
                   {items.map((r) => (
                     <tr key={r.id} className="border-b border-slate-100">
-                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{DAY_NAMES[r.requested_day_of_week]}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{whenLabel(r)}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{formatTime(r.requested_time)} ({r.duration_minutes}min)</td>
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {r.profiles ? `${r.profiles.first_name} ${r.profiles.last_name}` : "Any coach"}
@@ -118,7 +128,7 @@ export default async function PlayerPrivateSessionsPage() {
             {items.map((r) => (
               <Card key={r.id} className="p-4">
                 <div className="flex items-start justify-between mb-2">
-                  <p className="text-sm font-semibold text-slate-900">{DAY_NAMES[r.requested_day_of_week]}</p>
+                  <p className="text-sm font-semibold text-slate-900">{whenLabel(r)}</p>
                   {statusBadge(r.status)}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">

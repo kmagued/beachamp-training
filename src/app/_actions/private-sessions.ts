@@ -10,6 +10,7 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 export async function createPrivateSessionRequest(data: {
   coach_id?: string;
   requested_day_of_week: number;
+  requested_date?: string;
   requested_time: string;
   duration_minutes?: number;
   notes?: string;
@@ -27,6 +28,7 @@ export async function createPrivateSessionRequest(data: {
     player_id: user.id,
     coach_id: data.coach_id || null,
     requested_day_of_week: data.requested_day_of_week,
+    requested_date: data.requested_date || null,
     requested_time: data.requested_time,
     duration_minutes: data.duration_minutes || 60,
     notes: data.notes || null,
@@ -36,9 +38,12 @@ export async function createPrivateSessionRequest(data: {
 
   const playerName = `${user.profile.first_name} ${user.profile.last_name}`;
   const dayName = DAY_NAMES[data.requested_day_of_week];
+  const whenLabel = data.requested_date
+    ? `${data.requested_date} at ${data.requested_time}`
+    : `${dayName}s at ${data.requested_time}`;
   await notifyAdmins({
     title: "New Private Session Request",
-    body: `${playerName} requested a private session on ${dayName}s at ${data.requested_time}`,
+    body: `${playerName} requested a private session on ${whenLabel}`,
     type: "private_session",
     link: "/admin/private-sessions",
   });

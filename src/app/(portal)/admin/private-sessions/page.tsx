@@ -73,6 +73,7 @@ export default async function AdminPrivateSessionsPage() {
   const items = (requests || []) as {
     id: string;
     requested_day_of_week: number;
+    requested_date: string | null;
     requested_time: string;
     duration_minutes: number;
     status: string;
@@ -317,7 +318,7 @@ export default async function AdminPrivateSessionsPage() {
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Player</th>
-                    <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Day</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">When</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Time</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Coach</th>
                     <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Status</th>
@@ -334,7 +335,15 @@ export default async function AdminPrivateSessionsPage() {
                           <span className="block text-[10px] text-slate-400">{r.player.phone}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-600">{DAY_NAMES[r.requested_day_of_week]}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                        {r.requested_date
+                          ? new Date(r.requested_date + "T00:00:00").toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : DAY_NAMES[r.requested_day_of_week]}
+                      </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{formatTime(r.requested_time)} ({r.duration_minutes}min)</td>
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {r.coach ? `${r.coach.first_name} ${r.coach.last_name}` : "Any"}
@@ -368,8 +377,16 @@ export default async function AdminPrivateSessionsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-slate-400">Day</span>
-                    <p className="text-slate-700 font-medium">{DAY_NAMES[r.requested_day_of_week]}</p>
+                    <span className="text-slate-400">When</span>
+                    <p className="text-slate-700 font-medium">
+                      {r.requested_date
+                        ? new Date(r.requested_date + "T00:00:00").toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : DAY_NAMES[r.requested_day_of_week]}
+                    </p>
                   </div>
                   <div>
                     <span className="text-slate-400">Time</span>
