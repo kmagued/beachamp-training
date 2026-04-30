@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 import { branding } from "@/lib/config/branding";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import type { Package } from "@/types/database";
 import { TrainingGroupCarousel } from "./_components/training-groups-carousel";
@@ -98,12 +98,22 @@ export default async function LandingPage() {
     price: p.price,
   }));
 
-  const { data: scheduleRows } = await supabase
+  // Schedule + photo queries run with the service role so the public landing
+  // page can show them even when a visitor is not authenticated (groups and
+  // schedule_sessions both require auth via RLS).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adminSupabase = createAdminClient() as any;
+
+  const { data: scheduleRows } = await adminSupabase
     .from("schedule_sessions")
     .select("group_id")
     .eq("is_active", true);
   const groupIdsWithSchedule = Array.from(
-    new Set<string>((scheduleRows || []).map((r: { group_id: string }) => r.group_id)),
+    new Set<string>(
+      (scheduleRows || [])
+        .map((r: { group_id: string | null }) => r.group_id)
+        .filter((id: string | null): id is string => Boolean(id)),
+    ),
   );
 
   interface PhotoRow {
@@ -116,7 +126,7 @@ export default async function LandingPage() {
   }
 
   const { data: photoRows } = groupIdsWithSchedule.length > 0
-    ? ((await supabase
+    ? ((await adminSupabase
         .from("schedule_photos")
         .select("id, group_id, storage_path, caption, sort_order, groups(id, name, level)")
         .in("group_id", groupIdsWithSchedule)
@@ -126,7 +136,7 @@ export default async function LandingPage() {
   const photosByGroupMap = new Map<string, { name: string; level: string | null; items: { id: string; url: string; caption: string | null }[] }>();
   for (const p of photoRows || []) {
     if (!p.groups) continue;
-    const url = supabase.storage.from("schedule-photos").getPublicUrl(p.storage_path).data.publicUrl as string;
+    const url = adminSupabase.storage.from("schedule-photos").getPublicUrl(p.storage_path).data.publicUrl as string;
     const entry = photosByGroupMap.get(p.group_id) || { name: p.groups.name, level: p.groups.level, items: [] };
     entry.items.push({ id: p.id, url, caption: p.caption });
     photosByGroupMap.set(p.group_id, entry);

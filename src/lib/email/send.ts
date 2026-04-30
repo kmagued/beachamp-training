@@ -34,32 +34,29 @@ function escapeHtml(s: string): string {
 
 function wrapInTemplate(subject: string, body: string, ctaLabel?: string, ctaUrl?: string): string {
   const PRIMARY = "#124B5D";
-  const PRIMARY_DARK = "#0C313A";
-  const ACCENT = "#F7AC40";
-  const SECONDARY = "#5CACB0";
-  const SAND = "#F6EFDA";
   const TEXT = "#0C313A";
   const TEXT_MUTED = "#5A6B73";
+  const TEXT_SUBTLE = "#8A9499";
   const BORDER = "#E7F0F3";
-  const PAGE_BG = "#F6EFDA";
+  const PAGE_BG = "#F4F6F7";
 
   const safeBody = escapeHtml(body).replace(/\n/g, "<br>");
   const safeSubject = escapeHtml(subject);
   const ctaHtml = ctaLabel && ctaUrl
     ? `
-        <tr>
-          <td style="padding:8px 40px 4px;">
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-              <tr>
-                <td align="center" bgcolor="${ACCENT}" style="border-radius:10px;">
-                  <a href="${ctaUrl}" style="display:inline-block;padding:13px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:700;color:${PRIMARY_DARK};text-decoration:none;letter-spacing:0.2px;">
-                    ${escapeHtml(ctaLabel)}
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>`
+          <tr>
+            <td style="padding:4px 40px 8px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td bgcolor="${PRIMARY}" style="border-radius:6px;">
+                    <a href="${ctaUrl}" style="display:inline-block;padding:11px 22px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;color:#FFFFFF;text-decoration:none;letter-spacing:0.1px;">
+                      ${escapeHtml(ctaLabel)}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
     : "";
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -74,67 +71,32 @@ function wrapInTemplate(subject: string, body: string, ctaLabel?: string, ctaUrl
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${safeSubject}</div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="${PAGE_BG}" style="background-color:${PAGE_BG};">
     <tr>
-      <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px -28px rgba(12,49,58,0.35);">
-          <!-- Header band -->
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border:1px solid ${BORDER};border-radius:8px;">
+          <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,${PRIMARY_DARK} 0%,${PRIMARY} 60%,${SECONDARY} 100%);background-color:${PRIMARY};padding:0;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td style="padding:28px 40px 24px;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                      <tr>
-                        <td style="vertical-align:middle;">
-                          <span style="display:inline-block;padding:6px 12px;background:${ACCENT};color:${PRIMARY_DARK};font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border-radius:999px;">${escapeHtml(branding.sport)}</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding-top:14px;">
-                          <h1 style="margin:0;color:#FFFFFF;font-size:26px;font-weight:700;letter-spacing:-0.3px;line-height:1.15;">${escapeHtml(branding.name)}</h1>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding-top:4px;">
-                          <p style="margin:0;color:rgba(255,255,255,0.72);font-size:13px;font-weight:500;letter-spacing:0.2px;">${escapeHtml(branding.tagline)}</p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
+            <td style="padding:28px 40px 20px;border-bottom:1px solid ${BORDER};">
+              <p style="margin:0;color:${PRIMARY};font-size:16px;font-weight:700;letter-spacing:0.3px;">${escapeHtml(branding.name)}</p>
             </td>
-          </tr>
-
-          <!-- Accent rule -->
-          <tr>
-            <td style="height:4px;line-height:4px;font-size:0;background:linear-gradient(90deg,${ACCENT} 0%,${SECONDARY} 100%);background-color:${ACCENT};">&nbsp;</td>
           </tr>
 
           <!-- Body -->
           <tr>
-            <td style="padding:36px 40px 8px;">
-              <h2 style="margin:0 0 14px;color:${TEXT};font-size:22px;font-weight:700;line-height:1.3;letter-spacing:-0.2px;">${safeSubject}</h2>
+            <td style="padding:32px 40px 12px;">
+              <h2 style="margin:0 0 14px;color:${TEXT};font-size:18px;font-weight:600;line-height:1.4;">${safeSubject}</h2>
               <p style="margin:0;color:${TEXT_MUTED};font-size:15px;line-height:1.65;">${safeBody}</p>
             </td>
           </tr>
 
           ${ctaHtml}
 
-          <tr>
-            <td style="padding:24px 40px 32px;">
-              <div style="height:1px;background:${BORDER};line-height:1px;font-size:0;">&nbsp;</div>
-              <p style="margin:18px 0 0;color:${TEXT_MUTED};font-size:13px;line-height:1.6;">
-                You're receiving this because you have an account on ${escapeHtml(branding.name)}.
-                ${APP_URL ? `Visit your dashboard anytime at <a href="${APP_URL}" style="color:${PRIMARY};text-decoration:none;font-weight:600;">${APP_URL.replace(/^https?:\/\//, "")}</a>.` : ""}
-              </p>
-            </td>
-          </tr>
-
           <!-- Footer -->
           <tr>
-            <td style="background:${SAND};padding:20px 40px;text-align:center;">
-              <p style="margin:0;color:${PRIMARY};font-size:13px;font-weight:700;letter-spacing:0.4px;">${escapeHtml(branding.name)}</p>
-              <p style="margin:4px 0 0;color:${TEXT_MUTED};font-size:11px;letter-spacing:0.2px;">© ${new Date().getFullYear()} ${escapeHtml(branding.name)}. All rights reserved.</p>
+            <td style="padding:28px 40px;border-top:1px solid ${BORDER};">
+              <p style="margin:0;color:${TEXT_SUBTLE};font-size:12px;line-height:1.6;">
+                You're receiving this because you have an account on ${escapeHtml(branding.name)}.${APP_URL ? ` Visit your dashboard at <a href="${APP_URL}" style="color:${PRIMARY};text-decoration:none;">${APP_URL.replace(/^https?:\/\//, "")}</a>.` : ""}
+              </p>
+              <p style="margin:10px 0 0;color:${TEXT_SUBTLE};font-size:11px;">© ${new Date().getFullYear()} ${escapeHtml(branding.name)}</p>
             </td>
           </tr>
         </table>
