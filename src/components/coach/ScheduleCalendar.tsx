@@ -431,52 +431,79 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigateWeek(-1)}
-            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={goToThisWeek}
-            className={`text-sm font-medium px-2 ${isThisWeek ? "text-slate-400 cursor-default" : "text-primary hover:underline"}`}
-            disabled={isThisWeek}
-          >
-            This Week
-          </button>
-          <button
-            onClick={() => navigateWeek(1)}
-            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-slate-400 ml-1">
-            {weekDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} —{" "}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Week navigation */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <button
+              onClick={() => navigateWeek(-1)}
+              className="p-2 hover:bg-slate-50 text-slate-600 transition-colors"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={goToThisWeek}
+              disabled={isThisWeek}
+              className={`text-xs font-medium px-3 py-2 border-x border-slate-200 transition-colors ${
+                isThisWeek
+                  ? "text-slate-300 cursor-default bg-slate-50"
+                  : "text-primary hover:bg-primary-50"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => navigateWeek(1)}
+              className="p-2 hover:bg-slate-50 text-slate-600 transition-colors"
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <span className="text-sm font-medium text-slate-700 truncate">
+            {weekDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            {" – "}
             {weekDates[6].toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
         </div>
+
+        {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setShowBlockDrawer(true)}>
-            <span className="flex items-center gap-1.5"><Ban className="w-4 h-4" /> <span className="hidden sm:inline">Block Time</span></span>
-          </Button>
           {isAdmin && (
-            <>
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden text-xs font-medium">
               <button
-                onClick={() => setShowAll(!showAll)}
-                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  showAll
-                    ? "bg-primary-50 border-primary text-primary"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                onClick={() => setShowAll(false)}
+                className={`px-3 py-1.5 transition-colors ${
+                  !showAll ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
-                {showAll ? "All Sessions" : "My Sessions"}
+                Mine
               </button>
-              <Button size="sm" onClick={openAdd}>
-                <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span></span>
-              </Button>
-            </>
+              <button
+                onClick={() => setShowAll(true)}
+                className={`px-3 py-1.5 border-l border-slate-200 transition-colors ${
+                  showAll ? "bg-primary text-white" : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                All
+              </button>
+            </div>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setShowBlockDrawer(true)}>
+            <span className="flex items-center gap-1.5">
+              <Ban className="w-4 h-4" />
+              <span className="hidden sm:inline">Block</span>
+            </span>
+          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={openAdd}>
+              <span className="flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Session</span>
+                <span className="sm:hidden">Add</span>
+              </span>
+            </Button>
           )}
         </div>
       </div>
