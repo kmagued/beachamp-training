@@ -16,7 +16,9 @@ export interface PlayerRow {
   guardian_name: string | null;
   guardian_phone: string | null;
   gender: string | null;
+  occupation: string | null;
   is_active: boolean;
+  is_currently_active: boolean;
   created_at: string;
   last_attended: string | null;
   groups: { id: string; name: string }[];
@@ -63,15 +65,10 @@ export function getLatestSubscription(player: PlayerRow) {
   })[0];
 }
 
-/** Player is active if they trained in last 30 days. Having a subscription alone is not enough. */
+/** Player is active if they trained in the last 30 days OR have a valid subscription.
+ *  Predicate is computed by the `players_with_status` Postgres view. */
 export function getActivityStatus(player: PlayerRow): ActivityStatus {
-  const now = Date.now();
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-  const recentlyTrained = !!player.last_attended &&
-    (now - new Date(player.last_attended).getTime()) <= thirtyDaysMs;
-
-  if (recentlyTrained) return "active";
-  return "inactive";
+  return player.is_currently_active ? "active" : "inactive";
 }
 
 /** Subscription-only status — independent of player activity. */
