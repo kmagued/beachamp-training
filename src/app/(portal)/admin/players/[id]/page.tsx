@@ -22,6 +22,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
     { data: payments },
     { data: attendance },
     { data: feedback },
+    { data: statusRow },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -51,7 +52,14 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
       .eq("player_id", id)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("players_with_status")
+      .select("is_currently_active")
+      .eq("id", id)
+      .maybeSingle(),
   ]);
+
+  const isCurrentlyActive = !!(statusRow as { is_currently_active?: boolean } | null)?.is_currently_active;
 
   if (!profile) notFound();
 
@@ -94,7 +102,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
         Back to Players
       </Link>
 
-      <PlayerHeader player={player} hasActiveSubscription={activeSubs.length > 0} actions={<PlayerActionsMenu player={player} />} />
+      <PlayerHeader player={player} isCurrentlyActive={isCurrentlyActive} actions={<PlayerActionsMenu player={player} />} />
       <ProfileCard player={player} />
       <PlayerStats subsCount={subs.length} activeSubs={activeSubs} totalPaid={totalPaid} totalSessions={attendanceRows.length} />
       <SubscriptionHistory subscriptions={subs} paymentsBySub={paymentsBySub} playerId={id} playerName={`${player.first_name} ${player.last_name}`} />

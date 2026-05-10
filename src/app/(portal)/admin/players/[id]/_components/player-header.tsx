@@ -4,11 +4,11 @@ import type { PlayerProfile } from "./types";
 
 interface PlayerHeaderProps {
   player: PlayerProfile;
-  hasActiveSubscription: boolean;
+  isCurrentlyActive: boolean;
   actions?: React.ReactNode;
 }
 
-export function PlayerHeader({ player, hasActiveSubscription, actions }: PlayerHeaderProps) {
+export function PlayerHeader({ player, isCurrentlyActive, actions }: PlayerHeaderProps) {
   return (
     <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
       <div>
@@ -19,8 +19,8 @@ export function PlayerHeader({ player, hasActiveSubscription, actions }: PlayerH
           {player.first_name} {player.last_name}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-primary-700/60">
-          <Badge variant={hasActiveSubscription ? "success" : "neutral"}>
-            {hasActiveSubscription ? "Active" : "Inactive"}
+          <Badge variant={isCurrentlyActive ? "success" : "neutral"}>
+            {isCurrentlyActive ? "Active" : "Inactive"}
           </Badge>
           {player.email && <span>{player.email}</span>}
           {player.email && player.phone && <span className="text-primary-700/30">·</span>}
