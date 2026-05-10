@@ -9,6 +9,7 @@ import Link from "next/link";
 import { GroupModal } from "./_components/group-modal";
 import { DAY_NAMES, formatTime, getLevelVariant } from "./_components/types";
 import type { GroupData } from "./_components/types";
+import { getSystemSetting, setSystemSetting, clearSystemSetting } from "@/lib/settings/system-settings";
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<GroupData[]>([]);
@@ -22,6 +23,10 @@ export default function AdminGroupsPage() {
   const [deletingGroup, setDeletingGroup] = useState<GroupData | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const handleToastClose = useCallback(() => setToast(null), []);
+
+  // Default group for auto-assignment by gender
+  const [defaultMaleGroupId, setDefaultMaleGroupId] = useState<string | null>(null);
+  const [defaultFemaleGroupId, setDefaultFemaleGroupId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -98,7 +103,40 @@ export default function AdminGroupsPage() {
     }));
 
     setGroups(enriched);
+
+    // Load default group settings
+    const [maleSetting, femaleSetting] = await Promise.all([
+      getSystemSetting<{ group_id: string }>("default_male_group_id"),
+      getSystemSetting<{ group_id: string }>("default_female_group_id"),
+    ]);
+    setDefaultMaleGroupId(maleSetting?.group_id ?? null);
+    setDefaultFemaleGroupId(femaleSetting?.group_id ?? null);
+
     setLoading(false);
+  }
+
+  async function toggleDefault(gender: "male" | "female", groupId: string) {
+    const key = gender === "male" ? "default_male_group_id" : "default_female_group_id";
+    const currentId = gender === "male" ? defaultMaleGroupId : defaultFemaleGroupId;
+    const setter = gender === "male" ? setDefaultMaleGroupId : setDefaultFemaleGroupId;
+
+    if (currentId === groupId) {
+      const res = await clearSystemSetting(key);
+      if (res.error) {
+        setToast({ message: res.error, variant: "error" });
+        return;
+      }
+      setter(null);
+      setToast({ message: `Cleared default ${gender} group`, variant: "success" });
+    } else {
+      const res = await setSystemSetting(key, { group_id: groupId });
+      if (res.error) {
+        setToast({ message: res.error, variant: "error" });
+        return;
+      }
+      setter(groupId);
+      setToast({ message: `Default ${gender} group updated`, variant: "success" });
+    }
   }
 
   useEffect(() => {
@@ -341,6 +379,33 @@ export default function AdminGroupsPage() {
                         {group.is_active ? "Deactivate" : "Activate"}
                       </button>
                     </div>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2" onClick={(e) => e.preventDefault()}>
+                    <button
+                      type="button"
+                      onClick={() => toggleDefault("male", group.id)}
+                      aria-pressed={defaultMaleGroupId === group.id}
+                      className={`text-[11px] font-medium px-2 py-1 rounded-md border transition-colors ${
+                        defaultMaleGroupId === group.id
+                          ? "bg-blue-50 border-blue-300 text-blue-700"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      {defaultMaleGroupId === group.id ? "★ Default for men" : "Set default for men"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleDefault("female", group.id)}
+                      aria-pressed={defaultFemaleGroupId === group.id}
+                      className={`text-[11px] font-medium px-2 py-1 rounded-md border transition-colors ${
+                        defaultFemaleGroupId === group.id
+                          ? "bg-pink-50 border-pink-300 text-pink-700"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      {defaultFemaleGroupId === group.id ? "★ Default for women" : "Set default for women"}
+                    </button>
                   </div>
                 </Card>
               </Link>
