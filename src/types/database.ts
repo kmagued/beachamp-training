@@ -43,6 +43,7 @@ export interface Database {
           guardian_name: string | null;
           guardian_phone: string | null;
           gender: Gender | null;
+          occupation: string | null;
           is_active: boolean;
           profile_completed: boolean;
           created_at: string;
@@ -69,6 +70,7 @@ export interface Database {
           guardian_name?: string | null;
           guardian_phone?: string | null;
           gender?: Gender | null;
+          occupation?: string | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
@@ -95,10 +97,32 @@ export interface Database {
           guardian_name?: string | null;
           guardian_phone?: string | null;
           gender?: Gender | null;
+          occupation?: string | null;
           is_active?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      system_settings: {
+        Row: {
+          key: string;
+          value: Record<string, unknown>;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          key: string;
+          value: Record<string, unknown>;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          key?: string;
+          value?: Record<string, unknown>;
+          updated_at?: string;
+          updated_by?: string | null;
         };
         Relationships: [];
       };
@@ -803,7 +827,37 @@ export interface Database {
       };
     };
     Views: {
-      [_ in never]: never;
+      players_with_status: {
+        Row: {
+          id: string;
+          first_name: string;
+          last_name: string;
+          date_of_birth: string | null;
+          phone: string | null;
+          email: string | null;
+          role: UserRole;
+          area: string | null;
+          playing_level: PlayingLevel | null;
+          training_goals: string | null;
+          health_conditions: string | null;
+          preferred_package_id: string | null;
+          avatar_url: string | null;
+          height: number | null;
+          weight: number | null;
+          preferred_hand: PreferredHand | null;
+          preferred_position: PreferredPosition | null;
+          guardian_name: string | null;
+          guardian_phone: string | null;
+          gender: Gender | null;
+          occupation: string | null;
+          is_active: boolean;
+          profile_completed: boolean;
+          created_at: string;
+          updated_at: string;
+          is_currently_active: boolean;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       log_attendance_with_deduction: {
