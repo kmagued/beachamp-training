@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { generatePassword } from "@/lib/utils/password";
 import type { PaymentMethod } from "@/types/database";
 import type { BulkPlayerRow, BulkPlayerResult } from "./_components/types";
+import { autoAssignGenderGroup } from "@/lib/players/auto-assign-group";
 
 interface AddPlayerResult {
   success?: boolean;
@@ -101,6 +102,15 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
 
   if (profileError) {
     return { error: `Profile creation failed: ${profileError.message}` };
+  }
+
+  // Auto-assign to default group by gender (soft-fail; never blocks creation)
+  if (gender === "male" || gender === "female") {
+    try {
+      await autoAssignGenderGroup(userId, `${firstName} ${lastName}`, gender as "male" | "female");
+    } catch (e) {
+      console.error("[addSinglePlayer] auto-assign threw:", e);
+    }
   }
 
   // 3. Create subscription + payment (if package selected)
