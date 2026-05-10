@@ -4,8 +4,95 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { revalidatePath } from "next/cache";
 import { createNotification, notifyAdmins } from "./notifications";
+import {
+  ClashApiError,
+  cancelClashReservation,
+  createClashReservation,
+  isClashConfigured,
+  toCairoIso,
+} from "@/lib/clash/client";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAdmin = any;
+
+/**
+ * Reserve a Clash court for a freshly-created private session.
+ *
+ * On success, stamps the session row with clash_reservation_id (and mirrors
+ * the court name into `location` for display continuity).
+ * On failure, soft-deletes the session row (is_active=false) so the partial
+ * booking doesn't show up on the schedule, and returns the error message.
+ */
+async function reserveClashCourtForSession(
+  admin: SupabaseAdmin,
+  scheduleSessionId: string,
+  params: {
+    clashCourtId: string;
+    clashCourtName: string;
+    sessionDate: string;
+    startTime: string;
+    endTime: string;
+    primaryPlayerId: string;
+    notes?: string;
+  }
+): Promise<{ success: true } | { error: string }> {
+  // Pull the booking guest info from the primary player's profile.
+  const { data: player } = await admin
+    .from("profiles")
+    .select("first_name, last_name, email, phone")
+    .eq("id", params.primaryPlayerId)
+    .single();
+
+  const guestName = player
+    ? `${player.first_name || ""} ${player.last_name || ""}`.trim() || "Beachamp Player"
+    : "Beachamp Player";
+  const guestEmail = player?.email || "noreply@beachamp.org";
+  const guestPhone = player?.phone || "+200000000000";
+
+  const endTimeForClash = params.endTime === "00:00" ? "24:00" : params.endTime;
+
+  try {
+    const reservation = await createClashReservation({
+      courtId: params.clashCourtId,
+      startTime: toCairoIso(params.sessionDate, params.startTime),
+      endTime: toCairoIso(params.sessionDate, endTimeForClash),
+      guestName,
+      guestEmail,
+      guestPhone,
+      externalPaymentReference: `beachamp:session:${scheduleSessionId}`,
+      notes: params.notes,
+    });
+
+    await admin
+      .from("schedule_sessions")
+      .update({
+        clash_reservation_id: reservation.id,
+        clash_court_id: params.clashCourtId,
+        clash_court_name: params.clashCourtName,
+        location: params.clashCourtName,
+      })
+      .eq("id", scheduleSessionId);
+
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ClashApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "Failed to reserve court on The Clash";
+
+    // Roll back the local session so the schedule doesn't show a phantom booking.
+    await admin
+      .from("schedule_sessions")
+      .update({ is_active: false })
+      .eq("id", scheduleSessionId);
+
+    return { error: `Court reservation failed: ${message}` };
+  }
+}
 
 export async function createPrivateSessionRequest(data: {
   coach_id?: string;
@@ -92,7 +179,12 @@ function addMinutesToTime(start: string, minutes: number): string {
 export async function confirmPrivateSessionRequest(
   requestId: string,
   sessionDate: string,
-  opts?: { location?: string; coachId?: string }
+  opts?: {
+    location?: string;
+    coachId?: string;
+    clashCourtId?: string;
+    clashCourtName?: string;
+  }
 ) {
   const user = await getCurrentUser();
   if (!user || user.profile.role !== "admin") return { error: "Not authorized" };
@@ -118,7 +210,9 @@ export async function confirmPrivateSessionRequest(
   const startTime = (req.requested_time as string).slice(0, 5);
   const endTime = addMinutesToTime(startTime, duration);
   const coachId = opts?.coachId || req.coach_id || null;
-  const location = opts?.location ?? req.location ?? null;
+  const clashCourtId = opts?.clashCourtId || null;
+  const clashCourtName = opts?.clashCourtName || null;
+  const location = clashCourtName ?? opts?.location ?? req.location ?? null;
 
   const { data: created, error: insertErr } = await admin
     .from("schedule_sessions")
@@ -144,6 +238,19 @@ export async function confirmPrivateSessionRequest(
     schedule_session_id: created.id,
     player_id: req.player_id,
   });
+
+  if (clashCourtId && clashCourtName && isClashConfigured()) {
+    const reserveRes = await reserveClashCourtForSession(admin, created.id, {
+      clashCourtId,
+      clashCourtName,
+      sessionDate,
+      startTime,
+      endTime,
+      primaryPlayerId: req.player_id,
+      notes: "Private session (Beachamp Academy)",
+    });
+    if ("error" in reserveRes) return { error: reserveRes.error };
+  }
 
   const { error: updateErr } = await admin
     .from("private_session_requests")
@@ -226,7 +333,7 @@ export async function deletePrivateScheduleSession(scheduleSessionId: string) {
 
   const { data: session, error: fetchErr } = await admin
     .from("schedule_sessions")
-    .select("id, session_type")
+    .select("id, session_type, clash_reservation_id")
     .eq("id", scheduleSessionId)
     .single();
 
@@ -239,6 +346,17 @@ export async function deletePrivateScheduleSession(scheduleSessionId: string) {
     .eq("id", scheduleSessionId);
 
   if (error) return { error: error.message };
+
+  // Best-effort: release the Clash court so it frees up immediately.
+  // We don't fail the local cancellation if Clash is down — the academy
+  // still wants the session off its own schedule.
+  if (session.clash_reservation_id && isClashConfigured()) {
+    try {
+      await cancelClashReservation(session.clash_reservation_id);
+    } catch (err) {
+      console.error("[clash] Failed to cancel reservation", session.clash_reservation_id, err);
+    }
+  }
 
   // Unlink any request that pointed at this session
   await admin
@@ -260,6 +378,8 @@ export async function createAdminPrivateSession(data: {
   end_time: string;
   coach_id?: string | null;
   location?: string | null;
+  clash_court_id?: string | null;
+  clash_court_name?: string | null;
 }) {
   const user = await getCurrentUser();
   if (!user || user.profile.role !== "admin") return { error: "Not authorized" };
@@ -276,6 +396,10 @@ export async function createAdminPrivateSession(data: {
 
   const dow = new Date(data.session_date + "T00:00:00").getDay();
 
+  // When a Clash court is selected, mirror its name into the location text
+  // so the existing schedule UI keeps showing a sensible label.
+  const location = data.clash_court_name || data.location || null;
+
   const admin = createAdminClient();
   const { data: created, error } = await admin
     .from("schedule_sessions")
@@ -288,7 +412,7 @@ export async function createAdminPrivateSession(data: {
       day_of_week: dow,
       start_time: start,
       end_time: end,
-      location: data.location || null,
+      location,
       end_date: data.session_date,
       is_active: true,
     })
@@ -301,6 +425,19 @@ export async function createAdminPrivateSession(data: {
     playerIds.map((pid) => ({ schedule_session_id: created.id, player_id: pid }))
   );
   if (linkErr) return { error: linkErr.message };
+
+  if (data.clash_court_id && data.clash_court_name && isClashConfigured()) {
+    const reserveRes = await reserveClashCourtForSession(admin, created.id, {
+      clashCourtId: data.clash_court_id,
+      clashCourtName: data.clash_court_name,
+      sessionDate: data.session_date,
+      startTime: start,
+      endTime: end,
+      primaryPlayerId: playerIds[0],
+      notes: "Private session (Beachamp Academy)",
+    });
+    if ("error" in reserveRes) return { error: reserveRes.error };
+  }
 
   for (const pid of playerIds) {
     await createNotification({

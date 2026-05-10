@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { Check, X, Loader2 } from "lucide-react";
-import { Button, Drawer, Textarea, DatePicker, Toast } from "@/components/ui";
+import { Button, Drawer, Textarea, DatePicker, Select, Toast } from "@/components/ui";
 import {
   confirmPrivateSessionRequest,
   rejectPrivateSessionRequest,
 } from "@/app/_actions/private-sessions";
+import { getClashCourts, type ClashCourtOption } from "@/app/_actions/clash";
 
 interface Props {
   requestId: string;
@@ -31,7 +32,21 @@ export function ActionButtons({ requestId, requestedDayOfWeek, requestedTime }: 
   const [rejectReason, setRejectReason] = useState("");
   const [sessionDate, setSessionDate] = useState(() => nextDateForDayOfWeek(requestedDayOfWeek));
   const [location, setLocation] = useState("");
+  const [clashCourts, setClashCourts] = useState<ClashCourtOption[]>([]);
+  const [clashEnabled, setClashEnabled] = useState(false);
+  const [clashCourtId, setClashCourtId] = useState("");
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!showConfirm) return;
+    let cancelled = false;
+    getClashCourts().then((res) => {
+      if (cancelled) return;
+      setClashEnabled(res.enabled);
+      setClashCourts(res.courts);
+    });
+    return () => { cancelled = true; };
+  }, [showConfirm]);
 
   const dayMatches = useMemo(() => {
     if (!sessionDate) return false;
@@ -43,15 +58,21 @@ export function ActionButtons({ requestId, requestedDayOfWeek, requestedTime }: 
       setToast({ message: "Date must match the requested day of week.", variant: "error" });
       return;
     }
+    const selectedCourt = clashCourts.find((c) => c.id === clashCourtId);
     startTransition(async () => {
       const res = await confirmPrivateSessionRequest(requestId, sessionDate, {
-        location: location || undefined,
+        location: selectedCourt ? undefined : (location || undefined),
+        clashCourtId: selectedCourt?.id,
+        clashCourtName: selectedCourt?.name,
       });
       if ("error" in res) {
         setToast({ message: res.error ?? "Failed", variant: "error" });
       } else {
         setShowConfirm(false);
-        setToast({ message: "Session created", variant: "success" });
+        setToast({
+          message: selectedCourt ? `Session created and ${selectedCourt.name} reserved on The Clash` : "Session created",
+          variant: "success",
+        });
       }
     });
   }
@@ -118,15 +139,43 @@ export function ActionButtons({ requestId, requestedDayOfWeek, requestedTime }: 
               </p>
             )}
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Court 1"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-          </div>
+          {clashEnabled ? (
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                Court (The Clash)
+              </label>
+              <Select value={clashCourtId} onChange={(e) => setClashCourtId(e.target.value)}>
+                <option value="">No court reservation</option>
+                {clashCourts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Selecting a court reserves it on The Clash for this slot.
+              </p>
+              {clashCourtId === "" && (
+                <div className="mt-2">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Away venue"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Court 1"
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          )}
         </div>
       </Drawer>
 

@@ -4,6 +4,7 @@ import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { Button, Drawer, DatePicker, Select, Input, Toast } from "@/components/ui";
 import { createAdminPrivateSession } from "@/app/_actions/private-sessions";
+import { getClashCourts, type ClashCourtOption } from "@/app/_actions/clash";
 
 interface Option { id: string; name: string }
 
@@ -24,8 +25,22 @@ export function CreatePrivateSessionButton({ players, coaches }: Props) {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
+  const [clashCourts, setClashCourts] = useState<ClashCourtOption[]>([]);
+  const [clashEnabled, setClashEnabled] = useState(false);
+  const [clashCourtId, setClashCourtId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getClashCourts().then((res) => {
+      if (cancelled) return;
+      setClashEnabled(res.enabled);
+      setClashCourts(res.courts);
+    });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const selectedPlayers = useMemo(
     () => playerIds.map((id) => players.find((p) => p.id === id)).filter((p): p is Option => Boolean(p)),
@@ -60,6 +75,7 @@ export function CreatePrivateSessionButton({ players, coaches }: Props) {
     setStartTime("");
     setEndTime("");
     setLocation("");
+    setClashCourtId("");
     setError(null);
   }
 
@@ -78,6 +94,8 @@ export function CreatePrivateSessionButton({ players, coaches }: Props) {
     if (!sessionDate) return setError("Please pick a date.");
     if (!startTime || !endTime) return setError("Please set start and end times.");
 
+    const selectedCourt = clashCourts.find((c) => c.id === clashCourtId);
+
     startTransition(async () => {
       const res = await createAdminPrivateSession({
         player_ids: playerIds,
@@ -85,14 +103,19 @@ export function CreatePrivateSessionButton({ players, coaches }: Props) {
         session_date: sessionDate,
         start_time: startTime,
         end_time: endTime,
-        location: location || null,
+        location: selectedCourt ? null : (location || null),
+        clash_court_id: selectedCourt?.id || null,
+        clash_court_name: selectedCourt?.name || null,
       });
       if ("error" in res) {
         setError(res.error ?? "Failed to create session");
       } else {
         setOpen(false);
         reset();
-        setToast({ message: "Private session created", variant: "success" });
+        setToast({
+          message: selectedCourt ? `Session created and ${selectedCourt.name} reserved on The Clash` : "Private session created",
+          variant: "success",
+        });
       }
     });
   }
@@ -210,10 +233,33 @@ export function CreatePrivateSessionButton({ players, coaches }: Props) {
               ))}
             </Select>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Court 1" />
-          </div>
+          {clashEnabled ? (
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                Court (The Clash)
+              </label>
+              <Select value={clashCourtId} onChange={(e) => setClashCourtId(e.target.value)}>
+                <option value="">No court reservation</option>
+                {clashCourts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Selecting a court reserves it on The Clash for this slot.
+              </p>
+              {clashCourtId === "" && (
+                <div className="mt-2">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
+                  <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Away venue" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Location (optional)</label>
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Court 1" />
+            </div>
+          )}
         </div>
       </Drawer>
     </>

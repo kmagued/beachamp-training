@@ -463,6 +463,9 @@ export interface Database {
           location: string | null;
           end_date: string | null;
           is_active: boolean;
+          clash_court_id: string | null;
+          clash_court_name: string | null;
+          clash_reservation_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -478,6 +481,9 @@ export interface Database {
           location?: string | null;
           end_date?: string | null;
           is_active?: boolean;
+          clash_court_id?: string | null;
+          clash_court_name?: string | null;
+          clash_reservation_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -493,6 +499,9 @@ export interface Database {
           location?: string | null;
           end_date?: string | null;
           is_active?: boolean;
+          clash_court_id?: string | null;
+          clash_court_name?: string | null;
+          clash_reservation_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
