@@ -77,10 +77,10 @@ function AdminPlayersContent() {
   const fetchPlayers = useCallback(async () => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }] = await Promise.all([
+    const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }, { data: statusRows }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+        .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, occupation, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
         .eq("role", "player")
         .order("created_at", { ascending: false }),
       supabase
@@ -93,7 +93,16 @@ function AdminPlayersContent() {
         .from("group_players")
         .select("player_id, groups(id, name)")
         .eq("is_active", true),
+      supabase
+        .from("players_with_status")
+        .select("id, is_currently_active"),
     ]);
+
+    const statusById = new Map<string, boolean>(
+      ((statusRows || []) as { id: string; is_currently_active: boolean }[]).map(
+        (r) => [r.id, r.is_currently_active]
+      )
+    );
 
     const lastAttendedMap: Record<string, string> = {};
     if (attendanceData) {
@@ -120,6 +129,7 @@ function AdminPlayersContent() {
         ...p,
         last_attended: lastAttendedMap[p.id] || null,
         groups: playerGroupsMap[p.id] || [],
+        is_currently_active: statusById.get(p.id) ?? false,
       }));
       setPlayers(playersWithData);
       // Keep drawer player in sync with refreshed data
