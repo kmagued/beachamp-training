@@ -39,6 +39,7 @@ export default function RegisterPage() {
     if (!form.first_name.trim()) return "First name is required";
     if (!form.last_name.trim()) return "Last name is required";
     if (!form.date_of_birth) return "Date of birth is required";
+    if (!form.gender) return "Gender is required so we can assign you to the right training group.";
     if (!form.email.trim()) return "Email is required";
     if (!form.phone.trim()) return "Phone number is required";
     const phone = form.phone.replace(/\s+/g, "");
@@ -133,7 +134,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div>
-                <Label>Gender</Label>
+                <Label required>Gender</Label>
                 <Select
                   value={form.gender}
                   onChange={(e) => updateField("gender", e.target.value)}

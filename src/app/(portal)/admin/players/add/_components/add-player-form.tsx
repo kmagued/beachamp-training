@@ -80,6 +80,12 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
 
   function handleSubmit() {
     setError("");
+    if (!gender) {
+      const msg = "Gender is required to assign the player to a training group.";
+      setError(msg);
+      setToast({ message: msg, variant: "error" });
+      return;
+    }
     const formData = new FormData();
     formData.set("first_name", firstName);
     formData.set("last_name", lastName);
@@ -201,7 +207,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
             </datalist>
           </div>
           <div>
-            <Label>Gender</Label>
+            <Label required>Gender</Label>
             <Select value={gender} onChange={(e) => setGender(e.target.value)}>
               <option value="">Select...</option>
               <option value="male">Male</option>
