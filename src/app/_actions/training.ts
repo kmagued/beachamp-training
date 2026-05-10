@@ -799,11 +799,14 @@ export async function createCoach(formData: FormData) {
     return { error: authError2.message };
   }
 
-  // Profile is auto-created by the trigger, but update phone if needed
-  if (phone && authData?.user) {
+  // Profile is auto-created by the trigger; ensure is_coach is set and phone is recorded
+  if (authData?.user) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const update: any = { is_coach: true };
+    if (phone) update.phone = phone;
     await admin
       .from("profiles")
-      .update({ phone })
+      .update(update)
       .eq("id", authData.user.id);
   }
 

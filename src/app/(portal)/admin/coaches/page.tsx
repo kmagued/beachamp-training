@@ -49,7 +49,7 @@ function AdminCoachesContent() {
     const { data } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, email, phone, area, is_active, created_at, coach_groups!coach_groups_coach_id_fkey(is_active, groups(name))")
-      .eq("role", "coach")
+      .eq("is_coach", true)
       .order("created_at", { ascending: false });
 
     if (data) {

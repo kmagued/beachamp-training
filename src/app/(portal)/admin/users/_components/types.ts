@@ -9,6 +9,7 @@ export interface UserRow {
   area: string | null;
   role: UserRole;
   is_active: boolean;
+  is_coach: boolean;
   created_at: string;
 }
 

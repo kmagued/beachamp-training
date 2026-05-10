@@ -293,7 +293,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     async function loadOptions() {
       const [{ data: g }, { data: c }] = await Promise.all([
         supabase.from("groups").select("id, name").eq("is_active", true).order("name"),
-        supabase.from("profiles").select("id, first_name, last_name").in("role", ["coach", "admin"]).eq("is_active", true).order("first_name"),
+        supabase.from("profiles").select("id, first_name, last_name").eq("is_coach", true).eq("is_active", true).order("first_name"),
       ]);
       setGroups((g as GroupOption[]) || []);
       setCoaches((c as CoachOption[]) || []);

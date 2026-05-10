@@ -45,6 +45,7 @@ export interface Database {
           gender: Gender | null;
           occupation: string | null;
           is_active: boolean;
+          is_coach: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;
@@ -72,6 +73,7 @@ export interface Database {
           gender?: Gender | null;
           occupation?: string | null;
           is_active?: boolean;
+          is_coach?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -99,6 +101,7 @@ export interface Database {
           gender?: Gender | null;
           occupation?: string | null;
           is_active?: boolean;
+          is_coach?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -902,6 +905,7 @@ export interface Database {
           gender: Gender | null;
           occupation: string | null;
           is_active: boolean;
+          is_coach: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;

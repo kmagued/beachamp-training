@@ -26,7 +26,7 @@ export function CoachesSection({ groupId, coaches, onRefresh, supabase }: Coache
     const { data } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, role")
-      .in("role", ["coach", "admin"])
+      .eq("is_coach", true)
       .eq("is_active", true)
       .order("first_name");
 

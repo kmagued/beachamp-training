@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
 import { ShieldCheck, Plus, Search, Loader2, Mail, Phone } from "lucide-react";
-import { updateUserRole } from "./actions";
+import { updateUserRole, updateUserIsCoach } from "./actions";
 import type { UserRole } from "@/types/database";
 
 interface AdminUser {
@@ -14,6 +14,7 @@ interface AdminUser {
   email: string | null;
   phone: string | null;
   is_active: boolean;
+  is_coach: boolean;
   created_at: string;
 }
 
@@ -74,7 +75,7 @@ function AdminUsersContent() {
       supabase.auth.getUser(),
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, is_active, created_at")
+        .select("id, first_name, last_name, email, phone, is_active, is_coach, created_at")
         .eq("role", "admin")
         .order("first_name"),
     ]);
@@ -125,6 +126,19 @@ function AdminUsersContent() {
       fetchAdmins();
     }
     setPromotingId(null);
+  }
+
+  async function handleToggleCoach(userId: string, next: boolean) {
+    // Optimistic
+    setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, is_coach: next } : a));
+    const result = await updateUserIsCoach(userId, next);
+    if (result.error) {
+      // Revert
+      setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, is_coach: !next } : a));
+      setToast({ message: result.error, variant: "error" });
+    } else {
+      setToast({ message: next ? "Coach access granted" : "Coach access removed", variant: "success" });
+    }
   }
 
   async function handleRemoveAdmin(userId: string) {
@@ -205,19 +219,32 @@ function AdminUsersContent() {
                       </div>
                     </div>
                   </div>
-                  {!isSelf && (
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
                     <button
-                      onClick={() => handleRemoveAdmin(admin.id)}
-                      disabled={removingId === admin.id}
-                      className="text-xs font-medium px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0 ml-3"
+                      onClick={() => handleToggleCoach(admin.id, !admin.is_coach)}
+                      title={admin.is_coach ? "Click to remove coach access" : "Click to also assign as coach"}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                        admin.is_coach
+                          ? "border-primary bg-primary-50 text-primary hover:bg-primary-100"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
                     >
-                      {removingId === admin.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        "Remove"
-                      )}
+                      {admin.is_coach ? "✓ Coach" : "+ Coach"}
                     </button>
-                  )}
+                    {!isSelf && (
+                      <button
+                        onClick={() => handleRemoveAdmin(admin.id)}
+                        disabled={removingId === admin.id}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {removingId === admin.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          "Remove"
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

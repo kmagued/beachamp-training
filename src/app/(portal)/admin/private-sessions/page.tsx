@@ -65,7 +65,7 @@ export default async function AdminPrivateSessionsPage() {
     supabase
       .from("profiles")
       .select("id, first_name, last_name")
-      .in("role", ["coach", "admin"])
+      .eq("is_coach", true)
       .eq("is_active", true)
       .order("first_name"),
   ]);
