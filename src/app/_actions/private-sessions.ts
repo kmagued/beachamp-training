@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { revalidatePath } from "next/cache";
 import { createNotification, notifyAdmins } from "./notifications";
+import { isCoachBlocked } from "@/lib/scheduling/coach-availability";
 import {
   ClashApiError,
   cancelClashReservation,
@@ -214,6 +215,16 @@ export async function confirmPrivateSessionRequest(
   const clashCourtName = opts?.clashCourtName || null;
   const location = clashCourtName ?? opts?.location ?? req.location ?? null;
 
+  // Server-side block check (defense in depth)
+  if (coachId) {
+    const { blocked, matchingBlock } = await isCoachBlocked(coachId, sessionDate, startTime, endTime);
+    if (blocked) {
+      return {
+        error: `Coach is blocked at this time${matchingBlock?.reason ? ` (${matchingBlock.reason})` : ''}. Pick a different time or remove the block first.`,
+      };
+    }
+  }
+
   const { data: created, error: insertErr } = await admin
     .from("schedule_sessions")
     .insert({
@@ -399,6 +410,16 @@ export async function createAdminPrivateSession(data: {
   // When a Clash court is selected, mirror its name into the location text
   // so the existing schedule UI keeps showing a sensible label.
   const location = data.clash_court_name || data.location || null;
+
+  // Server-side block check (defense in depth)
+  if (data.coach_id) {
+    const { blocked, matchingBlock } = await isCoachBlocked(data.coach_id, data.session_date, start, end);
+    if (blocked) {
+      return {
+        error: `Coach is blocked at this time${matchingBlock?.reason ? ` (${matchingBlock.reason})` : ''}. Pick a different time or remove the block first.`,
+      };
+    }
+  }
 
   const admin = createAdminClient();
   const { data: created, error } = await admin
