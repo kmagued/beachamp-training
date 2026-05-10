@@ -126,6 +126,57 @@ export interface Database {
         };
         Relationships: [];
       };
+      coach_blocks: {
+        Row: {
+          id: string;
+          coach_id: string;
+          kind: 'one_time' | 'weekly';
+          start_date: string | null;
+          end_date: string | null;
+          day_of_week: number | null;
+          effective_from: string | null;
+          effective_until: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          reason: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          coach_id: string;
+          kind: 'one_time' | 'weekly';
+          start_date?: string | null;
+          end_date?: string | null;
+          day_of_week?: number | null;
+          effective_from?: string | null;
+          effective_until?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          coach_id?: string;
+          kind?: 'one_time' | 'weekly';
+          start_date?: string | null;
+          end_date?: string | null;
+          day_of_week?: number | null;
+          effective_from?: string | null;
+          effective_until?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       packages: {
         Row: {
           id: string;
@@ -902,6 +953,7 @@ export type PromoCode = Database["public"]["Tables"]["promo_codes"]["Row"];
 export type PromoCodeUse = Database["public"]["Tables"]["promo_code_uses"]["Row"];
 export type PrivateSessionRequest = Database["public"]["Tables"]["private_session_requests"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type CoachBlock = Database["public"]["Tables"]["coach_blocks"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
