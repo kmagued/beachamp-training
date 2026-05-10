@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
+import { autoAssignGenderGroup } from "@/lib/players/auto-assign-group";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -89,6 +90,17 @@ export async function register(formData: FormData) {
 
     if (profileError) {
       console.error("[register] Profile creation error:", profileError);
+    } else if (gender === "male" || gender === "female") {
+      try {
+        await autoAssignGenderGroup(
+          data.user.id,
+          `${firstName} ${lastName}`,
+          gender as "male" | "female"
+        );
+      } catch (e) {
+        // Helper already notifies admins on its own failures; never block registration.
+        console.error("[register] auto-assign threw:", e);
+      }
     }
   }
 
