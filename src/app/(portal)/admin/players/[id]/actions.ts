@@ -38,6 +38,7 @@ export async function updatePlayer(playerId: string, formData: FormData) {
     date_of_birth: (formData.get("date_of_birth") as string)?.trim() || null,
     area: (formData.get("area") as string)?.trim() || null,
     gender: (formData.get("gender") as string)?.trim() || null,
+    occupation: (formData.get("occupation") as string)?.trim() || null,
     playing_level: (formData.get("playing_level") as string)?.trim() || null,
     training_goals: (formData.get("training_goals") as string)?.trim() || null,
     health_conditions: (formData.get("health_conditions") as string)?.trim() || null,

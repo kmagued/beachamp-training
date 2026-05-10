@@ -16,6 +16,7 @@ export interface PlayerProfile {
   guardian_name: string | null;
   guardian_phone: string | null;
   gender: string | null;
+  occupation: string | null;
   is_active: boolean;
   created_at: string;
 }

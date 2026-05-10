@@ -165,6 +165,7 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
   const [dateOfBirth, setDateOfBirth] = useState(player.date_of_birth || "");
   const [area, setArea] = useState(player.area || "");
   const [gender, setGender] = useState(player.gender || "");
+  const [occupation, setOccupation] = useState(player.occupation || "");
   const [playingLevel, setPlayingLevel] = useState(player.playing_level || "");
   const [trainingGoals, setTrainingGoals] = useState<string[]>(
     player.training_goals ? player.training_goals.split(", ").filter(Boolean) : []
@@ -190,6 +191,7 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
     formData.set("date_of_birth", dateOfBirth);
     formData.set("area", area);
     formData.set("gender", gender);
+    formData.set("occupation", occupation);
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
@@ -285,6 +287,16 @@ function EditDrawerContent({ player, onClose, onSuccess }: { player: PlayerProfi
               <option value="female">Female</option>
             </Select>
           </div>
+        </div>
+
+        <div>
+          <Label>Occupation</Label>
+          <Input
+            type="text"
+            value={occupation}
+            onChange={(e) => setOccupation(e.target.value)}
+            placeholder="e.g. Engineer, Student, Doctor"
+          />
         </div>
 
         <div>
