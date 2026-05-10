@@ -22,6 +22,7 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
   const dateOfBirth = (formData.get("date_of_birth") as string)?.trim() || null;
   const area = (formData.get("area") as string)?.trim() || null;
   const gender = (formData.get("gender") as string)?.trim() || null;
+  const occupation = (formData.get("occupation") as string)?.trim() || null;
   const playingLevel = (formData.get("playing_level") as string)?.trim() || null;
   const trainingGoals = (formData.get("training_goals") as string)?.trim() || null;
   const healthConditions = (formData.get("health_conditions") as string)?.trim() || null;
@@ -83,6 +84,7 @@ export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResu
     date_of_birth: dateOfBirth,
     area,
     gender,
+    occupation,
     playing_level: playingLevel,
     training_goals: trainingGoals,
     health_conditions: healthConditions,

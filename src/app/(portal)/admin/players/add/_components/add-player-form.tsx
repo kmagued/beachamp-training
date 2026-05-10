@@ -24,6 +24,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [area, setArea] = useState("");
   const [gender, setGender] = useState("");
+  const [occupation, setOccupation] = useState("");
   const [playingLevel, setPlayingLevel] = useState("");
   const [trainingGoals, setTrainingGoals] = useState<string[]>([]);
   const [healthConditions, setHealthConditions] = useState("");
@@ -87,6 +88,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
     formData.set("date_of_birth", dateOfBirth);
     formData.set("area", area);
     formData.set("gender", gender);
+    formData.set("occupation", occupation);
     formData.set("playing_level", playingLevel);
     formData.set("training_goals", trainingGoals.join(", "));
     formData.set("health_conditions", healthConditions);
@@ -120,6 +122,7 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
         setDateOfBirth("");
         setArea("");
         setGender("");
+        setOccupation("");
         setPlayingLevel("");
         setTrainingGoals([]);
         setHealthConditions("");
@@ -204,6 +207,15 @@ export function AddPlayerForm({ packages }: AddPlayerFormProps) {
               <option value="male">Male</option>
               <option value="female">Female</option>
             </Select>
+          </div>
+          <div>
+            <Label>Occupation</Label>
+            <Input
+              type="text"
+              value={occupation}
+              onChange={(e) => setOccupation(e.target.value)}
+              placeholder="e.g. Engineer, Student, Doctor"
+            />
           </div>
           <div>
             <Label>Playing Level</Label>
