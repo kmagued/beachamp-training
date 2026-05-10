@@ -18,7 +18,8 @@ interface Coach {
 interface ReservedSlot {
   start_time: string;
   end_time: string;
-  kind: "group" | "private";
+  kind: "group" | "private" | "block";
+  reason?: string | null;
 }
 
 const DAY_LABELS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -182,7 +183,27 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
         },
       );
 
-      setReserved([...recurringReservations, ...requestReservations]);
+      // 4. Coach blocks (only if a specific coach is chosen)
+      let blockReservations: ReservedSlot[] = [];
+      if (selectedCoachId) {
+        const { data: blockRows } = await supabase
+          .from("coach_blocks")
+          .select("kind, start_date, end_date, day_of_week, effective_from, effective_until, start_time, end_time, reason")
+          .eq("coach_id", selectedCoachId)
+          .or(
+            `and(kind.eq.one_time,start_date.lte.${dateStr},or(end_date.is.null,end_date.gte.${dateStr})),` +
+            `and(kind.eq.weekly,day_of_week.eq.${dow},or(effective_from.is.null,effective_from.lte.${dateStr}),or(effective_until.is.null,effective_until.gte.${dateStr}))`
+          );
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        blockReservations = ((blockRows || []) as any[]).map((b) => {
+          const start = b.start_time ? (b.start_time as string).slice(0, 5) : '06:00';
+          const end = b.end_time ? (b.end_time as string).slice(0, 5) : '23:59';
+          return { start_time: start, end_time: end, kind: 'block' as const, reason: b.reason };
+        });
+      }
+
+      setReserved([...recurringReservations, ...requestReservations, ...blockReservations]);
       setLoading(false);
     }
     fetchReservations();
@@ -372,7 +393,9 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
                       )}
                       title={
                         reservedFlag
-                          ? `Reserved (${reservation?.kind === "private" ? "private session" : "group session"})`
+                          ? reservation?.kind === "block"
+                            ? (reservation.reason ? `Coach unavailable — ${reservation.reason}` : "Coach unavailable")
+                            : `Reserved (${reservation?.kind === "private" ? "private session" : "group session"})`
                           : "Available"
                       }
                     >
