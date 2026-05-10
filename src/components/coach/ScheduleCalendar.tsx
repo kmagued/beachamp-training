@@ -4,9 +4,12 @@ import { useState, useEffect, useMemo, useCallback, useTransition } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Skeleton, Button, Input, Select, Drawer, Toast, DatePicker } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Clock, ClipboardCheck, Pencil, Trash2, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, ClipboardCheck, Pencil, Trash2, Plus, Ban } from "lucide-react";
 import Link from "next/link";
 import { createSingleSession, updateScheduleSession, cancelScheduleSessionDate } from "@/app/_actions/training";
+import { BlockTimeDrawer } from "./BlockTimeDrawer";
+import { CoachBlocksList } from "./CoachBlocksList";
+import type { CoachBlock } from "@/types/database";
 
 // Saturday-first week for Egypt locale
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5]; // Sat, Sun, Mon, Tue, Wed, Thu, Fri
@@ -104,6 +107,10 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Coach blocks state
+  const [blocks, setBlocks] = useState<CoachBlock[]>([]);
+  const [showBlockDrawer, setShowBlockDrawer] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -295,6 +302,28 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
+  // Load coach blocks overlapping the visible week
+  useEffect(() => {
+    async function loadBlocks() {
+      const weekStart = formatLocalDate(weekDates[0]);
+      const weekEnd = formatLocalDate(weekDates[6]);
+
+      let query = supabase.from("coach_blocks").select("*");
+      if (!isAdmin || !showAll) {
+        query = query.eq("coach_id", coachId);
+      }
+      query = query.or(
+        `and(kind.eq.one_time,start_date.lte.${weekEnd},or(end_date.is.null,end_date.gte.${weekStart})),` +
+        `and(kind.eq.weekly,or(effective_from.is.null,effective_from.lte.${weekEnd}),or(effective_until.is.null,effective_until.gte.${weekStart}))`
+      );
+
+      const { data } = await query;
+      setBlocks((data || []) as CoachBlock[]);
+    }
+    loadBlocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coachId, showAll, selectedSaturday, refreshKey, isAdmin]);
+
   function handleCreate(formData: FormData) {
     setFormError(null);
     startTransition(async () => {
@@ -374,6 +403,31 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     sessionsByDay.set(s.day_of_week, existing);
   }
 
+  // Build per-day list of blocks that fire on each visible day
+  const blocksByDay = new Map<string, CoachBlock[]>();
+  for (const b of blocks) {
+    for (const date of weekDates) {
+      const dateStr = formatLocalDate(date);
+      const dow = date.getDay();
+      let fires = false;
+      if (b.kind === 'one_time') {
+        const endDate = b.end_date ?? b.start_date;
+        if (b.start_date && dateStr >= b.start_date && endDate && dateStr <= endDate) fires = true;
+      } else {
+        if (b.day_of_week === dow) {
+          const fromOk = !b.effective_from || dateStr >= b.effective_from;
+          const untilOk = !b.effective_until || dateStr <= b.effective_until;
+          if (fromOk && untilOk) fires = true;
+        }
+      }
+      if (fires) {
+        const list = blocksByDay.get(dateStr) || [];
+        list.push(b);
+        blocksByDay.set(dateStr, list);
+      }
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -403,23 +457,28 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
             {weekDates[6].toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                showAll
-                  ? "bg-primary-50 border-primary text-primary"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300"
-              }`}
-            >
-              {showAll ? "All Sessions" : "My Sessions"}
-            </button>
-            <Button size="sm" onClick={openAdd}>
-              <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span></span>
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowBlockDrawer(true)}>
+            <span className="flex items-center gap-1.5"><Ban className="w-4 h-4" /> <span className="hidden sm:inline">Block Time</span></span>
+          </Button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                  showAll
+                    ? "bg-primary-50 border-primary text-primary"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                }`}
+              >
+                {showAll ? "All Sessions" : "My Sessions"}
+              </button>
+              <Button size="sm" onClick={openAdd}>
+                <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span></span>
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Weekly Grid — Desktop */}
@@ -450,6 +509,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                 dateForDay.getMonth() === today.getMonth() &&
                 dateForDay.getFullYear() === today.getFullYear();
               const daySessions = sessionsByDay.get(dayNum) || [];
+              const dayBlocks = blocksByDay.get(formatLocalDate(dateForDay)) || [];
 
               return (
                 <div key={dayNum} className="min-h-[120px]">
@@ -467,7 +527,26 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                   </div>
 
                   <div className="space-y-1.5">
-                    {daySessions.length === 0 ? (
+                    {dayBlocks.map((b) => (
+                      <div
+                        key={`block-${b.id}`}
+                        className="rounded-lg p-2 border-l-3 border-l-slate-400"
+                        style={{
+                          backgroundImage: 'repeating-linear-gradient(45deg, rgba(100,116,139,0.15) 0, rgba(100,116,139,0.15) 4px, transparent 4px, transparent 10px)',
+                          backgroundColor: 'rgba(241,245,249,0.6)',
+                        }}
+                        title={b.reason ?? "Blocked"}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Ban className="w-3 h-3 text-slate-500" />
+                          <p className="text-[11px] font-semibold text-slate-700">
+                            {b.start_time === null ? 'All day' : `${b.start_time.slice(0, 5)}–${b.end_time?.slice(0, 5)}`}
+                          </p>
+                        </div>
+                        {b.reason && <p className="text-[10px] text-slate-500 truncate">{b.reason}</p>}
+                      </div>
+                    ))}
+                    {daySessions.length === 0 && dayBlocks.length === 0 ? (
                       <div className="text-center py-4 text-[10px] text-slate-300">—</div>
                     ) : (
                       daySessions.map((session) => {
@@ -529,6 +608,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                 dateForDay.getMonth() === today.getMonth() &&
                 dateForDay.getFullYear() === today.getFullYear();
               const daySessions = sessionsByDay.get(dayNum) || [];
+              const dayBlocks = blocksByDay.get(formatLocalDate(dateForDay)) || [];
 
               return (
                 <div
@@ -547,10 +627,28 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                       </span>
                     </div>
 
-                    {daySessions.length === 0 ? (
+                    {daySessions.length === 0 && dayBlocks.length === 0 ? (
                       <span className="text-xs text-slate-300">No sessions</span>
                     ) : (
                       <div className="flex-1 space-y-1.5">
+                        {dayBlocks.map((b) => (
+                          <div
+                            key={`block-${b.id}`}
+                            className="rounded-lg p-2 border-l-3 border-l-slate-400"
+                            style={{
+                              backgroundImage: 'repeating-linear-gradient(45deg, rgba(100,116,139,0.15) 0, rgba(100,116,139,0.15) 4px, transparent 4px, transparent 10px)',
+                              backgroundColor: 'rgba(241,245,249,0.6)',
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <Ban className="w-3 h-3 text-slate-500" />
+                              <span className="text-xs font-semibold text-slate-700">
+                                {b.start_time === null ? 'All day' : `${b.start_time.slice(0, 5)}–${b.end_time?.slice(0, 5)}`}
+                              </span>
+                            </div>
+                            {b.reason && <p className="text-[10px] text-slate-500 truncate">{b.reason}</p>}
+                          </div>
+                        ))}
                         {daySessions.map((session) => {
                           const sessionDate = formatLocalDate(dateForDay);
                           return (
@@ -604,10 +702,33 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         </>
       )}
 
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
+
+      <BlockTimeDrawer
+        open={showBlockDrawer}
+        onClose={() => setShowBlockDrawer(false)}
+        defaultCoachId={coachId}
+        isAdmin={isAdmin}
+        coachOptions={isAdmin ? coaches : undefined}
+        onSuccess={({ conflictCount }) => {
+          setToast({
+            message: conflictCount === 0
+              ? "Block created"
+              : `Block created. ${conflictCount} session${conflictCount === 1 ? '' : 's'} during this block — review and cancel manually if needed.`,
+            variant: "success",
+          });
+          setRefreshKey((k) => k + 1);
+        }}
+      />
+
+      <CoachBlocksList
+        blocks={blocks.filter((b) => isAdmin && showAll ? true : b.coach_id === coachId)}
+        onChange={() => setRefreshKey((k) => k + 1)}
+      />
+
       {/* Admin Add Session Drawer */}
       {isAdmin && (
         <>
-          <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
           <Drawer
             open={showAddDrawer}
             onClose={() => setShowAddDrawer(false)}
