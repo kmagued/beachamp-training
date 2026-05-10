@@ -59,6 +59,7 @@ export async function register(formData: FormData) {
   const area = formData.get("area") as string;
   const dateOfBirth = formData.get("date_of_birth") as string;
   const gender = formData.get("gender") as string;
+  const occupation = formData.get("occupation") as string;
 
   // signUp — Supabase sends an OTP code to the email
   const { data, error } = await supabase.auth.signUp({
@@ -82,6 +83,7 @@ export async function register(formData: FormData) {
       area,
       date_of_birth: dateOfBirth || null,
       gender: gender || null,
+      occupation: occupation || null,
       role: "player",
     });
 

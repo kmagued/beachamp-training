@@ -26,6 +26,7 @@ export default function RegisterPage() {
     email: "",
     phone: "",
     area: "",
+    occupation: "",
     password: "",
     confirm_password: "",
   });
@@ -178,6 +179,16 @@ export default function RegisterPage() {
                   <option key={a} value={a} />
                 ))}
               </datalist>
+            </div>
+
+            <div>
+              <Label>Occupation</Label>
+              <Input
+                type="text"
+                value={form.occupation}
+                onChange={(e) => updateField("occupation", e.target.value)}
+                placeholder="e.g. Engineer, Student, Doctor"
+              />
             </div>
 
             <div className="pt-2">
