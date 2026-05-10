@@ -34,7 +34,7 @@ export default async function AdminDashboard() {
     { data: allSubscriptions },
     // ALL active expenses with full fields — drives monthly, all-time, recurring, monthly table
     { data: allExpensesWithDates },
-    { data: recentAttendance },
+    { count: activePlayerCount },
     { data: groupsData },
     { data: groupPlayersData },
     { data: attendanceAll },
@@ -65,10 +65,9 @@ export default async function AdminDashboard() {
       .select("amount, expense_date, is_recurring, recurrence_type")
       .eq("is_active", true),
     supabase
-      .from("attendance")
-      .select("player_id")
-      .eq("status", "present")
-      .gte("session_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]),
+      .from("players_with_status")
+      .select("id", { count: "exact", head: true })
+      .eq("is_currently_active", true),
     supabase
       .from("groups")
       .select("id, name, max_players")
@@ -82,7 +81,6 @@ export default async function AdminDashboard() {
   ]);
 
   // Derive everything else in JS — no extra queries
-  const activeProfiles = allPlayerProfiles;
   const monthlyRevenuePayments = ((revenuePayments || []) as { amount: number; confirmed_at: string | null }[])
     .filter((p) => p.confirmed_at && cairoMonthKey(new Date(p.confirmed_at)) === currentMonthKey);
   const revenueData = monthlyRevenuePayments;
@@ -130,17 +128,6 @@ export default async function AdminDashboard() {
   const allTimeProfit = totalRevenue - allTimeExpenses;
 
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
-
-  // Active players: trained in last 30 days
-  const playerIdSet = new Set(
-    (activeProfiles || []).map((p: { id: string }) => p.id)
-  );
-  const activeIds = new Set<string>();
-  for (const a of recentAttendance || []) {
-    const pid = (a as { player_id: string }).player_id;
-    if (playerIdSet.has(pid)) activeIds.add(pid);
-  }
-  const activePlayerCount = activeIds.size;
 
   // --- Chart data transformations ---
 
@@ -246,7 +233,7 @@ export default async function AdminDashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-8">
           <StatCard
             label="Active Players"
-            value={activePlayerCount}
+            value={activePlayerCount ?? 0}
             accentColor="bg-primary-800"
             icon={<Users className="w-5 h-5" />}
             subtitle={`Total: ${playerCount ?? 0}`}
