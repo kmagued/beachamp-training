@@ -180,6 +180,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      whatsapp_templates: {
+        Row: {
+          id: string;
+          name: string;
+          body: string;
+          is_active: boolean;
+          sort_order: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          body: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          body?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       packages: {
         Row: {
           id: string;
@@ -958,6 +991,7 @@ export type PromoCodeUse = Database["public"]["Tables"]["promo_code_uses"]["Row"
 export type PrivateSessionRequest = Database["public"]["Tables"]["private_session_requests"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type CoachBlock = Database["public"]["Tables"]["coach_blocks"]["Row"];
+export type WhatsappTemplate = Database["public"]["Tables"]["whatsapp_templates"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
