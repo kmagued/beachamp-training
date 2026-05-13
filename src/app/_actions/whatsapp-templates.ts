@@ -7,11 +7,13 @@ import type { WhatsappTemplate } from "@/types/database";
 
 type Result<T> = (T & { success: true }) | { error: string };
 
-async function requireAdmin() {
+type AdminAuth = { ok: true; user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> } | { ok: false; error: string };
+
+async function requireAdmin(): Promise<AdminAuth> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" as const };
-  if (user.profile.role !== "admin") return { error: "Not authorized" as const };
-  return { user };
+  if (!user) return { ok: false, error: "Not authenticated" };
+  if (user.profile.role !== "admin") return { ok: false, error: "Not authorized" };
+  return { ok: true, user };
 }
 
 export async function listTemplates(opts?: { activeOnly?: boolean }): Promise<WhatsappTemplate[]> {
@@ -29,7 +31,7 @@ export async function listTemplates(opts?: { activeOnly?: boolean }): Promise<Wh
 
 export async function createTemplate(input: { name: string; body: string; is_active: boolean }): Promise<Result<{ id: string }>> {
   const auth = await requireAdmin();
-  if ("error" in auth) return auth;
+  if (!auth.ok) return { error: auth.error };
 
   if (!input.name?.trim()) return { error: "Name is required" };
   if (!input.body?.trim()) return { error: "Body is required" };
@@ -68,7 +70,7 @@ export async function updateTemplate(
   input: { name?: string; body?: string; is_active?: boolean }
 ): Promise<Result<{}>> {
   const auth = await requireAdmin();
-  if ("error" in auth) return auth;
+  if (!auth.ok) return { error: auth.error };
 
   if (input.name !== undefined && !input.name.trim()) return { error: "Name cannot be empty" };
   if (input.body !== undefined && !input.body.trim()) return { error: "Body cannot be empty" };
@@ -90,7 +92,7 @@ export async function updateTemplate(
 
 export async function deleteTemplate(id: string): Promise<Result<{}>> {
   const auth = await requireAdmin();
-  if ("error" in auth) return auth;
+  if (!auth.ok) return { error: auth.error };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -103,7 +105,7 @@ export async function deleteTemplate(id: string): Promise<Result<{}>> {
 
 export async function reorderTemplates(orderedIds: string[]): Promise<Result<{}>> {
   const auth = await requireAdmin();
-  if ("error" in auth) return auth;
+  if (!auth.ok) return { error: auth.error };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
