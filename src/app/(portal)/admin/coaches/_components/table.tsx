@@ -4,6 +4,7 @@ import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
+import { buildWhatsAppUrl } from "@/lib/whatsapp/url";
 import type { CoachRow, SortField, SortDir } from "./types";
 
 interface CoachesTableProps {
@@ -63,8 +64,6 @@ function ContactMenu({ phone, email }: { phone: string | null; email: string | n
 
   if (!phone && !email) return <span className="text-slate-300">—</span>;
 
-  const cleanPhone = phone?.replace(/[^0-9+]/g, "") || "";
-
   return (
     <>
       <button
@@ -82,7 +81,7 @@ function ContactMenu({ phone, email }: { phone: string | null; email: string | n
         >
           {phone && (
             <a
-              href={`https://wa.me/${cleanPhone}`}
+              href={buildWhatsAppUrl(phone!)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}

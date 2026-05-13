@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import type { UserRow, SortField, SortDir } from "./types";
 import type { UserRole } from "@/types/database";
+import { buildWhatsAppUrl } from "@/lib/whatsapp/url";
 
 interface UsersTableProps {
   users: UserRow[];
@@ -125,8 +126,6 @@ function ContactMenu({ phone, email }: { phone: string | null; email: string | n
 
   if (!phone && !email) return <span className="text-slate-300">—</span>;
 
-  const cleanPhone = phone?.replace(/[^0-9+]/g, "") || "";
-
   return (
     <>
       <button
@@ -144,7 +143,7 @@ function ContactMenu({ phone, email }: { phone: string | null; email: string | n
         >
           {phone && (
             <a
-              href={`https://wa.me/${cleanPhone}`}
+              href={buildWhatsAppUrl(phone!)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}
