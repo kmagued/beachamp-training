@@ -95,6 +95,7 @@ const adminNav: NavItem[] = [
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
   { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
+  { key: "whatsapp-templates", label: "WhatsApp Templates", href: "/admin/whatsapp-templates", section: "Messaging" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
 
