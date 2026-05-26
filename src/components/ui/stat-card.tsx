@@ -20,7 +20,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
         {icon && (
           <div
             className={cn(
-              "shrink-0 w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white",
+              "shrink-0 w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-5 sm:[&_svg]:h-5",
               accentColor
             )}
           >
@@ -28,14 +28,14 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] sm:text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider leading-tight line-clamp-2">
+          <p className="text-[9px] sm:text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider leading-tight line-clamp-2">
             {label}
           </p>
-          <p className="text-base sm:text-xl font-bold text-primary-900 mt-0.5 capitalize break-words">
+          <p className="text-sm sm:text-xl font-bold text-primary-900 mt-0.5 capitalize break-words">
             {value}
           </p>
           {subtitle && (
-            <p className="text-[11px] text-primary-700/50 mt-0.5 break-words">{subtitle}</p>
+            <p className="text-[10px] sm:text-[11px] text-primary-700/50 mt-0.5 break-words">{subtitle}</p>
           )}
         </div>
         {href && (
