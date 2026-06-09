@@ -10,7 +10,7 @@ export interface PaymentRow {
   confirmed_at: string | null;
   rejection_reason: string | null;
   note: string | null;
-  profiles: { first_name: string; last_name: string } | null;
+  profiles: { first_name: string; last_name: string; phone: string | null } | null;
   subscriptions: { start_date: string | null; end_date: string | null; package_id: string | null; packages: { id: string; name: string } } | null;
 }
 
