@@ -482,11 +482,34 @@ export async function updateScheduleSession(id: string, formData: FormData) {
   const endDate = (formData.get("end_date") as string)?.trim() || null;
   if (!endDate) return { error: "An end date is required." };
 
+  // day_of_week handling is session-type aware, because callers differ:
+  //  - Private (one-off) sessions: ALWAYS derive from end_date. The schedule renders
+  //    a private session only on the weekday matching its end_date, so a mismatch
+  //    makes it vanish from the calendar. (Its editor has no Day field.)
+  //  - Group (recurring) sessions: honor the submitted day_of_week when the form
+  //    provides one (the group-page editor has a Day picker), otherwise keep the
+  //    existing recurrence day (the calendar edit drawer omits the field — and
+  //    Number(null) === 0 would otherwise reset the session to Sunday).
+  const { data: existing, error: fetchErr } = await supabase
+    .from("schedule_sessions")
+    .select("session_type, day_of_week")
+    .eq("id", id)
+    .single();
+  if (fetchErr || !existing) return { error: "Session not found." };
+
+  const submittedDow = formData.get("day_of_week");
+  const dayOfWeek =
+    existing.session_type === "private"
+      ? new Date(endDate + "T00:00:00").getDay()
+      : submittedDow === null || submittedDow === ""
+        ? existing.day_of_week
+        : Number(submittedDow);
+
   const { error } = await supabase
     .from("schedule_sessions")
     .update({
       coach_id: coachId,
-      day_of_week: Number(formData.get("day_of_week")),
+      day_of_week: dayOfWeek,
       start_time: startTime,
       end_time: endTime,
       location: (formData.get("location") as string)?.trim() || null,
