@@ -212,6 +212,7 @@ function DrawerContent({
   }
 
   const [editDate, setEditDate] = useState(getDisplayDate(payment));
+  const [editStartDate, setEditStartDate] = useState(payment.subscriptions?.start_date || "");
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, startUpdateTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -225,6 +226,7 @@ function DrawerContent({
     setEditMethod(payment.method);
     setEditStatus(payment.status);
     setEditDate(getDisplayDate(payment));
+    setEditStartDate(payment.subscriptions?.start_date || "");
     setEditPackageId(payment.subscriptions?.package_id || "");
     setEditError(null);
     setConfirmDelete(false);
@@ -253,6 +255,7 @@ function DrawerContent({
     startUpdateTransition(async () => {
       const currentDate = getDisplayDate(payment);
       const currentPackageId = payment.subscriptions?.package_id || "";
+      const currentStartDate = payment.subscriptions?.start_date || "";
       const res = await updatePayment(payment.id, {
         amount: editAmount,
         method: editMethod,
@@ -261,6 +264,10 @@ function DrawerContent({
         package_id:
           payment.subscription_id && editPackageId && editPackageId !== currentPackageId
             ? editPackageId
+            : undefined,
+        start_date:
+          payment.subscription_id && editStartDate && editStartDate !== currentStartDate
+            ? editStartDate
             : undefined,
       });
       if ("error" in res) {
@@ -353,6 +360,19 @@ function DrawerContent({
                 placeholder="Select payment date..."
               />
             </div>
+            {payment.subscription_id && (
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Subscription Start Date</label>
+                <DatePicker
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  placeholder="Select start date..."
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  When the package becomes active. End date is derived from the package length. Leave as-is to keep the auto-computed date.
+                </p>
+              </div>
+            )}
             {editError && (
               <p className="text-xs text-red-600">{editError}</p>
             )}
@@ -483,7 +503,7 @@ function DrawerContent({
             <Button onClick={handleSaveEdit} disabled={isUpdating} fullWidth>
               {isUpdating ? "Saving..." : "Save Changes"}
             </Button>
-            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditDate(getDisplayDate(payment)); setEditError(null); }} disabled={isUpdating}>
+            <Button variant="secondary" onClick={() => { setEditing(false); setEditAmount(payment.amount); setEditMethod(payment.method); setEditStatus(payment.status); setEditDate(getDisplayDate(payment)); setEditStartDate(payment.subscriptions?.start_date || ""); setEditError(null); }} disabled={isUpdating}>
               Cancel
             </Button>
           </div>

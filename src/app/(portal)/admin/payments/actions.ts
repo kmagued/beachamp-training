@@ -215,6 +215,7 @@ export async function updatePayment(
     confirmed_at?: string;
     payment_date?: string;
     package_id?: string;
+    start_date?: string;
   },
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,12 +348,58 @@ export async function updatePayment(
     }
   }
 
+  // Manual subscription-period override ("date control"). Renewal-chaining stays
+  // the default, but when an admin sets an explicit start date we honor it —
+  // e.g. a payment confirmed weeks late should run from the real payment date,
+  // not snap to "today". Runs last so it wins over the chained dates set above.
+  // Skipped when the payment is being moved to pending/rejected, where the blocks
+  // above intentionally clear the subscription's dates.
+  const applyStartDateOverride = Boolean(
+    updates.start_date &&
+      payment.subscription_id &&
+      updates.status !== "pending" &&
+      updates.status !== "rejected",
+  );
+  if (applyStartDateOverride) {
+    const startDate = updates.start_date as string;
+    const [sy, sm, sd] = startDate.split("-").map(Number);
+    if (!sy || !sm || !sd) return { error: "Invalid subscription start date." };
+
+    // Use the effective package (the newly-selected one if it's being changed).
+    let sessionCount = payment.subscriptions?.packages?.session_count as number | undefined;
+    let validityDays = payment.subscriptions?.packages?.validity_days as number | undefined;
+    if (updates.package_id && updates.package_id !== payment.subscriptions?.package_id) {
+      const { data: effPkg } = await supabase
+        .from("packages")
+        .select("session_count, validity_days")
+        .eq("id", updates.package_id)
+        .single();
+      if (effPkg) {
+        sessionCount = effPkg.session_count;
+        validityDays = effPkg.validity_days;
+      }
+    }
+
+    // Single-session subs never carry an end_date; otherwise derive it from validity.
+    let endDateStr: string | null = null;
+    if (sessionCount !== 1 && validityDays) {
+      const end = new Date(sy, sm - 1, sd + validityDays);
+      endDateStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+    }
+
+    const { error: subErr } = await supabase
+      .from("subscriptions")
+      .update({ start_date: startDate, end_date: endDateStr })
+      .eq("id", payment.subscription_id);
+    if (subErr) return { error: subErr.message };
+  }
+
   const packageChanged =
     updates.package_id !== undefined &&
     payment.subscriptions &&
     updates.package_id !== payment.subscriptions.package_id;
 
-  if (Object.keys(paymentUpdate).length === 0 && !packageChanged) {
+  if (Object.keys(paymentUpdate).length === 0 && !packageChanged && !applyStartDateOverride) {
     return { error: "No changes provided" };
   }
 
