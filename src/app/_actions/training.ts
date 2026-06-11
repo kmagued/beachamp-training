@@ -822,17 +822,133 @@ export async function createCoach(formData: FormData) {
     return { error: authError2.message };
   }
 
-  // Profile is auto-created by the trigger; ensure is_coach is set and phone is recorded
+  // Don't rely on the signup trigger to create the profile — for admin-created
+  // coach accounts it has been leaving no profile row at all, so the coach never
+  // shows in the coaches list and logging in routes them to the player portal
+  // (a blank /player/dashboard). Create/repair the profile explicitly.
   if (authData?.user) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const update: any = { is_coach: true };
-    if (phone) update.phone = phone;
-    await admin
+    const { error: profileErr } = await admin
       .from("profiles")
-      .update(update)
-      .eq("id", authData.user.id);
+      .upsert(
+        {
+          id: authData.user.id,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          phone,
+          role: "coach",
+          is_coach: true,
+          is_active: true,
+          profile_completed: true,
+        },
+        { onConflict: "id" },
+      );
+    if (profileErr) {
+      // Roll back the orphaned auth user so a failed create doesn't leave a
+      // login-able account with no profile.
+      await admin.auth.admin.deleteUser(authData.user.id);
+      return { error: `Failed to create coach profile: ${profileErr.message}` };
+    }
   }
 
   revalidatePath("/admin/coaches");
   return { success: true, password };
+}
+
+export async function updateCoach(coachId: string, formData: FormData) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  const firstName = (formData.get("first_name") as string)?.trim();
+  const lastName = (formData.get("last_name") as string)?.trim();
+  if (!firstName || !lastName) return { error: "First and last name are required" };
+
+  const email = (formData.get("email") as string)?.trim() || null;
+  const phone = (formData.get("phone") as string)?.trim() || null;
+  const area = (formData.get("area") as string)?.trim() || null;
+  const isActive = formData.get("is_active") !== "false";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Coaches are real login accounts — keep the auth login email in step with the
+  // displayed email so editing it here doesn't desync the credential.
+  if (email) {
+    const { data: existing } = await admin.auth.admin.getUserById(coachId);
+    if (existing?.user && existing.user.email !== email) {
+      const { error: authErr } = await admin.auth.admin.updateUserById(coachId, { email, email_confirm: true });
+      if (authErr) return { error: `Failed to update email: ${authErr.message}` };
+    }
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ first_name: firstName, last_name: lastName, email, phone, area, is_active: isActive })
+    .eq("id", coachId)
+    .eq("is_coach", true);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/coaches");
+  revalidatePath(`/admin/coaches/${coachId}`);
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+export async function deleteCoach(coachId: string) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Never delete an admin via the coaches list — an admin can also be a coach
+  // (is_coach=true), and identity/is_active live on the single shared profile row.
+  const { data: target } = await admin.from("profiles").select("role").eq("id", coachId).single();
+  if (!target) return { error: "Coach not found" };
+  if (target.role === "admin") {
+    return { error: "This account is also an admin and can't be deleted from the coaches list." };
+  }
+
+  // Clean path first (works for a coach with no history). If FK references block
+  // the cascade, clear the RESTRICT refs a coach can hold, then retry.
+  //
+  // These are the ONLY non-cascade refs a role=coach target can populate. Other
+  // RESTRICT audit columns (expenses.created_by, whatsapp_templates.created_by,
+  // system_settings.updated_by, schedule_photos.uploaded_by) are written by
+  // admin-only actions, and admins are refused above — so a deletable coach never
+  // references them. Revisit this list if a coach is ever allowed to write those.
+  let { error } = await admin.auth.admin.deleteUser(coachId);
+  if (error) {
+    await admin.from("schedule_sessions").update({ coach_id: null }).eq("coach_id", coachId);
+    await admin.from("attendance").update({ marked_by: null }).eq("marked_by", coachId);
+    await admin.from("payments").update({ confirmed_by: null }).eq("confirmed_by", coachId);
+    await admin.from("coach_blocks").update({ created_by: null }).eq("created_by", coachId);
+    await admin.from("feedback").delete().eq("coach_id", coachId);
+    ({ error } = await admin.auth.admin.deleteUser(coachId));
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+export async function bulkDeleteCoaches(coachIds: string[]) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  const results = { success: 0, failed: 0 };
+  for (const id of coachIds) {
+    const res = await deleteCoach(id);
+    if ("error" in res) results.failed++;
+    else results.success++;
+  }
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/dashboard");
+  return { success: true, results };
 }

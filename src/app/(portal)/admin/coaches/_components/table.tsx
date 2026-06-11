@@ -20,6 +20,7 @@ interface CoachesTableProps {
   sortDir: SortDir;
   toggleSort: (field: SortField) => void;
   hasActiveFilters: boolean;
+  onCoachClick?: (coach: CoachRow) => void;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -112,16 +113,17 @@ export function CoachesTableView(props: CoachesTableProps) {
   const {
     coaches, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    hasActiveFilters,
+    hasActiveFilters, onCoachClick,
   } = props;
 
   const selectionMode = selectedIds.size > 0;
   const emptyMessage = hasActiveFilters ? "No coaches match your filters" : "No coaches found";
 
-  function handleRowClick(e: React.MouseEvent, coachId: string) {
+  function handleRowClick(e: React.MouseEvent, coach: CoachRow) {
     const target = e.target as HTMLElement;
     if (target.closest("input, button, a, select")) return;
-    if (selectionMode) toggleSelect(coachId);
+    if (selectionMode) toggleSelect(coach.id);
+    else onCoachClick?.(coach);
   }
 
   return (
@@ -168,7 +170,7 @@ export function CoachesTableView(props: CoachesTableProps) {
                   <tr
                     key={coach.id}
                     id={getRowId(coach.id)}
-                    onClick={(e) => handleRowClick(e, coach.id)}
+                    onClick={(e) => handleRowClick(e, coach)}
                     className={cn(
                       "group cursor-pointer hover:bg-primary-50 transition-colors",
                       selected && "bg-primary-100 hover:bg-primary-100",
@@ -240,7 +242,7 @@ export function CoachesTableView(props: CoachesTableProps) {
           <Card
             key={coach.id}
             id={getRowId(coach.id)}
-            onClick={(e: React.MouseEvent) => handleRowClick(e, coach.id)}
+            onClick={(e: React.MouseEvent) => handleRowClick(e, coach)}
             className={cn(
               "p-4 cursor-pointer hover:bg-primary-50 hover:border-primary-200 transition-colors",
               selected && "bg-primary-100 border-primary-200",

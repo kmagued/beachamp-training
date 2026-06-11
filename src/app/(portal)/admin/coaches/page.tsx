@@ -1,15 +1,17 @@
 "use client";
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { createBrowserClient } from "@supabase/ssr";
 import { Pagination, SelectionBar, Button, Input, Drawer } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import { createCoach } from "@/app/_actions/training";
-import { Plus, Eye, EyeOff, Copy, CheckCircle2 } from "lucide-react";
+import { createCoach, bulkDeleteCoaches } from "@/app/_actions/training";
+import { Plus, Eye, EyeOff, Copy, CheckCircle2, Trash2, Loader2 } from "lucide-react";
 import type { CoachRow, SortField, SortDir } from "./_components/types";
 import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
 import { CoachesFilters } from "./_components/filters";
 import { CoachesTableView } from "./_components/table";
+import { CoachDrawer } from "./_components/coach-drawer";
 
 export default function AdminCoachesPage() {
   return (
@@ -28,6 +30,10 @@ function AdminCoachesContent() {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [pageSize, setPageSize] = useState(10);
+  const [drawerCoach, setDrawerCoach] = useState<CoachRow | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, startBulkDeleteTransition] = useTransition();
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
 
   // Add Coach state
   const [showAddCoach, setShowAddCoach] = useState(false);
@@ -151,6 +157,12 @@ function AdminCoachesContent() {
       return next;
     });
   }, []);
+
+  // Keep an open coach drawer in sync with refreshed list data; close it if the
+  // coach is gone (e.g. after a delete), matching the players pattern.
+  useEffect(() => {
+    setDrawerCoach((prev) => (prev ? coaches.find((c) => c.id === prev.id) ?? null : prev));
+  }, [coaches]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -276,7 +288,21 @@ function AdminCoachesContent() {
         hasActiveFilters={hasActiveFilters}
       />
 
-      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} />
+      <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+        <button
+          onClick={() => setConfirmBulkDelete(true)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2 sm:px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Delete
+        </button>
+      </SelectionBar>
+      {bulkNotice && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+          <span>{bulkNotice}</span>
+          <button onClick={() => setBulkNotice(null)} className="ml-auto text-xs font-medium text-amber-500 hover:text-amber-700">Dismiss</button>
+        </div>
+      )}
 
       <div className="flex-1">
         {loading ? (
@@ -295,6 +321,7 @@ function AdminCoachesContent() {
             sortDir={sortDir}
             toggleSort={toggleSort}
             hasActiveFilters={hasActiveFilters}
+            onCoachClick={setDrawerCoach}
           />
         )}
       </div>
@@ -306,6 +333,62 @@ function AdminCoachesContent() {
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
       />
+
+      <CoachDrawer
+        coach={drawerCoach}
+        onClose={() => setDrawerCoach(null)}
+        onDataChange={fetchCoaches}
+      />
+
+      {/* Bulk delete confirmation — portaled to body so the backdrop covers the whole viewport */}
+      {confirmBulkDelete && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Delete {selectedIds.size} coach{selectedIds.size === 1 ? "" : "es"}
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Their accounts are removed, any sessions they ran become unassigned, and their feedback is deleted. Admin accounts are skipped. This can&apos;t be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting}>
+                Cancel
+              </Button>
+              <button
+                onClick={() => {
+                  const ids = Array.from(selectedIds);
+                  startBulkDeleteTransition(async () => {
+                    const res = await bulkDeleteCoaches(ids);
+                    const failed = "results" in res ? res.results.failed : ids.length;
+                    setSelectedIds(new Set());
+                    setConfirmBulkDelete(false);
+                    fetchCoaches();
+                    setBulkNotice(
+                      failed > 0
+                        ? `${failed} coach${failed === 1 ? "" : "es"} couldn't be deleted (admin accounts are skipped).`
+                        : null
+                    );
+                  });
+                }}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {bulkDeleting ? (
+                  <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</span>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
