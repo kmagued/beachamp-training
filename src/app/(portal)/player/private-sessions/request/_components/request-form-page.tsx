@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select, Card, Textarea, Skeleton } from "@/components/ui";
-import { ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronLeft, ChevronRight, Sunrise, Sun, Moon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { createPrivateSessionRequest, getPrivateSessionAvailability } from "@/app/_actions/private-sessions";
@@ -47,6 +47,13 @@ function toMinutes(time: string) {
 function bookingFits(slotTime: string) {
   return toMinutes(slotTime) + BOOKING_MINUTES <= DAY_END_MIN;
 }
+
+// Group the slot grid by part of day so it reads as a schedule, not a wall of buttons.
+const TIME_PERIODS = [
+  { label: "Morning", icon: Sunrise, from: 6 * 60, to: 12 * 60 },
+  { label: "Afternoon", icon: Sun, from: 12 * 60, to: 17 * 60 },
+  { label: "Evening", icon: Moon, from: 17 * 60, to: 24 * 60 },
+] as const;
 
 function formatLabel(time: string) {
   const [h, m] = time.split(":");
@@ -183,6 +190,12 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
   const today = startOfDay(new Date());
   const isSelectedToday = selectedDate.getTime() === today.getTime();
 
+  const availableCount = useMemo(
+    () => TIME_SLOTS.slice(0, -1).filter((t) => bookingFits(t) && !reservationAt(t, reserved)).length,
+    [reserved],
+  );
+  const showSlots = Boolean(selectedCoachId) || coaches.length <= 1;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <Link
@@ -298,69 +311,96 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
 
         {/* Step 3: Time slots */}
         <Card>
-          <h2 className="text-sm font-semibold text-slate-900 mb-1">3. Pick a Time</h2>
-          <p className="text-xs text-slate-400 mb-3">
-            Tap a green slot to select it. Red slots are already reserved.
+          <div className="flex items-baseline justify-between mb-1">
+            <h2 className="text-sm font-semibold text-slate-900">3. Pick a Time</h2>
+            {!loading && showSlots && (
+              <span
+                className={cn(
+                  "text-[11px] font-medium tabular-nums",
+                  availableCount > 0 ? "text-emerald-600" : "text-slate-400",
+                )}
+              >
+                {availableCount > 0 ? `${availableCount} open` : "Fully booked"}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mb-4">
+            Sessions run 1 hr 30 min · choose an open start time
           </p>
 
           {loading ? (
-            <Skeleton className="h-64 w-full rounded-lg" />
-          ) : !selectedCoachId && coaches.length > 1 ? (
-            <p className="text-sm text-slate-400 text-center py-6">
-              Choose a coach to see availability for this date.
+            <div className="space-y-5">
+              {[8, 6].map((count, gi) => (
+                <div key={gi}>
+                  <Skeleton className="h-3 w-20 rounded mb-3" />
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {Array.from({ length: count }).map((_, i) => (
+                      <Skeleton key={i} className="h-10 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !showSlots ? (
+            <p className="text-sm text-slate-400 text-center py-10">
+              Choose a coach to see available times.
             </p>
           ) : (
-            <>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                {TIME_SLOTS.slice(0, -1).map((time) => {
-                  const reservation = reservationAt(time, reserved);
-                  const fits = bookingFits(time);
-                  const reservedFlag = !!reservation || !fits;
-                  const isSelected = selectedTime === time;
-                  return (
-                    <button
-                      key={time}
-                      type="button"
-                      disabled={reservedFlag}
-                      onClick={() => handleSlotClick(time)}
-                      className={cn(
-                        "px-2 py-2 rounded-md border text-xs font-medium transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary text-white"
-                          : reservedFlag
-                            ? "border-red-200 bg-red-50 text-red-400 cursor-not-allowed"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300",
-                      )}
-                      title={
-                        reservation
-                          ? reservation.kind === "block"
-                            ? "Coach unavailable"
-                            : `Reserved (${reservation.kind === "private" ? "private session" : "group session"})`
-                          : !fits
-                            ? "Not enough time before midnight"
-                            : "Available"
-                      }
-                    >
-                      {formatLabel(time)}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] text-slate-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200 inline-block" />
-                  Available
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-red-50 border border-red-200 inline-block" />
-                  Reserved
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-primary inline-block" />
-                  Selected
-                </span>
-              </div>
-            </>
+            <div className="space-y-5">
+              {TIME_PERIODS.map((period) => {
+                const slots = TIME_SLOTS.slice(0, -1).filter((t) => {
+                  const m = toMinutes(t);
+                  return m >= period.from && m < period.to;
+                });
+                if (slots.length === 0) return null;
+                const Icon = period.icon;
+                return (
+                  <div key={period.label}>
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <Icon className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                        {period.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {slots.map((time) => {
+                        const reservation = reservationAt(time, reserved);
+                        const fits = bookingFits(time);
+                        const unavailable = !!reservation || !fits;
+                        const isSelected = selectedTime === time;
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            disabled={unavailable}
+                            onClick={() => handleSlotClick(time)}
+                            className={cn(
+                              "px-2 py-2.5 rounded-lg border text-[13px] font-medium transition-all duration-150",
+                              isSelected
+                                ? "border-primary bg-primary text-white shadow-sm shadow-primary/25"
+                                : unavailable
+                                  ? "border-transparent bg-slate-50 text-slate-300 cursor-not-allowed"
+                                  : "border-slate-200 bg-white text-slate-700 hover:border-primary hover:text-primary hover:-translate-y-0.5 hover:shadow-sm",
+                            )}
+                            title={
+                              reservation
+                                ? reservation.kind === "block"
+                                  ? "Coach unavailable"
+                                  : `Reserved (${reservation.kind === "private" ? "private session" : "group session"})`
+                                : !fits
+                                  ? "Not enough time before midnight"
+                                  : "Available"
+                            }
+                          >
+                            {formatLabel(time)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Card>
 
