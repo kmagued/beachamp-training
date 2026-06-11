@@ -95,6 +95,184 @@ async function reserveClashCourtForSession(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Availability for the player-facing request form.
+//
+// The request form must reflect coach blocks and OTHER players' pending/confirmed
+// requests — but RLS hides both from a player's browser client (players can only
+// read their own requests, and cannot read coach_blocks at all). So availability
+// is computed here, server-side, with the service-role admin client, and only
+// busy *intervals* are returned to the client (no reasons/identities leaked).
+// ---------------------------------------------------------------------------
+
+type BusyInterval = {
+  start_time: string;
+  end_time: string;
+  kind: "group" | "private" | "block";
+  reason?: string | null;
+};
+
+function hhmmToMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function minutesToHHMM(total: number): string {
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function dowOfDate(date: string): number {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+/**
+ * All busy intervals on `date` that occupy `coachId`'s calendar: recurring
+ * sessions (minus cancellations), pending/confirmed private requests, and the
+ * coach's unavailability blocks. When `includeUnassigned` is true (single-coach
+ * academy), sessions/requests with no coach attribution count too, since they
+ * can only run with the sole coach.
+ */
+async function coachBusyIntervals(
+  admin: SupabaseAdmin,
+  coachId: string,
+  date: string,
+  includeUnassigned: boolean
+): Promise<BusyInterval[]> {
+  const dow = dowOfDate(date);
+  const intervals: BusyInterval[] = [];
+
+  // Recurring schedule sessions on this weekday, still in range, minus cancellations.
+  let sessionQuery = admin
+    .from("schedule_sessions")
+    .select("id, start_time, end_time, session_type, end_date")
+    .eq("is_active", true)
+    .eq("day_of_week", dow)
+    .or(`end_date.is.null,end_date.gte.${date}`);
+  sessionQuery = includeUnassigned
+    ? sessionQuery.or(`coach_id.eq.${coachId},coach_id.is.null`)
+    : sessionQuery.eq("coach_id", coachId);
+  const { data: sessions } = await sessionQuery;
+
+  const sessionIds = (sessions || []).map((s: { id: string }) => s.id);
+  const cancelled = new Set<string>();
+  if (sessionIds.length > 0) {
+    const { data: cancels } = await admin
+      .from("schedule_session_cancellations")
+      .select("schedule_session_id")
+      .in("schedule_session_id", sessionIds)
+      .eq("cancelled_date", date);
+    for (const c of cancels || []) cancelled.add(c.schedule_session_id as string);
+  }
+  for (const s of (sessions || []) as Array<{
+    id: string;
+    start_time: string;
+    end_time: string;
+    session_type: string;
+    end_date: string | null;
+  }>) {
+    if (cancelled.has(s.id)) continue;
+    // A private one-off session occupies ONLY its exact date — end_date is the
+    // occurrence date, not an expiry. Without this, a future private session
+    // would falsely block the same weekday + time on every earlier date.
+    if (s.session_type === "private" && s.end_date !== date) continue;
+    intervals.push({
+      start_time: s.start_time.slice(0, 5),
+      end_time: s.end_time.slice(0, 5),
+      kind: s.session_type === "private" ? "private" : "group",
+    });
+  }
+
+  // Pending/confirmed private requests occupying this coach's calendar.
+  let reqQuery = admin
+    .from("private_session_requests")
+    .select("requested_time, duration_minutes")
+    .in("status", ["pending", "confirmed"])
+    .or(`requested_date.eq.${date},and(requested_date.is.null,requested_day_of_week.eq.${dow})`);
+  reqQuery = includeUnassigned
+    ? reqQuery.or(`coach_id.eq.${coachId},coach_id.is.null`)
+    : reqQuery.eq("coach_id", coachId);
+  const { data: requests } = await reqQuery;
+  for (const r of (requests || []) as Array<{ requested_time: string; duration_minutes: number | null }>) {
+    const start = r.requested_time.slice(0, 5);
+    intervals.push({
+      start_time: start,
+      end_time: minutesToHHMM(hhmmToMinutes(start) + (r.duration_minutes || 60)),
+      kind: "private",
+    });
+  }
+
+  // Coach unavailability blocks applying to this date.
+  const { data: blocks } = await admin
+    .from("coach_blocks")
+    .select("start_time, end_time, reason")
+    .eq("coach_id", coachId)
+    .or(
+      `and(kind.eq.one_time,start_date.lte.${date},or(end_date.is.null,end_date.gte.${date})),` +
+        `and(kind.eq.weekly,day_of_week.eq.${dow},or(effective_from.is.null,effective_from.lte.${date}),or(effective_until.is.null,effective_until.gte.${date}))`
+    );
+  for (const b of (blocks || []) as Array<{ start_time: string | null; end_time: string | null; reason: string | null }>) {
+    const allDay = b.start_time === null && b.end_time === null;
+    // A half-specified block (exactly one bound null) is never created, and the
+    // canonical matcher (blockMatchesSync) ignores it — so do the same here.
+    if (!allDay && (b.start_time === null || b.end_time === null)) continue;
+    intervals.push({
+      start_time: allDay ? "00:00" : (b.start_time as string).slice(0, 5),
+      end_time: allDay ? "24:00" : (b.end_time as string).slice(0, 5),
+      kind: "block",
+      reason: b.reason,
+    });
+  }
+
+  return intervals;
+}
+
+/**
+ * Resolve the busy set for a request. A specific coach uses that coach's
+ * calendar. With no coach ("any available coach"): a single-coach academy
+ * resolves to the sole coach; with multiple coaches we can't determine a single
+ * calendar here, so we signal needsCoach so the UI asks the player to choose one.
+ */
+async function resolveBusyIntervals(
+  admin: SupabaseAdmin,
+  date: string,
+  coachId?: string
+): Promise<{ busy: BusyInterval[]; needsCoach: boolean }> {
+  const { data: activeCoaches } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("is_coach", true)
+    .eq("is_active", true);
+  const coachIds = (activeCoaches || []).map((c: { id: string }) => c.id as string);
+
+  if (coachId) {
+    const sole = coachIds.length === 1 && coachIds[0] === coachId;
+    return { busy: await coachBusyIntervals(admin, coachId, date, sole), needsCoach: false };
+  }
+  if (coachIds.length === 1) {
+    return { busy: await coachBusyIntervals(admin, coachIds[0], date, true), needsCoach: false };
+  }
+  return { busy: [], needsCoach: coachIds.length > 1 };
+}
+
+export async function getPrivateSessionAvailability(input: {
+  date: string;
+  coachId?: string;
+}): Promise<{ busy: BusyInterval[]; needsCoach: boolean }> {
+  const user = await getCurrentUser();
+  if (!user) return { busy: [], needsCoach: false };
+
+  const admin = createAdminClient();
+  const { busy, needsCoach } = await resolveBusyIntervals(admin, input.date, input.coachId || undefined);
+  // Only expose the busy window + kind — never the coach's private block reason.
+  return {
+    busy: busy.map((b) => ({ start_time: b.start_time, end_time: b.end_time, kind: b.kind })),
+    needsCoach,
+  };
+}
+
 export async function createPrivateSessionRequest(data: {
   coach_id?: string;
   requested_day_of_week: number;
@@ -110,6 +288,29 @@ export async function createPrivateSessionRequest(data: {
 
   if (data.requested_day_of_week < 0 || data.requested_day_of_week > 6) {
     return { error: "Invalid day of week" };
+  }
+
+  // Defense in depth: never trust the client's slot pick. Re-check the full
+  // requested window against the coach's real availability (blocks + sessions +
+  // other players' requests), which RLS hides from the player's own browser.
+  if (data.requested_date) {
+    const startM = hhmmToMinutes(data.requested_time);
+    const endM = startM + (data.duration_minutes || 60);
+    const { busy, needsCoach } = await resolveBusyIntervals(admin, data.requested_date, data.coach_id || undefined);
+    if (needsCoach) {
+      return { error: "Please choose a specific coach for this session." };
+    }
+    const clash = busy.find(
+      (b) => hhmmToMinutes(b.start_time) < endM && hhmmToMinutes(b.end_time) > startM
+    );
+    if (clash) {
+      return {
+        error:
+          clash.kind === "block"
+            ? "The coach is unavailable at that time. Please pick another slot."
+            : "That time has just been booked. Please pick another slot.",
+      };
+    }
   }
 
   const { error } = await admin.from("private_session_requests").insert({

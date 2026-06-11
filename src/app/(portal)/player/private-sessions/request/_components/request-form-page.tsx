@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button, Select, Card, Textarea, Skeleton } from "@/components/ui";
 import { ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
 import { cn } from "@/lib/utils/cn";
-import { createPrivateSessionRequest } from "@/app/_actions/private-sessions";
+import { createPrivateSessionRequest, getPrivateSessionAvailability } from "@/app/_actions/private-sessions";
 
 interface Coach {
   id: string;
@@ -34,9 +33,19 @@ for (let h = 6; h <= 24; h++) {
 
 const DAYS_TO_SHOW = 28;
 
+// A private session books a fixed-length window; availability must reflect the
+// WHOLE window, not just the 30-min grid cell the player taps.
+const BOOKING_MINUTES = 90;
+const DAY_END_MIN = 24 * 60; // a booking must finish by midnight
+
 function toMinutes(time: string) {
-  const [h, m] = time.split(":").map(Number);
+  const [h, m] = time.slice(0, 5).split(":").map(Number);
   return h * 60 + m;
+}
+
+/** Does a full booking starting at this slot finish before end of day? */
+function bookingFits(slotTime: string) {
+  return toMinutes(slotTime) + BOOKING_MINUTES <= DAY_END_MIN;
 }
 
 function formatLabel(time: string) {
@@ -63,7 +72,7 @@ function startOfDay(d: Date) {
 
 function isSlotReserved(slotTime: string, reserved: ReservedSlot[]) {
   const start = toMinutes(slotTime);
-  const end = start + 30;
+  const end = start + BOOKING_MINUTES;
   return reserved.some((r) => {
     const rs = toMinutes(r.start_time);
     const re = toMinutes(r.end_time);
@@ -73,7 +82,7 @@ function isSlotReserved(slotTime: string, reserved: ReservedSlot[]) {
 
 function reservationAt(slotTime: string, reserved: ReservedSlot[]): ReservedSlot | undefined {
   const start = toMinutes(slotTime);
-  const end = start + 30;
+  const end = start + BOOKING_MINUTES;
   return reserved.find((r) => {
     const rs = toMinutes(r.start_time);
     const re = toMinutes(r.end_time);
@@ -101,11 +110,6 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
     return t;
   });
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   const dateOptions = useMemo(() => {
     const out: Date[] = [];
     for (let i = 0; i < DAYS_TO_SHOW; i++) {
@@ -118,100 +122,35 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
 
   useEffect(() => {
     setSelectedTime(null);
+    // With multiple coaches and none chosen we can't resolve a single calendar,
+    // so prompt the player to pick a coach first (server returns needsCoach too).
     if (!selectedCoachId && coaches.length > 1) {
       setReserved([]);
+      setLoading(false);
       return;
     }
 
     setLoading(true);
-    async function fetchReservations() {
-      const dateStr = formatDateISO(selectedDate);
-      const dow = selectedDate.getDay();
-
-      // 1. Recurring schedule sessions on that day-of-week
-      let scheduleQuery = supabase
-        .from("schedule_sessions")
-        .select("id, day_of_week, start_time, end_time, end_date, is_active, session_type, coach_id")
-        .eq("day_of_week", dow)
-        .eq("is_active", true)
-        .or(`end_date.is.null,end_date.gte.${dateStr}`);
-      if (selectedCoachId) scheduleQuery = scheduleQuery.eq("coach_id", selectedCoachId);
-      const { data: scheduleRows } = await scheduleQuery;
-
-      const sessionIds = (scheduleRows || []).map((r: { id: string }) => r.id);
-
-      // 2. Cancellations for those sessions on that date
-      const cancelledSet = new Set<string>();
-      if (sessionIds.length > 0) {
-        const { data: cancellations } = await supabase
-          .from("schedule_session_cancellations")
-          .select("schedule_session_id")
-          .in("schedule_session_id", sessionIds)
-          .eq("cancelled_date", dateStr);
-        for (const c of cancellations || []) cancelledSet.add(c.schedule_session_id as string);
-      }
-
-      const recurringReservations: ReservedSlot[] = (scheduleRows || [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((r: any) => !cancelledSet.has(r.id))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((r: any) => ({
-          start_time: r.start_time,
-          end_time: r.end_time,
-          kind: r.session_type === "private" ? "private" : "group",
-        }));
-
-      // 3. Pending/confirmed private session requests on this exact date (or matching dow legacy rows without a date)
-      let reqQuery = supabase
-        .from("private_session_requests")
-        .select("id, coach_id, requested_day_of_week, requested_date, requested_time, duration_minutes, status")
-        .in("status", ["pending", "confirmed"])
-        .or(`requested_date.eq.${dateStr},and(requested_date.is.null,requested_day_of_week.eq.${dow})`);
-      if (selectedCoachId) reqQuery = reqQuery.eq("coach_id", selectedCoachId);
-      const { data: requestRows } = await reqQuery;
-
-      const requestReservations: ReservedSlot[] = (requestRows || []).map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (r: any) => {
-          const start = r.requested_time as string;
-          const startMins = toMinutes(start);
-          const endMins = startMins + (r.duration_minutes || 60);
-          const eh = Math.floor(endMins / 60) % 24;
-          const em = endMins % 60;
-          const end = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
-          return { start_time: start, end_time: end, kind: "private" as const };
-        },
-      );
-
-      // 4. Coach blocks (only if a specific coach is chosen)
-      let blockReservations: ReservedSlot[] = [];
-      if (selectedCoachId) {
-        const { data: blockRows } = await supabase
-          .from("coach_blocks")
-          .select("kind, start_date, end_date, day_of_week, effective_from, effective_until, start_time, end_time, reason")
-          .eq("coach_id", selectedCoachId)
-          .or(
-            `and(kind.eq.one_time,start_date.lte.${dateStr},or(end_date.is.null,end_date.gte.${dateStr})),` +
-            `and(kind.eq.weekly,day_of_week.eq.${dow},or(effective_from.is.null,effective_from.lte.${dateStr}),or(effective_until.is.null,effective_until.gte.${dateStr}))`
-          );
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        blockReservations = ((blockRows || []) as any[]).map((b) => {
-          const start = b.start_time ? (b.start_time as string).slice(0, 5) : '06:00';
-          const end = b.end_time ? (b.end_time as string).slice(0, 5) : '23:59';
-          return { start_time: start, end_time: end, kind: 'block' as const, reason: b.reason };
-        });
-      }
-
-      setReserved([...recurringReservations, ...requestReservations, ...blockReservations]);
+    let cancelled = false;
+    (async () => {
+      // Availability is computed server-side (admin client) because RLS hides
+      // coach blocks and other players' requests from the player's own session.
+      const { busy } = await getPrivateSessionAvailability({
+        date: formatDateISO(selectedDate),
+        coachId: selectedCoachId || undefined,
+      });
+      if (cancelled) return;
+      setReserved(busy);
       setLoading(false);
-    }
-    fetchReservations();
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCoachId, selectedDate]);
 
   function handleSlotClick(time: string) {
-    if (isSlotReserved(time, reserved)) return;
+    if (isSlotReserved(time, reserved) || !bookingFits(time)) return;
     setSelectedTime(time);
   }
 
@@ -227,7 +166,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
       requested_date: formatDateISO(selectedDate),
       requested_day_of_week: selectedDate.getDay(),
       requested_time: selectedTime,
-      duration_minutes: 90,
+      duration_minutes: BOOKING_MINUTES,
       notes: notes.trim() || undefined,
     };
 
@@ -375,7 +314,8 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                 {TIME_SLOTS.slice(0, -1).map((time) => {
                   const reservation = reservationAt(time, reserved);
-                  const reservedFlag = !!reservation;
+                  const fits = bookingFits(time);
+                  const reservedFlag = !!reservation || !fits;
                   const isSelected = selectedTime === time;
                   return (
                     <button
@@ -392,11 +332,13 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
                             : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300",
                       )}
                       title={
-                        reservedFlag
-                          ? reservation?.kind === "block"
-                            ? (reservation.reason ? `Coach unavailable — ${reservation.reason}` : "Coach unavailable")
-                            : `Reserved (${reservation?.kind === "private" ? "private session" : "group session"})`
-                          : "Available"
+                        reservation
+                          ? reservation.kind === "block"
+                            ? "Coach unavailable"
+                            : `Reserved (${reservation.kind === "private" ? "private session" : "group session"})`
+                          : !fits
+                            ? "Not enough time before midnight"
+                            : "Available"
                       }
                     >
                       {formatLabel(time)}
