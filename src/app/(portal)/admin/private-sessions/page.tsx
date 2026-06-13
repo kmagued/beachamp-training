@@ -43,6 +43,7 @@ export default async function AdminPrivateSessionsPage() {
       .select(`
         *,
         player:profiles!private_session_requests_player_id_fkey(first_name, last_name, phone),
+        partner:profiles!private_session_requests_partner_player_id_fkey(first_name, last_name),
         coach:profiles!private_session_requests_coach_id_fkey(first_name, last_name)
       `)
       .order("created_at", { ascending: false }),
@@ -82,6 +83,7 @@ export default async function AdminPrivateSessionsPage() {
     location: string | null;
     created_at: string;
     player: { first_name: string; last_name: string; phone: string | null } | null;
+    partner: { first_name: string; last_name: string } | null;
     coach: { first_name: string; last_name: string } | null;
   }[];
 
@@ -334,6 +336,11 @@ export default async function AdminPrivateSessionsPage() {
                         {r.player?.phone && (
                           <span className="block text-[10px] text-slate-400">{r.player.phone}</span>
                         )}
+                        {r.partner && (
+                          <span className="block text-[10px] text-primary font-medium">
+                            + {r.partner.first_name} {r.partner.last_name} (team)
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-600">
                         {r.requested_date
@@ -369,6 +376,11 @@ export default async function AdminPrivateSessionsPage() {
                     <p className="text-sm font-semibold text-slate-900">
                       {r.player ? `${r.player.first_name} ${r.player.last_name}` : "—"}
                     </p>
+                    {r.partner && (
+                      <p className="text-[11px] text-primary font-medium">
+                        + {r.partner.first_name} {r.partner.last_name} (team)
+                      </p>
+                    )}
                     {r.player?.phone && (
                       <p className="text-[10px] text-slate-400">{r.player.phone}</p>
                     )}
