@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
+import { PendingPaymentCard } from "./_components/pending-payment-card";
 
 export default async function PlayerDashboard() {
   const currentUser = await getCurrentUser();
@@ -39,6 +40,28 @@ export default async function PlayerDashboard() {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
+
+  // For an unpaid (pending_payment) sub, load its payment so the player can
+  // upload an Instapay screenshot right from the dashboard.
+  let pendingPayment: { id: string; amount: number; screenshot_url: string | null } | null = null;
+  if (pendingSubscription?.status === "pending_payment") {
+    const { data } = await supabase
+      .from("payments")
+      .select("id, amount, screenshot_url")
+      .eq("subscription_id", pendingSubscription.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    pendingPayment = data;
+  }
+
+  // Show the upload card when there's an unpaid attended session and no active
+  // sub with sessions left (an exhausted-but-active multi-session sub stays
+  // 'active', so it must not hide the payment the player still owes).
+  const hasUsableActiveSub = !!subscription && subscription.sessions_remaining > 0;
+  const showPaymentCard =
+    !hasUsableActiveSub && pendingSubscription?.status === "pending_payment" && !!pendingPayment;
 
   const { data: latestFeedback } = await supabase
     .from("feedback")
@@ -142,7 +165,14 @@ export default async function PlayerDashboard() {
             <Package className="w-4 h-4 text-primary-700/50" />
             Subscription Status
           </h2>
-          {subscription ? (
+          {showPaymentCard ? (
+            <PendingPaymentCard
+              paymentId={pendingPayment!.id}
+              packageName={pendingSubscription?.packages?.name ?? "your package"}
+              amount={pendingPayment!.amount}
+              hasScreenshot={!!pendingPayment!.screenshot_url}
+            />
+          ) : subscription ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-primary-700/60">Status</span>
@@ -180,17 +210,9 @@ export default async function PlayerDashboard() {
               </Badge>
               <p className="text-sm text-primary-700/70 mt-2">
                 {pendingSubscription.status === "pending_payment"
-                  ? `You have an unpaid session for ${pendingSubscription.packages?.name}. Please make your payment.`
+                  ? `You have an unpaid session for ${pendingSubscription.packages?.name}.`
                   : `Your payment for ${pendingSubscription.packages?.name} is being reviewed.`}
               </p>
-              {pendingSubscription.status === "pending_payment" && (
-                <Link
-                  href="/player/subscribe"
-                  className="text-sm font-semibold text-primary-800 hover:text-primary-900 mt-2 inline-block"
-                >
-                  Pay Now →
-                </Link>
-              )}
             </div>
           ) : (
             <EmptyState

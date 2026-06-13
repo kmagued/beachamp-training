@@ -9,6 +9,7 @@ import { Check, Upload, CreditCard, Tag, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding } from "@/lib/config/branding";
+import { INSTAPAY } from "@/lib/config/payment";
 import { submitSubscription } from "./actions";
 import { validatePromoCode } from "@/app/(portal)/admin/promo-codes/actions";
 import type { Package, Subscription, Profile } from "@/types/database";
@@ -501,9 +502,9 @@ function PlayerSubscribeContent() {
           {selectedMethod === "instapay" && (
             <Card className="mb-8 bg-primary-50/50 border-primary-200">
               <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
-              <p className="text-base font-bold text-primary select-all">ahmed1.fahmy1@instapay</p>
+              <p className="text-base font-bold text-primary select-all">{INSTAPAY.handle}</p>
               <a
-                href="https://ipn.eg/S/ahmed1.fahmy1/instapay/7LeGVE"
+                href={INSTAPAY.link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
