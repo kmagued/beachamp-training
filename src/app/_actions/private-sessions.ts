@@ -280,6 +280,7 @@ export async function createPrivateSessionRequest(data: {
   requested_time: string;
   duration_minutes?: number;
   notes?: string;
+  partner_player_id?: string;
 }) {
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
@@ -313,6 +314,22 @@ export async function createPrivateSessionRequest(data: {
     }
   }
 
+  let partnerPlayerId: string | null = null;
+  if (data.partner_player_id) {
+    if (data.partner_player_id === user.id) {
+      return { error: "You cannot select yourself as the second player." };
+    }
+    const { data: partner } = await admin
+      .from("profiles")
+      .select("id, role, is_active")
+      .eq("id", data.partner_player_id)
+      .single();
+    if (!partner || partner.role !== "player" || !partner.is_active) {
+      return { error: "Selected second player is not available." };
+    }
+    partnerPlayerId = partner.id;
+  }
+
   const { error } = await admin.from("private_session_requests").insert({
     player_id: user.id,
     coach_id: data.coach_id || null,
@@ -321,7 +338,9 @@ export async function createPrivateSessionRequest(data: {
     requested_time: data.requested_time,
     duration_minutes: data.duration_minutes || 60,
     notes: data.notes || null,
-  });
+    partner_player_id: partnerPlayerId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   if (error) return { error: error.message };
 
@@ -332,7 +351,7 @@ export async function createPrivateSessionRequest(data: {
     : `${dayName}s at ${data.requested_time}`;
   await notifyAdmins({
     title: "New Private Session Request",
-    body: `${playerName} requested a private session on ${whenLabel}`,
+    body: `${playerName} requested a private session${partnerPlayerId ? " (team training, 2 players)" : ""} on ${whenLabel}`,
     type: "private_session",
     link: "/admin/private-sessions",
   });
@@ -393,9 +412,9 @@ export async function confirmPrivateSessionRequest(
 
   const admin = createAdminClient();
 
-  const { data: req, error: fetchErr } = await admin
+  const { data: req, error: fetchErr } = await (admin as unknown as SupabaseAdmin)
     .from("private_session_requests")
-    .select("id, status, player_id, coach_id, requested_day_of_week, requested_time, duration_minutes, location")
+    .select("id, status, player_id, partner_player_id, coach_id, requested_day_of_week, requested_time, duration_minutes, location")
     .eq("id", requestId)
     .single();
 
@@ -445,11 +464,14 @@ export async function confirmPrivateSessionRequest(
 
   if (insertErr || !created) return { error: insertErr?.message || "Failed to create session" };
 
-  // Player-requested sessions are always single-player
-  await admin.from("schedule_session_players").insert({
-    schedule_session_id: created.id,
-    player_id: req.player_id,
-  });
+  // Requester is always added; team-training requests also add the partner.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const partnerPlayerId = (req as any).partner_player_id as string | null;
+  const junctionRows = [{ schedule_session_id: created.id, player_id: req.player_id }];
+  if (partnerPlayerId) {
+    junctionRows.push({ schedule_session_id: created.id, player_id: partnerPlayerId });
+  }
+  await admin.from("schedule_session_players").insert(junctionRows);
 
   if (clashCourtId && clashCourtName && isClashConfigured()) {
     const reserveRes = await reserveClashCourtForSession(admin, created.id, {
@@ -484,6 +506,16 @@ export async function confirmPrivateSessionRequest(
     type: "private_session",
     link: "/player/private-sessions",
   });
+
+  if (partnerPlayerId) {
+    await createNotification({
+      user_id: partnerPlayerId,
+      title: "Added to a Private Session",
+      body: `You've been added to a private team training on ${dayName} ${sessionDate} at ${startTime}.`,
+      type: "private_session",
+      link: "/player/private-sessions",
+    });
+  }
 
   revalidatePath("/player/private-sessions");
   revalidatePath("/admin/private-sessions");
@@ -676,4 +708,32 @@ export async function createAdminPrivateSession(data: {
   revalidatePath("/coach/schedule");
   revalidatePath("/admin/daily-report");
   return { success: true, id: created.id };
+}
+
+// Search registered players to pick a 2nd player for team training.
+// Runs admin-side because RLS hides other players from a player's session.
+export async function searchPlayersForPartner(query: string): Promise<{ id: string; name: string }[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  // Strip PostgREST-special chars so the .or() filter can't be manipulated.
+  const safe = (query || "").replace(/[%,()]/g, " ").trim();
+  if (safe.length < 2) return [];
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .eq("role", "player")
+    .eq("is_active", true)
+    .neq("id", user.id)
+    .or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`)
+    .order("first_name")
+    .limit(20);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data as any[]) || []).map((p) => ({
+    id: p.id as string,
+    name: `${p.first_name} ${p.last_name}`,
+  }));
 }
