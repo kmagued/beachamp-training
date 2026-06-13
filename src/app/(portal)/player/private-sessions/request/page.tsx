@@ -17,5 +17,21 @@ export default async function RequestPrivateSessionPage() {
     .eq("is_active", true)
     .order("first_name");
 
-  return <RequestFormPage coaches={coaches || []} />;
+  const { data: privatePackages } = await supabase
+    .from("packages")
+    .select("price, private_session_players")
+    .in("private_session_players", [1, 2]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pkgs = (privatePackages || []) as any[];
+  const individualPrice = pkgs.find((p) => p.private_session_players === 1)?.price ?? null;
+  const teamPrice = pkgs.find((p) => p.private_session_players === 2)?.price ?? null;
+
+  return (
+    <RequestFormPage
+      coaches={coaches || []}
+      individualPrice={individualPrice}
+      teamPrice={teamPrice}
+    />
+  );
 }

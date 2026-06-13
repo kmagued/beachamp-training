@@ -17,6 +17,7 @@ export default async function PlayerPackagesPage() {
     .from("packages")
     .select("*")
     .eq("is_active", true)
+    .is("private_session_players", null)
     .order("sort_order", { ascending: true });
 
   const pkgs = (packages || []) as Package[];

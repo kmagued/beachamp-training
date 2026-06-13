@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition } from "react";
+import { useState, useEffect, useMemo, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select, Card, Textarea, Skeleton } from "@/components/ui";
-import { ArrowLeft, Loader2, ChevronLeft, ChevronRight, Sunrise, Sun, Moon } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronLeft, ChevronRight, Sunrise, Sun, Moon, User, Users, Search, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
-import { createPrivateSessionRequest, getPrivateSessionAvailability } from "@/app/_actions/private-sessions";
+import { createPrivateSessionRequest, getPrivateSessionAvailability, searchPlayersForPartner } from "@/app/_actions/private-sessions";
 
 interface Coach {
   id: string;
@@ -97,7 +97,15 @@ function reservationAt(slotTime: string, reserved: ReservedSlot[]): ReservedSlot
   });
 }
 
-export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
+export function RequestFormPage({
+  coaches,
+  individualPrice,
+  teamPrice,
+}: {
+  coaches: Coach[];
+  individualPrice: number | null;
+  teamPrice: number | null;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +119,14 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
   const [reserved, setReserved] = useState<ReservedSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState("");
+  const [sessionType, setSessionType] = useState<"individual" | "team">("individual");
+  const [partnerId, setPartnerId] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+  const [partnerQuery, setPartnerQuery] = useState("");
+  const [partnerResults, setPartnerResults] = useState<{ id: string; name: string }[]>([]);
+  const [partnerSearching, setPartnerSearching] = useState(false);
+  const [partnerDropdownOpen, setPartnerDropdownOpen] = useState(false);
+  const partnerPickerRef = useRef<HTMLDivElement>(null);
   const [dateRangeStart, setDateRangeStart] = useState<Date>(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -156,15 +172,72 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCoachId, selectedDate]);
 
+  // Debounced partner search (team training only).
+  useEffect(() => {
+    if (sessionType !== "team") return;
+    const q = partnerQuery.trim();
+    if (q.length < 2) {
+      setPartnerResults([]);
+      setPartnerSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setPartnerSearching(true);
+    const t = setTimeout(async () => {
+      const res = await searchPlayersForPartner(q);
+      if (cancelled) return;
+      setPartnerResults(res);
+      setPartnerSearching(false);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [partnerQuery, sessionType]);
+
+  // Close the partner dropdown on outside click.
+  useEffect(() => {
+    if (!partnerDropdownOpen) return;
+    function onClick(e: MouseEvent) {
+      if (!partnerPickerRef.current) return;
+      if (!partnerPickerRef.current.contains(e.target as Node)) {
+        setPartnerDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [partnerDropdownOpen]);
+
   function handleSlotClick(time: string) {
     if (isSlotReserved(time, reserved) || !bookingFits(time)) return;
     setSelectedTime(time);
   }
 
+  function selectPartner(p: { id: string; name: string }) {
+    setPartnerId(p.id);
+    setPartnerName(p.name);
+    setPartnerQuery("");
+    setPartnerResults([]);
+    setPartnerDropdownOpen(false);
+  }
+
+  function clearPartner() {
+    setPartnerId(null);
+    setPartnerName(null);
+    setPartnerQuery("");
+    setPartnerResults([]);
+  }
+
+  const selectedPrice = sessionType === "team" ? teamPrice : individualPrice;
+
   function handleSubmit() {
     setError(null);
     if (!selectedTime) {
       setError("Please pick an available time slot");
+      return;
+    }
+    if (sessionType === "team" && !partnerId) {
+      setError("Please select a second player for team training");
       return;
     }
 
@@ -175,6 +248,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
       requested_time: selectedTime,
       duration_minutes: BOOKING_MINUTES,
       notes: notes.trim() || undefined,
+      partner_player_id: sessionType === "team" && partnerId ? partnerId : undefined,
     };
 
     startTransition(async () => {
@@ -218,9 +292,100 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
           </div>
         )}
 
-        {/* Step 1: Coach */}
+        {/* Step 1: Session Type */}
         <Card>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">1. Choose a Coach</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">1. Session Type</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setSessionType("individual"); clearPartner(); }}
+              className={cn(
+                "text-left rounded-lg border p-3 transition-all",
+                sessionType === "individual"
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-slate-200 hover:border-slate-300",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Private Session</span>
+                <User className="w-4 h-4 text-slate-400" />
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">1 player</p>
+              <p className="text-sm font-bold text-primary mt-2">
+                {individualPrice != null ? `${individualPrice.toLocaleString("en-US")} EGP` : "—"}
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSessionType("team")}
+              className={cn(
+                "text-left rounded-lg border p-3 transition-all",
+                sessionType === "team"
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-slate-200 hover:border-slate-300",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Private Team Training</span>
+                <Users className="w-4 h-4 text-slate-400" />
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">2 players</p>
+              <p className="text-sm font-bold text-primary mt-2">
+                {teamPrice != null ? `${teamPrice.toLocaleString("en-US")} EGP` : "—"}
+              </p>
+            </button>
+          </div>
+
+          {sessionType === "team" && (
+            <div className="mt-4" ref={partnerPickerRef}>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Second player</label>
+              {partnerId ? (
+                <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-sm font-medium rounded-full pl-3 pr-1.5 py-1">
+                  {partnerName}
+                  <button type="button" onClick={clearPartner} className="hover:bg-primary/20 rounded-full p-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={partnerQuery}
+                    onChange={(e) => { setPartnerQuery(e.target.value); setPartnerDropdownOpen(true); }}
+                    onFocus={() => setPartnerDropdownOpen(true)}
+                    placeholder="Search players by name..."
+                    className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400"
+                  />
+                  {partnerDropdownOpen && partnerQuery.trim().length >= 2 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      {partnerSearching ? (
+                        <p className="px-3 py-2 text-sm text-slate-400">Searching…</p>
+                      ) : partnerResults.length === 0 ? (
+                        <p className="px-3 py-2 text-sm text-slate-400">No players found</p>
+                      ) : (
+                        partnerResults.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => selectPartner(p)}
+                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            {p.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* Step 2: Coach */}
+        <Card>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">2. Choose a Coach</h2>
           <Select
             name="coach_id"
             value={selectedCoachId}
@@ -236,7 +401,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
         {/* Step 2: Date picker */}
         <Card>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900">2. Pick a Date</h2>
+            <h2 className="text-sm font-semibold text-slate-900">3. Pick a Date</h2>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -312,7 +477,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
         {/* Step 3: Time slots */}
         <Card>
           <div className="flex items-baseline justify-between mb-1">
-            <h2 className="text-sm font-semibold text-slate-900">3. Pick a Time</h2>
+            <h2 className="text-sm font-semibold text-slate-900">4. Pick a Time</h2>
             {!loading && showSlots && (
               <span
                 className={cn(
@@ -406,13 +571,17 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
 
         {/* Step 4: Notes & confirm */}
         <Card>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">4. Confirm Details</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">5. Confirm Details</h2>
           {selectedTime && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 mb-4">
               <p className="text-sm font-medium text-emerald-800">
                 {DAY_LABELS_FULL[selectedDate.getDay()]},{" "}
                 {selectedDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} at{" "}
                 {formatLabel(selectedTime)}
+              </p>
+              <p className="text-xs font-medium text-emerald-700 mt-1">
+                {sessionType === "team" ? "Private Team Training (2 players)" : "Private Session"}
+                {selectedPrice != null ? ` · ${selectedPrice.toLocaleString("en-US")} EGP` : ""}
               </p>
             </div>
           )}
@@ -427,7 +596,7 @@ export function RequestFormPage({ coaches }: { coaches: Coach[] }) {
           />
         </Card>
 
-        <Button onClick={handleSubmit} fullWidth disabled={isPending || !selectedTime}>
+        <Button onClick={handleSubmit} fullWidth disabled={isPending || !selectedTime || (sessionType === "team" && !partnerId)}>
           {isPending ? (
             <span className="flex items-center justify-center gap-1.5">
               <Loader2 className="w-4 h-4 animate-spin" /> Submitting...
