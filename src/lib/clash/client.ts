@@ -213,9 +213,27 @@ export async function cancelClashReservation(id: string): Promise<boolean> {
   return request<boolean>(`/reservations/${id}`, { method: "DELETE" });
 }
 
+// UTC offset Africa/Cairo applies on a given calendar date, as "+02:00"/"+03:00".
+// Egypt reinstated seasonal DST in 2023: +02:00 in winter, +03:00 in summer.
+// DST flips at midnight local, so the offset is constant across a day's daytime
+// hours — probe at noon UTC to classify the date (also avoids parsing the
+// "24:00" midnight-end sentinel the caller may pass as the time).
+function cairoOffset(date: string): string {
+  const probe = new Date(`${date}T12:00:00Z`);
+  const name = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Cairo",
+    timeZoneName: "longOffset",
+  })
+    .formatToParts(probe)
+    .find((p) => p.type === "timeZoneName")?.value;
+  // `name` looks like "GMT+03:00"; strip the prefix to get "+03:00".
+  const offset = name?.replace("GMT", "");
+  return offset || "+02:00";
+}
+
 // Format a (yyyy-mm-dd, HH:mm) pair as ISO 8601 with the Africa/Cairo offset
-// the Clash API expects. Cairo is UTC+02:00 year-round (no DST since 2014).
+// the Clash API expects (DST-aware — see cairoOffset).
 export function toCairoIso(date: string, time: string): string {
   const hhmm = time.length >= 5 ? time.slice(0, 5) : time;
-  return `${date}T${hhmm}:00+02:00`;
+  return `${date}T${hhmm}:00${cairoOffset(date)}`;
 }

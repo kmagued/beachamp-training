@@ -473,6 +473,36 @@ export async function confirmPrivateSessionRequest(
   }
   await admin.from("schedule_session_players").insert(junctionRows);
 
+  // Pre-payment: create a pending charge for this private session, owed by the
+  // requester (team training: requester pays full). Priced from the tagged
+  // private package; if none is found, skip silently (never block confirmation).
+  const playerCount = partnerPlayerId ? 2 : 1;
+  const { data: pricePkg } = await admin
+    .from("packages")
+    .select("id, price")
+    .eq("private_session_players", playerCount)
+    .limit(1)
+    .maybeSingle();
+  if (pricePkg) {
+    await admin.from("payments").insert({
+      player_id: req.player_id,
+      subscription_id: null,
+      amount: pricePkg.price,
+      method: "cash",
+      status: "pending",
+      schedule_session_id: created.id,
+      note: `Private session — ${sessionDate}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    await createNotification({
+      user_id: req.player_id,
+      title: "Payment required",
+      body: `Please pay ${pricePkg.price} EGP for your private session on ${sessionDate} via Instapay.`,
+      type: "payment",
+      link: "/player/private-sessions",
+    });
+  }
+
   if (clashCourtId && clashCourtName && isClashConfigured()) {
     const reserveRes = await reserveClashCourtForSession(admin, created.id, {
       clashCourtId,
@@ -736,4 +766,30 @@ export async function searchPlayersForPartner(query: string): Promise<{ id: stri
     id: p.id as string,
     name: `${p.first_name} ${p.last_name}`,
   }));
+}
+
+// Coach/admin-only: the payment status of a private session (RLS hides payments
+// from coaches, so this runs admin-side).
+export async function getSessionPaymentStatus(scheduleSessionId: string): Promise<{
+  hasPayment: boolean;
+  paid: boolean;
+  amount: number | null;
+  status: string | null;
+}> {
+  const user = await getCurrentUser();
+  if (!user || (user.profile.role !== "admin" && user.profile.role !== "coach")) {
+    return { hasPayment: false, paid: false, amount: null, status: null };
+  }
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("payments")
+    .select("amount, status")
+    .eq("schedule_session_id", scheduleSessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return { hasPayment: false, paid: false, amount: null, status: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = data as any;
+  return { hasPayment: true, paid: d.status === "confirmed", amount: d.amount, status: d.status };
 }

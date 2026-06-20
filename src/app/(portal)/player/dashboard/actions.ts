@@ -30,12 +30,15 @@ export async function submitPendingPaymentScreenshot(formData: FormData) {
   // The payment must be this player's, still pending, and tied to an unpaid sub.
   const { data: payment } = await admin
     .from("payments")
-    .select("id, player_id, status, subscriptions(status)")
+    .select("id, player_id, status, subscription_id, subscriptions(status)")
     .eq("id", paymentId)
     .single();
 
   if (!payment || payment.player_id !== user.id) return { error: "Payment not found" };
-  if (payment.status !== "pending" || payment.subscriptions?.status !== "pending_payment") {
+  // Subscription-linked payments must still be on a pending_payment sub; standalone
+  // session payments (no subscription) just need to be pending.
+  const subOk = !payment.subscription_id || payment.subscriptions?.status === "pending_payment";
+  if (payment.status !== "pending" || !subOk) {
     return { error: "This payment can no longer be updated" };
   }
 
@@ -61,6 +64,7 @@ export async function submitPendingPaymentScreenshot(formData: FormData) {
   }
 
   revalidatePath("/player/dashboard");
+  revalidatePath("/player/private-sessions");
   revalidatePath("/admin/payments");
   return { success: true };
 }
