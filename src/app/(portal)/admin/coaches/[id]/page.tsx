@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, Badge } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, Users, Clock, CalendarDays } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import { buildWhatsAppUrl } from "@/lib/whatsapp/url";
@@ -181,7 +182,7 @@ export default async function CoachDetailPage({ params }: { params: Promise<{ id
                 className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
               >
                 <span className="text-sm font-medium text-slate-900">{g.name}</span>
-                <Badge variant="info" className="capitalize">{g.level}</Badge>
+                <Badge variant="info">{getLevelLabel(g.level)}</Badge>
               </Link>
             ))}
           </div>

@@ -58,9 +58,9 @@ export function GroupModal({ open, onClose, onSuccess, editingGroup }: GroupModa
           <div>
             <label className="text-xs font-medium text-slate-500 mb-1 block">Level</label>
             <Select name="level" defaultValue={editingGroup?.level || "mixed"}>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
+              <option value="beginner">Rookies</option>
+              <option value="intermediate">Challengers</option>
+              <option value="advanced">Pro</option>
               <option value="mixed">Mixed</option>
             </Select>
           </div>

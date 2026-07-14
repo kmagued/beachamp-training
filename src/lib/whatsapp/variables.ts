@@ -13,7 +13,7 @@ export const VARIABLES: WhatsappVariable[] = [
   { key: 'phone',         label: 'Phone',         description: "Player's phone",           example: '01XXXXXXXXX' },
   { key: 'email',         label: 'Email',         description: "Player's email",           example: 'ahmed@example.com' },
   { key: 'area',          label: 'Area',          description: 'Area of residence',        example: 'Maadi' },
-  { key: 'playing_level', label: 'Playing level', description: 'beginner / intermediate / advanced / professional', example: 'intermediate' },
+  { key: 'playing_level', label: 'Playing level', description: 'Rookies / Challengers / Pro', example: 'Challengers' },
   { key: 'gender',        label: 'Gender',        description: 'male / female',            example: 'male' },
   { key: 'occupation',    label: 'Occupation',    description: 'Player occupation',        example: 'Engineer' },
 

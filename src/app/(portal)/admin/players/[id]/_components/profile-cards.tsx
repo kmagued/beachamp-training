@@ -4,6 +4,7 @@ import {
   Activity, Heart, Target, Ruler, Hand, Shield, Users,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
+import { getLevelLabel } from "@/lib/config/branding";
 import type { PlayerProfile } from "./types";
 
 function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | null | undefined }) {
@@ -21,11 +22,11 @@ function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string
 function LevelBadge({ level }: { level: string | null }) {
   if (!level) return <span className="text-primary-700/40">—</span>;
   switch (level) {
-    case "beginner": return <Badge variant="info">Beginner</Badge>;
-    case "intermediate": return <Badge variant="info">Intermediate</Badge>;
-    case "advanced": return <Badge variant="success">Advanced</Badge>;
-    case "professional": return <Badge variant="success">Professional</Badge>;
-    default: return <Badge variant="neutral">{level}</Badge>;
+    case "beginner": return <Badge variant="info">{getLevelLabel(level)}</Badge>;
+    case "intermediate": return <Badge variant="info">{getLevelLabel(level)}</Badge>;
+    case "advanced":
+    case "professional": return <Badge variant="success">{getLevelLabel(level)}</Badge>;
+    default: return <Badge variant="neutral">{getLevelLabel(level)}</Badge>;
   }
 }
 
