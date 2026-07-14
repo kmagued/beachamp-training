@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { getLevelLabel } from "@/lib/config/branding";
 
 /**
  * Resolve all known variable keys for a player.
@@ -58,7 +59,7 @@ export async function resolvePlayerVariables(playerId: string): Promise<Map<stri
   vars.set("phone", p?.phone ?? null);
   vars.set("email", p?.email ?? null);
   vars.set("area", p?.area ?? null);
-  vars.set("playing_level", p?.playing_level ?? null);
+  vars.set("playing_level", p?.playing_level ? getLevelLabel(p.playing_level) : null);
   vars.set("gender", p?.gender ?? null);
   vars.set("occupation", p?.occupation ?? null);
 

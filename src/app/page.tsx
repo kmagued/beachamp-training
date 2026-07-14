@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
-import { branding } from "@/lib/config/branding";
+import { branding, getLevelLabel } from "@/lib/config/branding";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import type { Package } from "@/types/database";
@@ -49,7 +49,7 @@ const stats = [
 
 const levels = [
   {
-    name: "Beginner",
+    name: "Rookies",
     description: "New to volleyball or returning after a break.",
     includes: [
       "Fundamentals & technique",
@@ -59,7 +59,7 @@ const levels = [
     ],
   },
   {
-    name: "Intermediate",
+    name: "Challengers",
     description: "Comfortable with the basics, ready to level up.",
     includes: [
       "Advanced shot selection",
@@ -69,7 +69,7 @@ const levels = [
     ],
   },
   {
-    name: "Advanced",
+    name: "Pro",
     description: "Experienced players training for competition.",
     includes: [
       "High-intensity match play",
@@ -396,7 +396,7 @@ export default async function LandingPage() {
                   <div className="mb-4 text-center">
                     {g.level && (
                       <span className="inline-flex text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-600 mb-1">
-                        {g.level}
+                        {getLevelLabel(g.level)}
                       </span>
                     )}
                     <h3 className="font-display text-xl sm:text-2xl tracking-wide text-primary-900">

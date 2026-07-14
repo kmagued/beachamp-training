@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard, Card, Badge, EmptyState } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import {
   CalendarDays,
   Clock,
@@ -138,7 +139,7 @@ export default async function PlayerDashboard() {
           />
           <StatCard
             label="Level"
-            value={currentUser.profile.playing_level || "—"}
+            value={getLevelLabel(currentUser.profile.playing_level) || "—"}
             accentColor="bg-secondary-dark"
             icon={<TrendingUp className="w-5 h-5" />}
           />
@@ -150,7 +151,7 @@ export default async function PlayerDashboard() {
           <StatCard label="Package" value="None" accentColor="bg-primary-200" icon={<Package className="w-5 h-5" />} />
           <StatCard
             label="Level"
-            value={currentUser.profile.playing_level || "—"}
+            value={getLevelLabel(currentUser.profile.playing_level) || "—"}
             accentColor="bg-secondary-dark"
             icon={<TrendingUp className="w-5 h-5" />}
           />

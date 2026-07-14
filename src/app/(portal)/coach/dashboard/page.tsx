@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { StatCard, Card, Badge } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { CalendarDays, Users, MessageSquare, UsersRound, Clock, ClipboardCheck, Star, ChevronRight } from "lucide-react";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -202,7 +203,7 @@ export default async function CoachDashboard() {
                           : session.groups?.name}
                       </p>
                       <Badge variant={session.session_type === "private" ? "info" : getLevelVariant(session.groups?.level || "mixed")}>
-                        {session.session_type === "private" ? "private" : session.groups?.level}
+                        {session.session_type === "private" ? "Private" : getLevelLabel(session.groups?.level || "mixed")}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
