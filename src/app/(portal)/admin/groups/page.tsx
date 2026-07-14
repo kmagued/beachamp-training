@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, StatCard, Skeleton, Drawer, Toast } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { toggleGroupActive, deleteGroup } from "@/app/_actions/training";
 import { UsersRound, Plus, Pencil, Calendar, Users, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -309,7 +310,7 @@ export default function AdminGroupsPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="font-semibold text-slate-900">{group.name}</h3>
-                      <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+                      <Badge variant={getLevelVariant(group.level)}>{getLevelLabel(group.level)}</Badge>
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
                       <button onClick={() => openEdit(group)} className="text-slate-400 hover:text-slate-600 p-1">

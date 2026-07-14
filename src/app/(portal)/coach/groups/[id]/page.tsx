@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { ArrowLeft, Users, Calendar } from "lucide-react";
 import Link from "next/link";
 import { getLevelVariant } from "@/app/(portal)/admin/groups/_components/types";
@@ -186,7 +187,7 @@ export default function CoachGroupDetailPage() {
         </Link>
         <div className="flex items-center gap-3">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">{group.name}</h1>
-          <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+          <Badge variant={getLevelVariant(group.level)}>{getLevelLabel(group.level)}</Badge>
         </div>
         {group.description && <p className="text-slate-500 text-sm mt-1">{group.description}</p>}
         <p className="text-xs text-slate-400 mt-1">{players.length} / {group.max_players} players</p>
@@ -246,7 +247,7 @@ export default function CoachGroupDetailPage() {
                     {players.map((p) => (
                       <tr key={p.id}>
                         <td className="py-2.5 font-medium text-slate-900">{p.first_name} {p.last_name}</td>
-                        <td className="py-2.5 capitalize text-slate-600">{p.playing_level || "—"}</td>
+                        <td className="py-2.5 text-slate-600">{getLevelLabel(p.playing_level) || "—"}</td>
                         <td className="py-2.5">
                           {p.sessions_remaining !== null ? (
                             <span className={p.sessions_remaining <= 2 ? "text-amber-600 font-medium" : "text-slate-600"}>
@@ -275,7 +276,7 @@ export default function CoachGroupDetailPage() {
                             p.playing_level === "intermediate" ? "warning" :
                             p.playing_level === "beginner" ? "success" : "info"
                           }>
-                            {p.playing_level}
+                            {getLevelLabel(p.playing_level)}
                           </Badge>
                         )}
                       </div>

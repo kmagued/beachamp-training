@@ -11,6 +11,7 @@ import type { PlayerRow, SortField, SortDir } from "./_components/types";
 import { getActivityStatus, getSubscriptionStatus, getLatestSubscription, isEffectivelyActive } from "./_components/types";
 import { updatePlayerLevel, bulkUpdatePlayerLevel } from "./[id]/actions";
 import { PlayersPageSkeleton, PlayersInlineSkeleton } from "./_components/skeleton";
+import { branding, getLevelValue } from "@/lib/config/branding";
 import { PlayersFilters } from "./_components/filters";
 import { PlayersTableView } from "./_components/table";
 import { PlayerDrawer } from "./_components/player-drawer";
@@ -205,7 +206,7 @@ function AdminPlayersContent() {
         if (!selected.includes(getSubscriptionStatus(p))) return false;
       }
       if (levelFilter) {
-        const selected = levelFilter.split(",").map((s) => s.toLowerCase());
+        const selected = levelFilter.split(",").map((s) => getLevelValue(s));
         if (!p.playing_level || !selected.includes(p.playing_level)) return false;
       }
       if (packageFilter) {
@@ -496,12 +497,7 @@ function AdminPlayersContent() {
           </button>
           {levelDropdownOpen && (
             <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
-              {[
-                { value: "beginner", label: "Beginner" },
-                { value: "intermediate", label: "Intermediate" },
-                { value: "advanced", label: "Advanced" },
-                { value: "professional", label: "Professional" },
-              ].map((opt) => (
+              {branding.levels.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => handleBulkLevel(opt.value)}

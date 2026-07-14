@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition, useCallback } from "react";
 import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { Users, Plus, X, Search, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { addPlayersToGroup, removePlayersFromGroup } from "@/app/_actions/training";
 import type { GroupPlayerRow, AvailablePlayer } from "./types";
@@ -276,7 +277,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                     <td className="py-2.5 font-medium text-slate-900">
                       {p.first_name} {p.last_name}
                     </td>
-                    <td className="py-2.5 capitalize text-slate-600">{p.playing_level || "—"}</td>
+                    <td className="py-2.5 text-slate-600">{getLevelLabel(p.playing_level) || "—"}</td>
                     <td className="py-2.5">
                       {p.sessions_remaining !== null ? (
                         <span className={p.sessions_remaining <= 2 ? "text-amber-600 font-medium" : "text-slate-600"}>
@@ -354,7 +355,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                      {p.playing_level && <span className="capitalize">{p.playing_level}</span>}
+                      {p.playing_level && <span>{getLevelLabel(p.playing_level)}</span>}
                       {p.playing_level && <span>·</span>}
                       <span>
                         {p.sessions_remaining !== null ? (
@@ -418,7 +419,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
                   <span className="font-medium text-slate-900">
                     {p.first_name} {p.last_name}
                   </span>
-                  {p.playing_level && <span className="text-xs text-slate-400 ml-2 capitalize">{p.playing_level}</span>}
+                  {p.playing_level && <span className="text-xs text-slate-400 ml-2">{getLevelLabel(p.playing_level)}</span>}
                 </div>
                 {selectedPlayerIds.has(p.id) && <Check className="w-4 h-4 text-primary" />}
               </button>

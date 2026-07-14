@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
@@ -179,7 +180,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
         </Link>
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{session.group_name}</h1>
-          <Badge variant={getLevelVariant(session.group_level)}>{session.group_level}</Badge>
+          <Badge variant={getLevelVariant(session.group_level)}>{getLevelLabel(session.group_level)}</Badge>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
           <span className="flex items-center gap-1">

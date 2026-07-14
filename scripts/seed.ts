@@ -30,7 +30,7 @@ const users = [
   { email: "player1@test.com", first_name: "Omar", last_name: "Sherif", role: "player" as const, phone: "01112345678", area: "Maadi", level: "advanced", goals: "Competitive training" },
   { email: "player2@test.com", first_name: "Youssef", last_name: "Ali", role: "player" as const, phone: "01223456789", area: "Zamalek", level: "intermediate", goals: "Improve Fitness" },
   { email: "player3@test.com", first_name: "Kareem", last_name: "Mostafa", role: "player" as const, phone: "01098765432", area: "New Cairo", level: "beginner", goals: "Learn the basics" },
-  { email: "player4@test.com", first_name: "Nour", last_name: "Ibrahim", role: "player" as const, phone: "01198765432", area: "6th October", level: "professional", goals: "Prepare for a season" },
+  { email: "player4@test.com", first_name: "Nour", last_name: "Ibrahim", role: "player" as const, phone: "01198765432", area: "6th October", level: "advanced", goals: "Prepare for a season" },
   { email: "player5@test.com", first_name: "Tarek", last_name: "Saad", role: "player" as const, phone: "01298765432", area: "Heliopolis", level: "intermediate", goals: "Participate in tournaments" },
   { email: "player6@test.com", first_name: "Marwan", last_name: "Adel", role: "player" as const, phone: "01098712345", area: "Nasr City", level: "beginner", goals: "Learn the basics" },
 ];
@@ -73,7 +73,7 @@ async function main() {
     { id: player1, first_name: "Omar", last_name: "Sherif", role: "player", email: "player1@test.com", phone: "01112345678", area: "Maadi", playing_level: "advanced", training_goals: "Competitive training", is_active: true, profile_completed: true },
     { id: player2, first_name: "Youssef", last_name: "Ali", role: "player", email: "player2@test.com", phone: "01223456789", area: "Zamalek", playing_level: "intermediate", training_goals: "Improve Fitness", is_active: true, profile_completed: true },
     { id: player3, first_name: "Kareem", last_name: "Mostafa", role: "player", email: "player3@test.com", phone: "01098765432", area: "New Cairo", playing_level: "beginner", training_goals: "Learn the basics", is_active: true, profile_completed: true },
-    { id: player4, first_name: "Nour", last_name: "Ibrahim", role: "player", email: "player4@test.com", phone: "01198765432", area: "6th October", playing_level: "professional", training_goals: "Prepare for a season", is_active: true, profile_completed: true },
+    { id: player4, first_name: "Nour", last_name: "Ibrahim", role: "player", email: "player4@test.com", phone: "01198765432", area: "6th October", playing_level: "advanced", training_goals: "Prepare for a season", is_active: true, profile_completed: true },
     { id: player5, first_name: "Tarek", last_name: "Saad", role: "player", email: "player5@test.com", phone: "01298765432", area: "Heliopolis", playing_level: "intermediate", training_goals: "Participate in tournaments", is_active: true, profile_completed: true },
     { id: player6, first_name: "Marwan", last_name: "Adel", role: "player", email: "player6@test.com", phone: "01098712345", area: "Nasr City", playing_level: "beginner", training_goals: "Learn the basics", is_active: true, profile_completed: false },
   ];

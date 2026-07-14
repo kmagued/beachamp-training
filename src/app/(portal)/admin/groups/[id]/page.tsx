@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Button, Skeleton } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { ArrowLeft, Users, UserCheck, Calendar, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { deleteGroup } from "@/app/_actions/training";
@@ -228,7 +229,7 @@ export default function AdminGroupDetailPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">{group.name}</h1>
-            <Badge variant={getLevelVariant(group.level)}>{group.level}</Badge>
+            <Badge variant={getLevelVariant(group.level)}>{getLevelLabel(group.level)}</Badge>
           </div>
           <div className="flex items-center gap-2">
             <Button

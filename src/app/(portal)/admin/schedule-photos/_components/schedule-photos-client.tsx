@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, Button, EmptyState, Label, Select, Input, Toast } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { Upload, ImageIcon, Trash2, Loader2, Check, X } from "lucide-react";
 import { uploadSchedulePhoto, deleteSchedulePhoto, updateSchedulePhotoCaption } from "../actions";
 
@@ -136,7 +137,7 @@ export function SchedulePhotosClient({
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
-                      {g.level ? ` · ${g.level}` : ""}
+                      {g.level ? ` · ${getLevelLabel(g.level)}` : ""}
                     </option>
                   ))}
                 </Select>
@@ -197,7 +198,7 @@ export function SchedulePhotosClient({
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-slate-900">
                     {group.name}
-                    {group.level && <span className="text-xs text-slate-400 ml-2">{group.level}</span>}
+                    {group.level && <span className="text-xs text-slate-400 ml-2">{getLevelLabel(group.level)}</span>}
                   </h3>
                   <span className="text-xs text-slate-400">{items.length} photo{items.length === 1 ? "" : "s"}</span>
                 </div>

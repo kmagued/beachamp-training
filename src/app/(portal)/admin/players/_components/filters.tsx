@@ -5,7 +5,7 @@ import type { SortField, SortDir } from "./types";
 
 const ACTIVITY_OPTIONS = ["Active", "Inactive"] as const;
 const SUBSCRIPTION_OPTIONS = ["Active", "Attended", "Expiring Soon", "Expired", "Pending", "No Sub"] as const;
-const LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
+const LEVEL_OPTIONS = ["Rookies", "Challengers", "Pro"] as const;
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: "name", label: "Name" },

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Skeleton } from "@/components/ui";
+import { getLevelLabel } from "@/lib/config/branding";
 import { Users, UsersRound, Calendar, Clock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -200,7 +201,7 @@ export function CoachGroups({ coachId, isAdmin }: CoachGroupsProps) {
                 <div>
                   <h3 className="font-semibold text-slate-900">{group.name}</h3>
                   <Badge variant={getLevelVariant(group.level)}>
-                    {group.level}
+                    {getLevelLabel(group.level)}
                   </Badge>
                 </div>
                 <div className="text-right">

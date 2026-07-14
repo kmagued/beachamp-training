@@ -3,6 +3,7 @@ import { Card, Badge } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2, Check, X, Users, Package, CalendarDays, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
+import { getLevelLabel } from "@/lib/config/branding";
 import { WhatsappSendDrawer } from "@/components/whatsapp/WhatsappSendDrawer";
 import type { PlayerRow, SortField, SortDir, ActivityStatus, SubscriptionStatus } from "./types";
 import { getActivityStatus, getSubscriptionStatus, getLatestSubscription, isEffectivelyActive } from "./types";
@@ -59,10 +60,9 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
 
 const LEVEL_OPTIONS = [
   { value: "", label: "—" },
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced" },
-  { value: "professional", label: "Professional" },
+  { value: "beginner", label: "Rookies" },
+  { value: "intermediate", label: "Challengers" },
+  { value: "advanced", label: "Pro" },
 ];
 
 function LevelSelect({
@@ -443,9 +443,9 @@ export function PlayersTableView(props: PlayersTableProps) {
                     </span>
                   ))}
                   {player.playing_level && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-800 bg-sand/60 rounded-full px-2.5 py-1 capitalize">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-800 bg-sand/60 rounded-full px-2.5 py-1">
                       <Dumbbell className="w-3 h-3" />
-                      {player.playing_level}
+                      {getLevelLabel(player.playing_level)}
                     </span>
                   )}
                 </div>

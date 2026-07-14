@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
-import { branding } from "@/lib/config/branding";
+import { branding, getLevelLabel } from "@/lib/config/branding";
 import { updatePlayer, updateSubscriptionBalance, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import { WhatsappSendDrawer } from "@/components/whatsapp/WhatsappSendDrawer";
@@ -37,11 +37,11 @@ function SubscriptionBadge({ status }: { status: SubscriptionStatus }) {
 function LevelBadge({ level }: { level: string | null }) {
   if (!level) return null;
   switch (level) {
-    case "beginner": return <Badge variant="info">Beginner</Badge>;
-    case "intermediate": return <Badge variant="info">Intermediate</Badge>;
-    case "advanced": return <Badge variant="success">Advanced</Badge>;
-    case "professional": return <Badge variant="success">Professional</Badge>;
-    default: return <Badge variant="neutral">{level}</Badge>;
+    case "beginner": return <Badge variant="info">{getLevelLabel(level)}</Badge>;
+    case "intermediate": return <Badge variant="info">{getLevelLabel(level)}</Badge>;
+    case "advanced":
+    case "professional": return <Badge variant="success">{getLevelLabel(level)}</Badge>;
+    default: return <Badge variant="neutral">{getLevelLabel(level)}</Badge>;
   }
 }
 

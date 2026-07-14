@@ -67,10 +67,9 @@ export const branding = {
   },
   areas: ["Maadi", "Zamalek", "New Cairo", "6th October", "Heliopolis", "Nasr City", "Mohandessin", "El Shorouk"],
   levels: [
-    { value: "beginner", label: "Beginner" },
-    { value: "intermediate", label: "Intermediate" },
-    { value: "advanced", label: "Advanced" },
-    { value: "professional", label: "Professional" },
+    { value: "beginner", label: "Rookies" },
+    { value: "intermediate", label: "Challengers" },
+    { value: "advanced", label: "Pro" },
   ],
   trainingGoals: [
     "Learn the basics",
@@ -80,3 +79,32 @@ export const branding = {
     "Prepare for a season",
   ],
 } as const;
+
+/**
+ * Display labels for level enum values. The underlying DB enum values
+ * (playing_level / group_level) are unchanged — only the labels shown to users.
+ * `professional` is retired from selection but still mapped here so any legacy
+ * records render sensibly (folded into the "Pro" tier).
+ */
+export const LEVEL_LABELS: Record<string, string> = {
+  beginner: "Rookies",
+  intermediate: "Challengers",
+  advanced: "Pro",
+  professional: "Pro",
+  mixed: "Mixed",
+  private: "Private",
+};
+
+/** Map a level enum value to its display label, with a capitalized fallback. */
+export function getLevelLabel(value?: string | null): string {
+  if (!value) return "";
+  return LEVEL_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** Map a display label back to its enum value (used for label-based filters). */
+export function getLevelValue(label: string): string {
+  const match = Object.entries(LEVEL_LABELS).find(
+    ([, l]) => l.toLowerCase() === label.toLowerCase()
+  );
+  return match ? match[0] : label.toLowerCase();
+}
