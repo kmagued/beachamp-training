@@ -12,7 +12,8 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { branding, getLevelLabel } from "@/lib/config/branding";
-import { updatePlayer, updateSubscriptionBalance, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
+import { updatePlayer, updateSubscriptionBalance, updateSubscriptionEndDate, deletePlayer, freezeSubscription, unfreezeSubscription } from "../[id]/actions";
+import { canEditEndDate } from "@/lib/subscriptions/expiry";
 import { NewPaymentDrawer } from "../../payments/_components/new-payment-drawer";
 import { WhatsappSendDrawer } from "@/components/whatsapp/WhatsappSendDrawer";
 import type { PlayerRow, ActivityStatus, SubscriptionStatus } from "./types";
@@ -129,9 +130,13 @@ function DrawerContent({
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editRemaining, setEditRemaining] = useState(0);
   const [editTotal, setEditTotal] = useState(0);
+  const [editingDateSubId, setEditingDateSubId] = useState<string | null>(null);
+  const [editEndDate, setEditEndDate] = useState("");
   const [isSavingSessions, startSessionsTransition] = useTransition();
+  const [isSavingDate, startDateTransition] = useTransition();
   const [isFreezing, startFreezeTransition] = useTransition();
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -144,6 +149,8 @@ function DrawerContent({
     setConfirmDelete(false);
     setDeleteError(null);
     setSessionError(null);
+    setEditingDateSubId(null);
+    setDateError(null);
   }, [player.id]);
 
   if (view === "edit") {
@@ -308,6 +315,7 @@ function DrawerContent({
                             setEditTotal(sub.sessions_total);
                             setEditingSubId(sub.id);
                             setEditingSessions(true);
+                            setEditingDateSubId(null);
                           }}
                           className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                           title="Edit balance"
@@ -319,15 +327,72 @@ function DrawerContent({
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-slate-400">Expires</p>
-                    <p className={cn(
-                      "text-sm",
-                      isExpired ? "text-red-600 font-medium" :
-                      isExpiringSoon ? "text-amber-600 font-medium" : "text-slate-700"
-                    )}>
-                      {sub.end_date
-                        ? formatDate(sub.end_date)
-                        : "—"}
-                    </p>
+                    {editingDateSubId === sub.id ? (
+                      <>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <DatePicker
+                            value={editEndDate}
+                            onChange={(e) => setEditEndDate(e.target.value)}
+                            yearsForward={2}
+                            className="w-40"
+                          />
+                          <button
+                            onClick={() => {
+                              startDateTransition(async () => {
+                                setDateError(null);
+                                const res = await updateSubscriptionEndDate(sub.id, editEndDate);
+                                if ("error" in res) {
+                                  setDateError(res.error ?? "Failed to update expiry date");
+                                } else {
+                                  setEditingDateSubId(null);
+                                  onDataChange();
+                                }
+                              });
+                            }}
+                            disabled={isSavingDate}
+                            className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
+                            title="Save expiry date"
+                          >
+                            {isSavingDate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => { setEditingDateSubId(null); setDateError(null); }}
+                            className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {dateError && <p className="text-xs text-red-600 mt-1">{dateError}</p>}
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <p className={cn(
+                          "text-sm",
+                          isExpired ? "text-red-600 font-medium" :
+                          isExpiringSoon ? "text-amber-600 font-medium" : "text-slate-700"
+                        )}>
+                          {sub.end_date
+                            ? formatDate(sub.end_date)
+                            : "—"}
+                        </p>
+                        {canEditEndDate(sub) && (
+                          <button
+                            onClick={() => {
+                              setEditEndDate(sub.end_date || "");
+                              setEditingDateSubId(sub.id);
+                              setEditingSessions(false);
+                              setEditingSubId(null);
+                              setDateError(null);
+                            }}
+                            className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                            title="Edit expiry date"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {isAttended && (

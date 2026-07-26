@@ -11,6 +11,10 @@ interface DatePickerProps {
   placeholder?: string;
   className?: string;
   name?: string;
+  /** How many years past the current one to offer in the year dropdown.
+   *  Defaults to 0 — the picker was built for dates of birth. Raise it for
+   *  forward-looking dates such as subscription expiry. */
+  yearsForward?: number;
 }
 
 const MONTHS = [
@@ -35,6 +39,7 @@ export function DatePicker({
   placeholder = "Select date...",
   className,
   name,
+  yearsForward = 0,
 }: DatePickerProps) {
   const today = new Date();
   const [open, setOpen] = useState(false);
@@ -119,14 +124,19 @@ export function DatePicker({
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
 
-  // Year options (80 years back from current year)
+  // Year options: 80 years back, plus `yearsForward` ahead. Always widened to
+  // cover the viewed and selected years so arrowing past the range can't leave
+  // the <select> displaying a value it has no option for.
   const yearOptions = useMemo(() => {
+    const current = today.getFullYear();
+    const anchors = [current, viewYear, selectedDate?.year ?? current];
+    const max = Math.max(current + yearsForward, ...anchors);
+    const min = Math.min(current - 80, ...anchors);
     const years: number[] = [];
-    for (let y = today.getFullYear(); y >= today.getFullYear() - 80; y--) {
-      years.push(y);
-    }
+    for (let y = max; y >= min; y--) years.push(y);
     return years;
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearsForward, viewYear, selectedDate?.year]);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>

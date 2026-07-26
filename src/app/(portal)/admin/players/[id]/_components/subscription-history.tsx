@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, Badge, EmptyState, Button } from "@/components/ui";
+import { Card, Badge, EmptyState, Button, DatePicker } from "@/components/ui";
 import { Package, Pencil, Check, X, Loader2, Snowflake, Play, Plus } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
-import { updateSubscriptionBalance, freezeSubscription, unfreezeSubscription } from "../actions";
+import { canEditEndDate } from "@/lib/subscriptions/expiry";
+import {
+  updateSubscriptionBalance,
+  updateSubscriptionEndDate,
+  freezeSubscription,
+  unfreezeSubscription,
+} from "../actions";
 import { useRouter } from "next/navigation";
 import { NewPaymentDrawer } from "../../../payments/_components/new-payment-drawer";
 import type { SubscriptionRow, PaymentRow } from "./types";
@@ -38,6 +44,69 @@ function PaymentStatusBadge({ status }: { status: string }) {
   }
 }
 
+interface EndDateCellProps {
+  sub: SubscriptionRow;
+  isEditing: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  onStart: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+  compact?: boolean;
+}
+
+function EndDateCell({
+  sub, isEditing, value, onChange, onStart, onSave, onCancel, isSaving, compact,
+}: EndDateCellProps) {
+  const icon = compact ? "w-3 h-3" : "w-3.5 h-3.5";
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <DatePicker
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          yearsForward={2}
+          className={compact ? "w-36" : "w-44"}
+        />
+        <button
+          onClick={onSave}
+          disabled={isSaving}
+          className="p-0.5 rounded text-success hover:bg-success/10"
+          title="Save expiry date"
+        >
+          {isSaving ? <Loader2 className={`${icon} animate-spin`} /> : <Check className={icon} />}
+        </button>
+        <button
+          onClick={onCancel}
+          className="p-0.5 rounded text-primary-700/50 hover:text-primary-900 hover:bg-primary-50"
+          title="Cancel"
+        >
+          <X className={icon} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={compact ? "text-primary-900 font-medium" : undefined}>
+        {sub.end_date ? formatDate(sub.end_date) : "—"}
+      </span>
+      {canEditEndDate(sub) && (
+        <button
+          onClick={onStart}
+          className="p-0.5 rounded text-primary-700/40 hover:text-primary-900 hover:bg-primary-50 transition-colors"
+          title="Edit expiry date"
+        >
+          <Pencil className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface SubscriptionHistoryProps {
   subscriptions: SubscriptionRow[];
   paymentsBySub: Record<string, PaymentRow[]>;
@@ -50,7 +119,10 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editRemaining, setEditRemaining] = useState(0);
   const [editTotal, setEditTotal] = useState(0);
+  const [editingDateSubId, setEditingDateSubId] = useState<string | null>(null);
+  const [editEndDate, setEditEndDate] = useState("");
   const [isSaving, startSaveTransition] = useTransition();
+  const [isSavingDate, startDateTransition] = useTransition();
   const [isFreezing, startFreezeTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
@@ -59,12 +131,38 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
     setEditingSubId(sub.id);
     setEditRemaining(sub.sessions_remaining);
     setEditTotal(sub.sessions_total);
+    setEditingDateSubId(null);
     setError(null);
   }
 
   function cancelEdit() {
     setEditingSubId(null);
     setError(null);
+  }
+
+  function startEditDate(sub: SubscriptionRow) {
+    setEditingDateSubId(sub.id);
+    setEditEndDate(sub.end_date || "");
+    setEditingSubId(null);
+    setError(null);
+  }
+
+  function cancelEditDate() {
+    setEditingDateSubId(null);
+    setError(null);
+  }
+
+  function saveEditDate(subId: string) {
+    startDateTransition(async () => {
+      setError(null);
+      const res = await updateSubscriptionEndDate(subId, editEndDate);
+      if ("error" in res) {
+        setError(res.error ?? "Failed to update expiry date");
+      } else {
+        setEditingDateSubId(null);
+        router.refresh();
+      }
+    });
   }
 
   function saveEdit(subId: string) {
@@ -194,7 +292,18 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                         )}
                       </td>
                       <td className="py-3 text-primary-700/70 whitespace-nowrap">{sub.start_date ? formatDate(sub.start_date) : "—"}</td>
-                      <td className="py-3 text-primary-700/70 whitespace-nowrap">{sub.end_date ? formatDate(sub.end_date) : "—"}</td>
+                      <td className="py-3 text-primary-700/70 whitespace-nowrap">
+                        <EndDateCell
+                          sub={sub}
+                          isEditing={editingDateSubId === sub.id}
+                          value={editEndDate}
+                          onChange={setEditEndDate}
+                          onStart={() => startEditDate(sub)}
+                          onSave={() => saveEditDate(sub.id)}
+                          onCancel={cancelEditDate}
+                          isSaving={isSavingDate}
+                        />
+                      </td>
                       <td className="py-3"><SubStatusBadge status={effectiveStatus} /></td>
                       <td className="py-3">
                         {displayPayment ? (
@@ -325,11 +434,24 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className={editingDateSubId === sub.id ? "col-span-2" : undefined}>
                       <span className="text-primary-700/50 font-semibold uppercase tracking-wider text-[10px]">Period</span>
-                      <p className="text-primary-900 font-medium">
-                        {sub.start_date ? formatDate(sub.start_date) : "—"} — {sub.end_date ? formatDate(sub.end_date) : "—"}
-                      </p>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="text-primary-900 font-medium">
+                          {sub.start_date ? formatDate(sub.start_date) : "—"} —
+                        </span>
+                        <EndDateCell
+                          sub={sub}
+                          isEditing={editingDateSubId === sub.id}
+                          value={editEndDate}
+                          onChange={setEditEndDate}
+                          onStart={() => startEditDate(sub)}
+                          onSave={() => saveEditDate(sub.id)}
+                          onCancel={cancelEditDate}
+                          isSaving={isSavingDate}
+                          compact
+                        />
+                      </div>
                     </div>
                     {displayPayment && (
                       <div className="col-span-2">

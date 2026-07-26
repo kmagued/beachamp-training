@@ -1,7 +1,28 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { addDays, cairoToday, daysBetween } from "@/lib/utils/cairo-time";
+
+/** Confirm the caller is a signed-in admin. The actions below write with the
+ *  service-role key, and a server action is a POST endpoint any authenticated
+ *  user can reach — route middleware only guards the page. */
+async function assertAdmin(): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "Not authorized";
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  return callerProfile?.role === "admin" ? null : "Not authorized";
+}
 
 export async function updatePlayer(playerId: string, formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,6 +133,64 @@ export async function updateSubscriptionBalance(
   return { success: true };
 }
 
+/** Move a subscription's expiry date. Used for goodwill extensions when a
+ *  player misses sessions, and to correct a wrong auto-derived date.
+ *
+ *  Pushing the date past today revives a lapsed subscription: "expired" is
+ *  derived from end_date at read time for multi-session subs, never stored. */
+export async function updateSubscriptionEndDate(
+  subscriptionId: string,
+  endDate: string
+) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  if (!endDate) return { error: "End date is required" };
+  // Guard the format before the string comparison below relies on it
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || Number.isNaN(Date.parse(`${endDate}T00:00:00Z`))) {
+    return { error: "Invalid date" };
+  }
+
+  const { data: sub, error: fetchError } = await admin
+    .from("subscriptions")
+    .select("id, status, start_date, end_date, sessions_total, player_id")
+    .eq("id", subscriptionId)
+    .single();
+
+  if (fetchError || !sub) return { error: "Subscription not found" };
+  if (sub.sessions_total === 1) {
+    return { error: "Single-session subscriptions don't have an expiry date" };
+  }
+  // ISO dates compare correctly as strings
+  if (sub.start_date && endDate < sub.start_date) {
+    return { error: "End date cannot be before the start date" };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateData: Record<string, any> = { end_date: endDate };
+
+  // A frozen sub's end_date is rewritten on unfreeze as today + frozen_days_remaining,
+  // so bank the granted days there too or the edit is discarded on thaw.
+  if (sub.status === "frozen") {
+    updateData.frozen_days_remaining = Math.max(0, daysBetween(cairoToday(), endDate));
+  }
+
+  const { error } = await admin
+    .from("subscriptions")
+    .update(updateData)
+    .eq("id", subscriptionId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/players/${sub.player_id}`);
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
 export async function deletePlayer(playerId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -182,11 +261,10 @@ export async function unfreezeSubscription(subscriptionId: string) {
   if (fetchError || !sub) return { error: "Subscription not found" };
   if (sub.status !== "frozen") return { error: "Subscription is not frozen" };
 
-  // Calculate new end date: today + remaining days
+  // Calculate new end date: today + remaining days. Cairo's calendar day, not
+  // the server's — Vercel runs UTC, which rolls over 2-3 hours late.
   const newEndDate = sub.frozen_days_remaining
-    ? new Date(Date.now() + sub.frozen_days_remaining * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0]
+    ? addDays(cairoToday(), sub.frozen_days_remaining)
     : null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
