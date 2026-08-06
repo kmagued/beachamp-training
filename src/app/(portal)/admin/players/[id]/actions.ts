@@ -136,8 +136,13 @@ export async function updateSubscriptionBalance(
 /** Move a subscription's expiry date. Used for goodwill extensions when a
  *  player misses sessions, and to correct a wrong auto-derived date.
  *
- *  Pushing the date past today revives a lapsed subscription: "expired" is
- *  derived from end_date at read time for multi-session subs, never stored. */
+ *  Pushing the date past today revives a lapsed subscription by clearing the
+ *  stored "expired" status. That status is NOT purely derived at read time —
+ *  lapsed subs are flipped to 'expired' in the database, and every consumer
+ *  (daily report, player page, group rosters, coach attendance) filters on
+ *  `status IN ('active','pending')`. Moving only end_date therefore left the
+ *  subscription invisible, so attendance still billed the player as having no
+ *  balance and raised a pending payment. */
 export async function updateSubscriptionEndDate(
   subscriptionId: string,
   endDate: string
@@ -156,7 +161,7 @@ export async function updateSubscriptionEndDate(
 
   const { data: sub, error: fetchError } = await admin
     .from("subscriptions")
-    .select("id, status, start_date, end_date, sessions_total, player_id")
+    .select("id, status, start_date, end_date, sessions_total, sessions_remaining, player_id")
     .eq("id", subscriptionId)
     .single();
 
@@ -176,6 +181,19 @@ export async function updateSubscriptionEndDate(
   // so bank the granted days there too or the edit is discarded on thaw.
   if (sub.status === "frozen") {
     updateData.frozen_days_remaining = Math.max(0, daysBetween(cairoToday(), endDate));
+  }
+
+  // Revive a lapsed sub: without this the row keeps its stored 'expired' status
+  // and stays filtered out everywhere, so the extension has no visible effect.
+  // Only 'expired' is revived — 'cancelled' is a deliberate act, and 'frozen'
+  // resumes through unfreeze. An exhausted sub stays expired: more time doesn't
+  // grant more sessions, and the balance is what attendance actually spends.
+  if (
+    sub.status === "expired" &&
+    sub.sessions_remaining > 0 &&
+    endDate >= cairoToday()
+  ) {
+    updateData.status = "active";
   }
 
   const { error } = await admin

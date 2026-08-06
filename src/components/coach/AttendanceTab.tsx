@@ -5,6 +5,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Button, Badge, Skeleton, Drawer } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
+import { hasLapsed } from "@/lib/subscriptions/expiry";
 import {
   Check,
   X,
@@ -143,9 +144,10 @@ export function AttendanceTab({
       const subMap = new Map<string, PlayerSubscription[]>();
       if (subscriptions) {
         for (const sub of subscriptions) {
-          // Skip effectively expired subs (no sessions left or past end date)
+          // Skip effectively expired subs (no sessions left or past end date),
+          // judged against the session's own date rather than today
           if (sub.sessions_remaining <= 0) continue;
-          if (sub.end_date && new Date(sub.end_date).getTime() < Date.now()) continue;
+          if (hasLapsed(sub.end_date, sessionDate)) continue;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pkgName = (sub as any).packages?.name || "Package";
           const entry: PlayerSubscription = {

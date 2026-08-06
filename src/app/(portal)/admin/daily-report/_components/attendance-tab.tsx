@@ -7,6 +7,7 @@ import { Loader2, Check, Clock, Users, X, AlertTriangle, CheckCircle2, XCircle, 
 import { cn } from "@/lib/utils/cn";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
+import { hasLapsed } from "@/lib/subscriptions/expiry";
 
 interface ScheduleSession {
   id: string;
@@ -191,9 +192,11 @@ export function AttendanceTab({ date }: { date: string }) {
         const sessionsMap: Record<string, PlayerSubscription[]> = {};
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (subs || []).forEach((s: any) => {
-          // Skip effectively expired subs
+          // Skip effectively expired subs. Judged against the day being
+          // reported on, not today, so backfilling an older date bills against
+          // the balance the player actually had then.
           if (s.sessions_remaining <= 0) return;
-          if (s.end_date && new Date(s.end_date).getTime() < Date.now()) return;
+          if (hasLapsed(s.end_date, date)) return;
           const entry: PlayerSubscription = {
             id: s.id,
             remaining: s.sessions_remaining,
@@ -454,7 +457,7 @@ export function AttendanceTab({ date }: { date: string }) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             for (const s of updatedSubs as any[]) {
               if (s.sessions_remaining <= 0) continue;
-              if (s.end_date && new Date(s.end_date).getTime() < Date.now()) continue;
+              if (hasLapsed(s.end_date, date)) continue;
               const entry: PlayerSubscription = {
                 id: s.id,
                 remaining: s.sessions_remaining,
