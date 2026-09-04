@@ -611,7 +611,14 @@ export async function submitAttendance(data: {
 
   const sessionTime = scheduleSession?.start_time || null;
 
-  const results: { player_id: string; sessions_remaining: number | null; updated: boolean }[] = [];
+  const results: {
+    player_id: string;
+    sessions_remaining: number | null;
+    updated: boolean;
+    deducted: boolean;
+    reason: string;
+    subscription_id: string | null;
+  }[] = [];
 
   // Use the RPC function for each player
   for (const record of data.records) {
@@ -635,6 +642,9 @@ export async function submitAttendance(data: {
       player_id: record.player_id,
       sessions_remaining: result?.sessions_remaining ?? null,
       updated: result?.updated ?? false,
+      deducted: result?.deducted ?? false,
+      reason: result?.reason ?? "unknown",
+      subscription_id: result?.subscription_id ?? null,
     });
   }
 
@@ -663,7 +673,7 @@ export async function removeAttendanceRecords(data: {
   // Find existing attendance records for these players (match via schedule_session_id)
   let existingQuery = admin
     .from("attendance")
-    .select("id, player_id, status")
+    .select("id, player_id, status, subscription_id")
     .eq("schedule_session_id", data.schedule_session_id)
     .eq("session_date", data.session_date)
     .in("player_id", data.player_ids);
@@ -677,13 +687,18 @@ export async function removeAttendanceRecords(data: {
   if (fetchErr) return { error: fetchErr.message };
   if (!existing || existing.length === 0) return { success: true };
 
-  // For players who were marked "present", re-credit their subscription
-  const presentPlayerIds = existing
-    .filter((r: { status: string }) => r.status === "present")
-    .map((r: { player_id: string }) => r.player_id);
+  // For players who were marked "present", re-credit the exact subscription the
+  // attendance was deducted from (falls back to the old heuristic for legacy rows
+  // written before attendance.subscription_id existed).
+  const presentRecords = existing.filter(
+    (r: { status: string }) => r.status === "present"
+  ) as { player_id: string; subscription_id: string | null }[];
 
-  for (const playerId of presentPlayerIds) {
-    await admin.rpc("increment_sessions_remaining", { p_player_id: playerId });
+  for (const record of presentRecords) {
+    await admin.rpc("restore_session_credit", {
+      p_player_id: record.player_id,
+      p_subscription_id: record.subscription_id,
+    });
   }
 
   // Delete the attendance records

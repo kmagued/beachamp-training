@@ -388,12 +388,25 @@ export function AttendanceTab({
 
         const warnings: string[] = [];
         if ("results" in res) {
-          for (const r of (res as { results: { player_id: string; sessions_remaining: number | null }[] }).results) {
-            if (r.sessions_remaining !== null && r.sessions_remaining <= 0) {
-              const player = players.find((p) => p.id === r.player_id);
-              if (player) {
-                warnings.push(`${player.first_name} ${player.last_name} has ${r.sessions_remaining} sessions remaining`);
-              }
+          const results = (res as {
+            results: {
+              player_id: string;
+              sessions_remaining: number | null;
+              deducted: boolean;
+              reason: string;
+            }[];
+          }).results;
+          for (const r of results) {
+            const player = players.find((p) => p.id === r.player_id);
+            if (!player) continue;
+            const name = `${player.first_name} ${player.last_name}`;
+            // A present player whose session could not be charged to any subscription.
+            // This used to be reported as "0 sessions remaining", which was
+            // indistinguishable from a genuine zero balance.
+            if (r.reason === "no_subscription") {
+              warnings.push(`${name} was marked present but no session could be deducted \u2014 no usable subscription`);
+            } else if (r.deducted && r.sessions_remaining !== null && r.sessions_remaining <= 0) {
+              warnings.push(`${name} has no sessions remaining after this one`);
             }
           }
         }

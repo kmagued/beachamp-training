@@ -402,23 +402,31 @@ export function AttendanceTab({ date }: { date: string }) {
           setPlayerSessions((prev) => {
             const updated = { ...prev };
             for (const r of res.results) {
-              if (r.sessions_remaining !== null) {
-                const playerSubs = updated[r.player_id];
-                if (playerSubs) {
-                  // Find the specific subscription that was deducted
-                  const chosenSubId = chosenSubs[r.player_id];
-                  if (chosenSubId) {
-                    updated[r.player_id] = playerSubs.map((s) =>
-                      s.id === chosenSubId ? { ...s, remaining: r.sessions_remaining! } : s
-                    );
-                  } else if (playerSubs.length === 1) {
-                    updated[r.player_id] = [{ ...playerSubs[0], remaining: r.sessions_remaining! }];
-                  }
-                }
+              if (!r.deducted || r.sessions_remaining === null) continue;
+              const playerSubs = updated[r.player_id];
+              if (!playerSubs) continue;
+              // Trust the subscription the server actually charged, not the local
+              // pick — they diverge when the chosen one was no longer usable.
+              const chargedSubId = r.subscription_id ?? chosenSubs[r.player_id];
+              if (chargedSubId) {
+                updated[r.player_id] = playerSubs.map((s) =>
+                  s.id === chargedSubId ? { ...s, remaining: r.sessions_remaining! } : s
+                );
+              } else if (playerSubs.length === 1) {
+                updated[r.player_id] = [{ ...playerSubs[0], remaining: r.sessions_remaining! }];
               }
             }
             return updated;
           });
+
+          // Surface players whose session could not be charged to any subscription
+          const undeducted = res.results.filter((r) => r.reason === "no_subscription");
+          if (undeducted.length > 0) {
+            setToast({
+              message: `${undeducted.length} player${undeducted.length > 1 ? "s were" : " was"} marked present with no session deducted \u2014 no usable subscription`,
+              variant: "error",
+            });
+          }
         }
       }
 
