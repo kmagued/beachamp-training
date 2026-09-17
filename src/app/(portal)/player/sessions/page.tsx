@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, Badge, EmptyState } from "@/components/ui";
 import { CalendarDays } from "lucide-react";
-import { formatDate } from "@/lib/utils/format-date";
+import { SessionsTable, type SessionRecord } from "./_components/sessions-table";
 import type { Attendance } from "@/types/database";
 
 export default async function PlayerSessionsPage() {
@@ -15,39 +15,23 @@ export default async function PlayerSessionsPage() {
 
   const { data: attendance } = await supabase
     .from("attendance")
-    .select("*, groups(name)")
+    .select("id, session_date, session_time, status, groups(name)")
     .eq("player_id", currentUser.id)
     .order("session_date", { ascending: false }) as {
     data: (Attendance & { groups: { name: string } | null })[] | null;
   };
 
-  const records = attendance || [];
+  const rows = attendance || [];
+  const records: SessionRecord[] = rows.map((r) => ({
+    id: r.id,
+    session_date: r.session_date,
+    session_time: r.session_time,
+    status: r.status,
+    group_name: r.groups?.name ?? null,
+  }));
   const presentCount = records.filter((r) => r.status === "present").length;
   const absentCount = records.filter((r) => r.status === "absent").length;
   const excusedCount = records.filter((r) => r.status === "excused").length;
-
-  function formatTime(time: string | null) {
-    if (!time) return "—";
-    const [h, m] = time.split(":");
-    const hour = parseInt(h, 10);
-    if (isNaN(hour)) return time;
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const h12 = hour % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
-  }
-
-  const statusBadge = (status: string) => {
-    switch (status) {
-      case "present":
-        return <Badge variant="success">Present</Badge>;
-      case "absent":
-        return <Badge variant="danger">Absent</Badge>;
-      case "excused":
-        return <Badge variant="warning">Excused</Badge>;
-      default:
-        return <Badge variant="neutral">{status}</Badge>;
-    }
-  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -64,47 +48,7 @@ export default async function PlayerSessionsPage() {
       </div>
 
       {records.length > 0 ? (
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                    Date
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                    Time
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                    Group
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((record, i) => (
-                  <tr
-                    key={record.id}
-                    className={`border-b border-slate-100 ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}
-                  >
-                    <td className="px-4 py-3 text-sm text-slate-900">
-                      {formatDate(record.session_date)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {formatTime(record.session_time)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {record.groups?.name || "—"}
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(record.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <SessionsTable records={records} />
       ) : (
         <Card>
           <EmptyState
