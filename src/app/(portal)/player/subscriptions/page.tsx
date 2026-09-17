@@ -8,8 +8,20 @@ import { formatDate } from "@/lib/utils/format-date";
 import type { Subscription } from "@/types/database";
 
 interface SubWithPackage extends Subscription {
-  packages: { name: string; session_count: number; price: number } | null;
-  payments: { status: string; rejection_reason: string | null }[] | null;
+  packages: { name: string; session_count: number } | null;
+  payments: { amount: number; status: string; rejection_reason: string | null; created_at: string }[] | null;
+}
+
+/** What the player paid (or owes) for a subscription: its confirmed payment, else the latest one.
+ *  Not the package's price — that is today's price and changes over time, and promo codes discount it.
+ *  A subscription with no payment at all was fully covered by a promo code. */
+function formatPaidPrice(sub: SubWithPackage) {
+  const payments = sub.payments ?? [];
+  const payment =
+    payments.find((p) => p.status === "confirmed") ??
+    [...payments].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (!payment) return sub.promo_code_id ? "Free" : "—";
+  return `${Number(payment.amount).toLocaleString("en-US")} EGP`;
 }
 
 export default async function PlayerSubscriptionsPage() {
@@ -21,7 +33,7 @@ export default async function PlayerSubscriptionsPage() {
 
   const { data: subscriptions } = (await supabase
     .from("subscriptions")
-    .select("*, packages(name, session_count, price), payments(status, rejection_reason)")
+    .select("*, packages(name, session_count), payments(amount, status, rejection_reason, created_at)")
     .eq("player_id", currentUser.id)
     .order("created_at", { ascending: false })) as { data: SubWithPackage[] | null };
 
@@ -132,7 +144,7 @@ export default async function PlayerSubscriptionsPage() {
                             : `${sub.sessions_remaining} / ${sub.sessions_total}`}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-700">
-                          {sub.packages?.price ? `${sub.packages.price.toLocaleString("en-US")} EGP` : "—"}
+                          {formatPaidPrice(sub)}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">
                           {sub.start_date ? formatDate(sub.start_date) : "—"}
@@ -186,7 +198,7 @@ export default async function PlayerSubscriptionsPage() {
                     <div>
                       <span className="text-slate-400">Price</span>
                       <p className="text-slate-700 font-medium">
-                        {sub.packages?.price ? `${sub.packages.price.toLocaleString("en-US")} EGP` : "—"}
+                        {formatPaidPrice(sub)}
                       </p>
                     </div>
                     <div>
