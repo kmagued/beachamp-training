@@ -233,6 +233,7 @@ function DrawerContent({
           const sessionsOut = !isSingleSession && sub.sessions_remaining <= 0;
           const isAttended = isSingleSession && sub.sessions_remaining <= 0;
           const isBeingEdited = editingSessions && editingSubId === sub.id;
+          const isPendingConfirmation = sub.status === "pending";
 
           return (
             <div key={sub.id} className={cn(
@@ -242,7 +243,12 @@ function DrawerContent({
               isExpiringSoon || sessionsLow ? "border-amber-200" : "border-slate-200"
             )}>
               <div className="px-4 py-3 border-b border-slate-100">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Subscription</p>
+                <p className={cn(
+                  "text-xs font-semibold uppercase tracking-wider",
+                  isPendingConfirmation ? "text-amber-600" : "text-slate-400"
+                )}>
+                  {isPendingConfirmation ? "Pending Confirmation" : "Active Subscription"}
+                </p>
               </div>
               <div className="divide-y divide-slate-100">
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -414,7 +420,7 @@ function DrawerContent({
                      `Only ${sub.sessions_remaining} session${sub.sessions_remaining === 1 ? "" : "s"} remaining`}
                   </div>
                 )}
-                {!isSingleSession && !isAttended && !isExpired && !sessionsOut && (
+                {!isSingleSession && !isAttended && !isExpired && !sessionsOut && !isPendingConfirmation && (
                   <div className="px-4 py-2 border-t border-slate-100">
                     <button
                       onClick={() => {

@@ -2,12 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui";
-import { cn } from "@/lib/utils/cn";
-import { Users, CreditCard, CalendarDays, Receipt, TrendingUp, BarChart3 } from "lucide-react";
+import { Users, CreditCard, Receipt, TrendingUp, Wallet } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { MonthlyFinancialTable } from "./_components/monthly-financial-table";
 import { MetricsTable } from "./_components/metrics-table";
+import type { PackageIncome } from "./_components/income-by-package";
 import { cairoMonthKey, cairoNowYearMonth } from "@/lib/utils/cairo-time";
 
 export default async function AdminDashboard() {
@@ -18,16 +18,11 @@ export default async function AdminDashboard() {
   const supabase = (await createClient()) as any;
 
   // Stats queries in parallel
-  const todayDow = new Date().getDay();
-  const _now = new Date();
-  const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
-
   const currentMonthKey = cairoMonthKey(new Date()); // "YYYY-MM" in Africa/Cairo
 
   const [
     { data: allPlayerProfiles, count: playerCount },
-    { count: pendingPayments },
-    { count: todaySessionCount },
+    { data: pendingPaymentRows, count: pendingPayments },
     // ALL confirmed payments — drives monthly revenue, all-time revenue, chart, and monthly table
     { data: revenuePayments },
     // ALL subscriptions (any status) with package join — drives chart + metrics table
@@ -45,24 +40,18 @@ export default async function AdminDashboard() {
       .eq("role", "player"),
     supabase
       .from("payments")
-      .select("*", { count: "exact", head: true })
+      .select("amount", { count: "exact" })
       .eq("status", "pending"),
     supabase
-      .from("schedule_sessions")
-      .select("*", { count: "exact", head: true })
-      .eq("day_of_week", todayDow)
-      .eq("is_active", true)
-      .or(`session_type.eq.group,end_date.eq.${todayStr}`),
-    supabase
       .from("payments")
-      .select("amount, confirmed_at")
+      .select("amount, confirmed_at, subscriptions(packages(name))")
       .eq("status", "confirmed"),
     supabase
       .from("subscriptions")
       .select("player_id, package_id, status, start_date, end_date, created_at, packages(name)"),
     supabase
       .from("expenses")
-      .select("amount, expense_date, is_recurring, recurrence_type")
+      .select("amount, expense_date, is_recurring, recurrence_type, expense_categories(name)")
       .eq("is_active", true),
     supabase
       .from("players_with_status")
@@ -84,10 +73,6 @@ export default async function AdminDashboard() {
   const monthlyRevenuePayments = ((revenuePayments || []) as { amount: number; confirmed_at: string | null }[])
     .filter((p) => p.confirmed_at && cairoMonthKey(new Date(p.confirmed_at)) === currentMonthKey);
   const revenueData = monthlyRevenuePayments;
-
-  // Active subscriptions for the chart
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activeSubscriptions = ((allSubscriptions || []) as any[]).filter((s) => s.status === "active");
 
   // Expense slices — expense_date is a DATE (no timezone), so its YYYY-MM
   // prefix is already the calendar month it was logged for.
@@ -127,19 +112,43 @@ export default async function AdminDashboard() {
   );
   const allTimeProfit = totalRevenue - allTimeExpenses;
 
+  // Profit without court rentals, which the expenses module files under "Court Reservation".
+  // Same monthly rules as above: this month's one-time rentals plus recurring ones at their monthly rate.
+  const rentalExpenseRows = ((allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null; expense_categories: { name: string } | null }[])
+    .filter((e) => e.expense_categories?.name === "Court Reservation");
+  const monthlyRentalExpenses = rentalExpenseRows.reduce((sum, e) => {
+    if (!e.is_recurring) return e.expense_date?.slice(0, 7) === currentMonthKey ? sum + e.amount : sum;
+    if (e.recurrence_type === "monthly") return sum + e.amount;
+    if (e.recurrence_type === "weekly") return sum + e.amount * 4;
+    return sum;
+  }, 0);
+  const allTimeRentalExpenses = rentalExpenseRows.reduce((sum, e) => sum + e.amount, 0);
+  const monthlyProfitExRentals = monthlyProfit + monthlyRentalExpenses;
+  const allTimeProfitExRentals = allTimeProfit + allTimeRentalExpenses;
+
+  const pendingAmount = ((pendingPaymentRows || []) as { amount: number }[]).reduce(
+    (sum, p) => sum + Number(p.amount),
+    0
+  );
+
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
   // --- Chart data transformations ---
 
-  // Subscriptions by package
-  const subCounts: Record<string, number> = {};
-  for (const s of activeSubscriptions || []) {
-    const name = (s.packages as { name: string } | null)?.name || "Unknown";
-    subCounts[name] = (subCounts[name] || 0) + 1;
+  // Confirmed income per package per Cairo month
+  const incomeByPackageKey = new Map<string, PackageIncome>();
+  for (const p of (revenuePayments || []) as { amount: number; confirmed_at: string | null; subscriptions: { packages: { name: string } | null } | null }[]) {
+    if (!p.confirmed_at) continue;
+    const d = new Date(p.confirmed_at);
+    if (isNaN(d.getTime())) continue;
+    const month = cairoMonthKey(d);
+    const pkg = p.subscriptions?.packages?.name || "No package";
+    const key = `${month}|${pkg}`;
+    const entry = incomeByPackageKey.get(key) ?? { month, pkg, amount: 0 };
+    entry.amount += Number(p.amount);
+    incomeByPackageKey.set(key, entry);
   }
-  const subsByPackage = Object.entries(subCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+  const incomeByPackage = [...incomeByPackageKey.values()];
 
   // --- Monthly financial table data ---
   type MonthlyRow = { month: string; key: string; income: number; expenses: number; profit: number };
@@ -192,17 +201,9 @@ export default async function AdminDashboard() {
       return { month: monthLabel(k), key: k, income, expenses, profit: income - expenses };
     });
 
-  // Group player counts
+  // Groups and memberships for the metrics table
   const groups = (groupsData || []) as { id: string; name: string; max_players: number }[];
   const allGpRows = (groupPlayersData || []) as { group_id: string; player_id: string; joined_at: string; is_active: boolean }[];
-  const gpRows = allGpRows.filter((gp) => gp.is_active);
-  const gpCountByGroup: Record<string, number> = {};
-  for (const gp of gpRows) {
-    gpCountByGroup[gp.group_id] = (gpCountByGroup[gp.group_id] || 0) + 1;
-  }
-  const groupCounts = groups
-    .map((g) => ({ name: g.name, count: gpCountByGroup[g.id] || 0, max: g.max_players }))
-    .sort((a, b) => b.count - a.count);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -260,18 +261,19 @@ export default async function AdminDashboard() {
             subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
           />
           <StatCard
+            label={`Profit excl. Rentals (${currentMonth})`}
+            value={`${monthlyProfitExRentals.toLocaleString()} EGP`}
+            accentColor={monthlyProfitExRentals >= 0 ? "bg-success" : "bg-danger"}
+            icon={<Wallet className="w-5 h-5" />}
+            subtitle={`All Time: ${allTimeProfitExRentals.toLocaleString()} EGP`}
+          />
+          <StatCard
             label="Pending Payments"
             value={pendingPayments ?? 0}
             accentColor={pendingPayments ? "bg-accent" : "bg-primary-200"}
             icon={<CreditCard className="w-5 h-5" />}
+            subtitle={`Amount: ${pendingAmount.toLocaleString()} EGP`}
             href="/admin/payments?statusFilter=Pending"
-          />
-          <StatCard
-            label="Sessions Today"
-            value={todaySessionCount ?? 0}
-            accentColor="bg-secondary"
-            icon={<CalendarDays className="w-5 h-5" />}
-            href="/admin/daily-report"
           />
         </div>
 
@@ -286,56 +288,6 @@ export default async function AdminDashboard() {
           />
         </div>
 
-        {/* Group Breakdown */}
-        {groupCounts.length > 0 && (
-          <div className="mb-8">
-            <div className="bg-white rounded-2xl border border-primary-100 p-5 sm:p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-secondary" />
-                  Players by Group
-                </h2>
-                <span className="text-[11px] font-semibold text-primary-700/50 uppercase tracking-wider">
-                  Capacity
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {groupCounts.map((g) => {
-                  const pct = g.max > 0 ? Math.min(100, (g.count / g.max) * 100) : 0;
-                  const full = pct >= 90;
-                  return (
-                    <div
-                      key={g.name}
-                      className="rounded-xl border border-primary-100 p-4 hover:border-primary-300 transition-colors"
-                    >
-                      <div className="flex items-baseline justify-between mb-2">
-                        <p className="text-sm font-semibold text-primary-900 truncate">
-                          {g.name}
-                        </p>
-                        <p className="text-sm font-bold text-primary-900 shrink-0">
-                          {g.count}
-                          <span className="text-xs font-normal text-primary-700/40">
-                            {" "}/ {g.max}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="h-1.5 bg-primary-100 rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-all",
-                            full ? "bg-accent" : "bg-secondary"
-                          )}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Charts */}
         <DashboardCharts
         revenuePayments={(revenuePayments || [])
@@ -344,7 +296,8 @@ export default async function AdminDashboard() {
             date: p.confirmed_at || "",
           }))
           .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
-        subsByPackage={subsByPackage}
+        incomeByPackage={incomeByPackage}
+        currentMonthKey={currentMonthKey}
       />
 
         {/* Monthly Financial Table */}

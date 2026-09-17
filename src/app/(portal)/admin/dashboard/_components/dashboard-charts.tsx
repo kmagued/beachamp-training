@@ -5,17 +5,15 @@ import { Card } from "@/components/ui";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, Package } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { IncomeByPackage, type PackageIncome } from "./income-by-package";
 
 type RevenueView = "30d" | "monthly" | "quarterly" | "yearly";
 
@@ -28,7 +26,8 @@ const REVENUE_VIEWS: { key: RevenueView; label: string }[] = [
 
 interface DashboardChartsProps {
   revenuePayments: { amount: number; date: string }[];
-  subsByPackage: { name: string; count: number }[];
+  incomeByPackage: PackageIncome[];
+  currentMonthKey: string;
 }
 
 const COLORS = {
@@ -40,8 +39,6 @@ const COLORS = {
   accentDark: "#E8901A",
   sand: "#EDDCB2",
 };
-
-const PACKAGE_COLORS = [COLORS.primary, COLORS.secondary, COLORS.accent, COLORS.secondaryDark, COLORS.accentDark, COLORS.sand];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
@@ -59,7 +56,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 
-export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardChartsProps) {
+export function DashboardCharts({ revenuePayments, incomeByPackage, currentMonthKey }: DashboardChartsProps) {
   const [revenueView, setRevenueView] = useState<RevenueView>("30d");
 
   const revenueChartData = useMemo(() => {
@@ -199,40 +196,7 @@ export function DashboardCharts({ revenuePayments, subsByPackage }: DashboardCha
         )}
       </Card>
 
-      {/* Subscriptions by Package */}
-      <Card className="sm:col-span-2">
-        <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2 mb-4">
-          <Package className="w-5 h-5 text-secondary" />
-          Active Subscriptions
-        </h2>
-        {subsByPackage.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={subsByPackage} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EDDCB2" vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: "#5A6B73" }}
-                tickLine={false}
-                axisLine={{ stroke: "#C4D8DE" }}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "#5A6B73" }}
-                tickLine={false}
-                axisLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Subscriptions" radius={[6, 6, 0, 0]}>
-                {subsByPackage.map((_, i) => (
-                  <Cell key={i} fill={PACKAGE_COLORS[i % PACKAGE_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <p className="text-sm text-primary-700/50 text-center py-12">No active subscriptions</p>
-        )}
-      </Card>
+      <IncomeByPackage data={incomeByPackage} currentMonth={currentMonthKey} />
     </div>
   );
 }

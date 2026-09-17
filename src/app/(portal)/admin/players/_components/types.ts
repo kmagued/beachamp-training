@@ -74,7 +74,9 @@ export function getActivityStatus(player: PlayerRow): ActivityStatus {
 /** Subscription-only status — independent of player activity. */
 export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
   const now = Date.now();
-  const activeSubs = player.subscriptions?.filter((s) => isEffectivelyActive(s)) || [];
+  // Only confirmed subscriptions count as active. A 'pending' one has no dates until
+  // payment is confirmed, so an open-ended date check would otherwise pass it as active.
+  const activeSubs = player.subscriptions?.filter((s) => s.status === "active" && isEffectivelyActive(s)) || [];
 
   // Prefer the subscription covering today; if none, pick the nearest upcoming one
   const activeSub =
@@ -116,6 +118,9 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
 
     return "active";
   }
+
+  // A usable subscription awaiting payment confirmation outranks older frozen/expired ones
+  if (player.subscriptions?.some((s) => s.status === "pending" && isEffectivelyActive(s))) return "pending";
 
   // Check for frozen subscription
   const frozenSub = player.subscriptions?.find((s) => s.status === "frozen");

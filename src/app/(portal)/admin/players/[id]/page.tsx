@@ -88,7 +88,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
     paymentsBySub[p.subscription_id].push(p);
   }
 
-  const activeSubs = subs.filter((s) => (s.status === "active" || s.status === "pending") && s.sessions_remaining > 0 && (!s.end_date || new Date(s.end_date).getTime() >= Date.now()));
+  // Confirmed subscriptions only — a 'pending' one has no dates yet and isn't active until its payment is confirmed
+  const activeSubs = subs.filter((s) => s.status === "active" && s.sessions_remaining > 0 && (!s.end_date || new Date(s.end_date).getTime() >= Date.now()));
   const totalPaid = pays.filter((p) => p.status === "confirmed").reduce((sum, p) => sum + p.amount, 0);
 
   return (
