@@ -5,10 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { getLevelLabel } from "@/lib/config/branding";
-import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, Target } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
+import { SessionPlanTab } from "./SessionPlanTab";
 
 interface PrivatePlayer {
   id: string;
@@ -40,6 +41,7 @@ interface SessionDetailProps {
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
+  { key: "plan", label: "Plan", icon: Target },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -241,6 +243,9 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
             endTime={session.end_time}
             privatePlayers={session.session_type === "private" ? session.private_players : null}
           />
+        )}
+        {activeTab === "plan" && (
+          <SessionPlanTab scheduleSessionId={session.id} sessionDate={dateParam} />
         )}
       </Card>
     </div>

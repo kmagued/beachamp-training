@@ -967,3 +967,41 @@ export async function bulkDeleteCoaches(coachIds: string[]) {
   revalidatePath("/admin/dashboard");
   return { success: true, results };
 }
+
+// ═══════════════════════════════════════
+// SESSION PLANS (Coach + Admin)
+// ═══════════════════════════════════════
+
+export async function upsertSessionPlan(data: {
+  schedule_session_id: string;
+  session_date: string;
+  goal: string | null;
+  description: string | null;
+}) {
+  const user = await getCurrentUserRole();
+  const authErr = requireCoachOrAdmin(user);
+  if (authErr) return authErr;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { error } = await admin
+    .from("session_plans")
+    .upsert(
+      {
+        schedule_session_id: data.schedule_session_id,
+        session_date: data.session_date,
+        goal: data.goal?.trim() || null,
+        description: data.description?.trim() || null,
+        updated_by: user!.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "schedule_session_id,session_date" },
+    );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/sessions");
+  revalidatePath("/coach/sessions");
+  return { success: true };
+}
