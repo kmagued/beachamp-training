@@ -1,6 +1,6 @@
 import { RefObject, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Card, Badge } from "@/components/ui";
+import { Card, Badge, Select } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, EllipsisVertical } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
@@ -66,7 +66,7 @@ function RoleSelect({
       {isChanging ? (
         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
       ) : (
-        <select
+        <Select
           value={currentRole}
           onChange={(e) => {
             const newRole = e.target.value as UserRole;
@@ -75,19 +75,17 @@ function RoleSelect({
               const confirmed = window.confirm(
                 `Are you sure you want to change this user's role ${currentRole === "admin" ? "from" : "to"} Admin?`
               );
-              if (!confirmed) {
-                e.target.value = currentRole;
-                return;
-              }
+              if (!confirmed) return;
             }
             onRoleChange(userId, newRole);
           }}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+          size="sm"
+          className="w-auto px-2 py-1 text-sm border-slate-200"
         >
           <option value="player">Player</option>
           <option value="coach">Coach</option>
           <option value="admin">Admin</option>
-        </select>
+        </Select>
       )}
     </div>
   );

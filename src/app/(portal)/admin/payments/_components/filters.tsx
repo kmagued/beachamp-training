@@ -1,4 +1,4 @@
-import { Input, MultiSelect, MobileFilterSheet } from "@/components/ui";
+import { Input, MultiSelect, MobileFilterSheet, Select } from "@/components/ui";
 import { Search, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
@@ -59,16 +59,16 @@ export function PaymentsFilters({
 
   const filterDropdowns = (
     <>
-      <select
+      <Select
         value={monthFilter}
         onChange={(e) => onMonthFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
       >
         <option value="">All Months</option>
         {monthOptions.map((m) => (
           <option key={m} value={m}>{m}</option>
         ))}
-      </select>
+      </Select>
       <MultiSelect
         options={STATUS_OPTIONS}
         value={statusFilter}
@@ -95,15 +95,15 @@ export function PaymentsFilters({
           className="sm:w-40"
         />
       )}
-      <select
+      <Select
         value={typeFilter}
         onChange={(e) => onTypeFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
       >
         <option value="">All Types</option>
         <option value="player">Player Payments</option>
         <option value="quick">Quick Payments</option>
-      </select>
+      </Select>
       {hasActiveFilters && (
         <button
           onClick={onReset}

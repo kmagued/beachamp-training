@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, Badge, EmptyState, Button, DatePicker } from "@/components/ui";
-import { Package, Pencil, Check, X, Loader2, Snowflake, Play, Plus } from "lucide-react";
+import { Card, Badge, EmptyState, Button, DatePicker, ConfirmDialog } from "@/components/ui";
+import { Package, Pencil, Check, X, Loader2, Snowflake, Play, Plus, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import { canEditEndDate } from "@/lib/subscriptions/expiry";
 import {
@@ -10,6 +10,7 @@ import {
   updateSubscriptionEndDate,
   freezeSubscription,
   unfreezeSubscription,
+  deleteSubscription,
 } from "../actions";
 import { useRouter } from "next/navigation";
 import { NewPaymentDrawer } from "../../../payments/_components/new-payment-drawer";
@@ -126,6 +127,8 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
   const [isFreezing, startFreezeTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SubscriptionRow | null>(null);
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   function startEdit(sub: SubscriptionRow) {
     setEditingSubId(sub.id);
@@ -195,6 +198,21 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
       else router.refresh();
     });
   }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const subId = deleteTarget.id;
+    startDeleteTransition(async () => {
+      setError(null);
+      const res = await deleteSubscription(subId);
+      if ("error" in res) setError(res.error ?? "Failed to delete subscription");
+      else router.refresh();
+      setDeleteTarget(null);
+    });
+  }
+
+  const deletePayments = deleteTarget ? paymentsBySub[deleteTarget.id] || [] : [];
+  const deletePaymentsTotal = deletePayments.reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <Card className="mb-6">
@@ -338,6 +356,13 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                               {isFreezing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                             </button>
                           )}
+                          <button
+                            onClick={() => setDeleteTarget(sub)}
+                            className="p-1 rounded text-primary-700/40 hover:text-danger hover:bg-danger/10 transition-colors"
+                            title="Delete subscription"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -383,6 +408,13 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
                           <Play className="w-3.5 h-3.5" />
                         </button>
                       )}
+                      <button
+                        onClick={() => setDeleteTarget(sub)}
+                        className="p-1 rounded text-primary-700/40 hover:text-danger hover:bg-danger/10 transition-colors"
+                        title="Delete subscription"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -483,6 +515,22 @@ export function SubscriptionHistory({ subscriptions, paymentsBySub, playerId, pl
         onSuccess={() => { setShowAddPayment(false); router.refresh(); }}
         prefillPlayerId={playerId}
         prefillPlayerName={playerName}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        loading={isDeleting}
+        title="Delete subscription?"
+        description={
+          <>
+            This permanently deletes the <strong>{deleteTarget?.packages?.name || "selected"}</strong> subscription
+            {deletePayments.length > 0 &&
+              ` and its ${deletePayments.length} payment${deletePayments.length > 1 ? "s" : ""} (${deletePaymentsTotal.toLocaleString()} EGP)`}
+            . Attendance records are kept. This can&apos;t be undone.
+          </>
+        }
       />
     </Card>
   );

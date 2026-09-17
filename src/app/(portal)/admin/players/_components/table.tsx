@@ -1,5 +1,5 @@
 import { RefObject, useState } from "react";
-import { Card, Badge } from "@/components/ui";
+import { Card, Badge, Select } from "@/components/ui";
 import { ArrowUpDown, ArrowUp, ArrowDown, Mail, Loader2, Check, X, Users, Package, CalendarDays, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
@@ -81,7 +81,7 @@ function LevelSelect({
       {isChanging ? (
         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
       ) : (
-        <select
+        <Select
           value={currentLevel || ""}
           onChange={(e) => {
             const newLevel = e.target.value || null;
@@ -89,12 +89,13 @@ function LevelSelect({
             onLevelChange(playerId, newLevel);
           }}
           onClick={(e) => e.stopPropagation()}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+          size="sm"
+          className="w-auto px-2 py-1 text-sm border-slate-200"
         >
           {LEVEL_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
-        </select>
+        </Select>
       )}
     </div>
   );

@@ -68,7 +68,7 @@ function PlayerSubscribeContent() {
   } | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ success?: boolean; activated?: boolean; error?: string } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [infoPackage, setInfoPackage] = useState<Package | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -166,14 +166,18 @@ function PlayerSubscribeContent() {
     setPreviewUrl(URL.createObjectURL(file));
   }
 
+  // A promo code can bring the total to 0 — then there's nothing to pay or upload
+  const selectedPkg = packages.find((p) => p.id === selectedPackage);
+  const isFree = !!selectedPkg && getDiscountedPrice(selectedPkg.price) === 0;
+
   function handleSubmit() {
-    if (!selectedPackage || !selectedMethod || isPending) return;
-    if (selectedMethod === "instapay" && !screenshot) return;
+    if (!selectedPackage || isPending) return;
+    if (!isFree && (!selectedMethod || (selectedMethod === "instapay" && !screenshot))) return;
 
     const formData = new FormData();
     formData.set("package_id", selectedPackage);
-    formData.set("method", selectedMethod);
-    if (screenshot) formData.set("screenshot", screenshot);
+    if (!isFree && selectedMethod) formData.set("method", selectedMethod);
+    if (!isFree && screenshot) formData.set("screenshot", screenshot);
     if (promoResult?.valid && promoResult.promo_code_id) {
       formData.set("promo_code_id", promoResult.promo_code_id);
     }
@@ -198,11 +202,17 @@ function PlayerSubscribeContent() {
             <Check className="w-7 h-7 text-emerald-600" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-2">
-            Subscription Request Submitted
+            {result.activated ? "Subscription Activated" : "Subscription Request Submitted"}
           </h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            Your subscription request has been submitted and is awaiting confirmation.
-            You&apos;ll be notified once the admin confirms your payment.
+            {result.activated ? (
+              "Your promo code covered the full price, so your subscription is active now."
+            ) : (
+              <>
+                Your subscription request has been submitted and is awaiting confirmation.
+                You&apos;ll be notified once the admin confirms your payment.
+              </>
+            )}
           </p>
         </Card>
       </div>
@@ -472,94 +482,97 @@ function PlayerSubscribeContent() {
       {/* Payment method — only show after package is selected */}
       {selectedPackage && (
         <>
-          <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method <span className="text-red-400">*</span></h2>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {paymentMethods.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => {
-                  setSelectedMethod(m.value);
-                  if (m.value !== "instapay") {
-                    setScreenshot(null);
-                    if (previewUrl) URL.revokeObjectURL(previewUrl);
-                    setPreviewUrl(null);
-                    setFileError(null);
-                  }
-                }}
-                className={cn(
-                  "px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
-                  selectedMethod === m.value
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-slate-200 text-slate-600 hover:border-slate-300"
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Instapay account info */}
-          {selectedMethod === "instapay" && (
-            <Card className="mb-8 bg-primary-50/50 border-primary-200">
-              <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
-              <p className="text-base font-bold text-primary select-all">{INSTAPAY.handle}</p>
-              <a
-                href={INSTAPAY.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
-              >
-                Open Instapay Link
-                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
-                </svg>
-              </a>
-            </Card>
-          )}
-
-          {!selectedMethod && <div className="mb-8" />}
-
-          {/* Screenshot upload — instapay only */}
-          {showScreenshot && (
+          {!isFree && (
             <>
-              <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot <span className="text-red-400">*</span></h2>
-              <div className="mb-8">
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
-                  {previewUrl ? (
-                    <div className="flex flex-col items-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={previewUrl}
-                        alt="Payment screenshot preview"
-                        className="max-h-32 rounded-lg object-contain mb-2"
-                      />
-                      <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
-                      <p className="text-xs text-slate-400 mt-1">Click to change</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-slate-300 mb-2" />
-                      <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
-                      <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </label>
-                {fileError && (
-                  <p className="text-xs text-red-500 mt-2">{fileError}</p>
-                )}
+              <h2 className="font-semibold text-slate-900 mb-3">{methodStep}. Payment Method <span className="text-red-400">*</span></h2>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {paymentMethods.map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => {
+                      setSelectedMethod(m.value);
+                      if (m.value !== "instapay") {
+                        setScreenshot(null);
+                        if (previewUrl) URL.revokeObjectURL(previewUrl);
+                        setPreviewUrl(null);
+                        setFileError(null);
+                      }
+                    }}
+                    className={cn(
+                      "px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                      selectedMethod === m.value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Instapay account info */}
+              {selectedMethod === "instapay" && (
+                <Card className="mb-8 bg-primary-50/50 border-primary-200">
+                  <p className="text-sm font-medium text-slate-900 mb-1">Send payment to:</p>
+                  <p className="text-base font-bold text-primary select-all">{INSTAPAY.handle}</p>
+                  <a
+                    href={INSTAPAY.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline"
+                  >
+                    Open Instapay Link
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 01-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clipRule="evenodd" />
+                    </svg>
+                  </a>
+                </Card>
+              )}
+
+              {!selectedMethod && <div className="mb-8" />}
+
+              {/* Screenshot upload — instapay only */}
+              {showScreenshot && (
+                <>
+                  <h2 className="font-semibold text-slate-900 mb-3">{screenshotStep}. Payment Screenshot <span className="text-red-400">*</span></h2>
+                  <div className="mb-8">
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
+                      {previewUrl ? (
+                        <div className="flex flex-col items-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={previewUrl}
+                            alt="Payment screenshot preview"
+                            className="max-h-32 rounded-lg object-contain mb-2"
+                          />
+                          <p className="text-sm text-slate-600 font-medium">{screenshot?.name}</p>
+                          <p className="text-xs text-slate-400 mt-1">Click to change</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-slate-300 mb-2" />
+                          <p className="text-sm text-slate-500 mb-1">Click to upload payment screenshot</p>
+                          <p className="text-xs text-slate-400">PNG, JPG up to 5MB</p>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                    {fileError && (
+                      <p className="text-xs text-red-500 mt-2">{fileError}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           )}
 
           {/* Total */}
           {(() => {
-            const selectedPkg = packages.find((p) => p.id === selectedPackage);
             if (!selectedPkg) return null;
             const original = selectedPkg.price;
             const final = getDiscountedPrice(original);
@@ -606,7 +619,7 @@ function PlayerSubscribeContent() {
           {/* Submit */}
           <Button
             onClick={handleSubmit}
-            disabled={!selectedMethod || (selectedMethod === "instapay" && !screenshot) || isPending}
+            disabled={isPending || (!isFree && (!selectedMethod || (selectedMethod === "instapay" && !screenshot)))}
             fullWidth
             size="md"
           >

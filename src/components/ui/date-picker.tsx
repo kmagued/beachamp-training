@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils/cn";
+import { Select } from "./select";
 
 interface DatePickerProps {
   value?: string;
@@ -126,7 +127,7 @@ export function DatePicker({
 
   // Year options: 80 years back, plus `yearsForward` ahead. Always widened to
   // cover the viewed and selected years so arrowing past the range can't leave
-  // the <select> displaying a value it has no option for.
+  // the <Select> displaying a value it has no option for.
   const yearOptions = useMemo(() => {
     const current = today.getFullYear();
     const anchors = [current, viewYear, selectedDate?.year ?? current];
@@ -204,24 +205,26 @@ export function DatePicker({
             </button>
 
             <div className="flex items-center gap-2">
-              <select
+              <Select
                 value={viewMonth}
                 onChange={(e) => setViewMonth(Number(e.target.value))}
-                className="text-sm font-semibold text-slate-900 bg-transparent border-none cursor-pointer focus:outline-none"
+                size="sm"
+                className="w-auto gap-1 px-1.5 py-1 border-transparent bg-transparent ring-0 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus:bg-slate-100 focus:border-transparent focus:ring-0"
               >
                 {MONTHS.map((m, i) => (
                   <option key={m} value={i}>{m}</option>
                 ))}
-              </select>
-              <select
+              </Select>
+              <Select
                 value={viewYear}
                 onChange={(e) => setViewYear(Number(e.target.value))}
-                className="text-sm font-semibold text-slate-900 bg-transparent border-none cursor-pointer focus:outline-none"
+                size="sm"
+                className="w-auto gap-1 px-1.5 py-1 border-transparent bg-transparent ring-0 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus:bg-slate-100 focus:border-transparent focus:ring-0"
               >
                 {yearOptions.map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <button

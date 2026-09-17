@@ -44,8 +44,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
       .from("attendance")
       .select("id, session_date, session_time, status, notes, created_at, groups!attendance_group_id_fkey(name), profiles!attendance_marked_by_fkey(first_name, last_name)")
       .eq("player_id", id)
-      .order("session_date", { ascending: false })
-      .limit(50),
+      .order("session_date", { ascending: false }),
     supabase
       .from("feedback")
       .select("id, comment, created_at, profiles!feedback_coach_id_fkey(first_name, last_name)")

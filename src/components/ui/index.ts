@@ -1,6 +1,6 @@
 export { Button, buttonVariants, buttonSizes } from "./button";
 export { Input } from "./input";
-export { Select } from "./select";
+export { Select, type SelectChangeEvent } from "./select";
 export { Label } from "./label";
 export { Card } from "./card";
 export { Alert } from "./alert";

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Card } from "@/components/ui";
+import { Card, Select } from "@/components/ui";
 import type { ExpenseRow, CategoryRow } from "./types";
 
 interface CategoryReportProps {
@@ -76,16 +76,16 @@ export function CategoryReport({ expenses, categories }: CategoryReportProps) {
 
   return (
     <div className="space-y-4">
-      <select
+      <Select
         value={monthFilter}
         onChange={(e) => setMonthFilter(e.target.value)}
-        className="w-full sm:w-52 h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-52"
       >
         <option value="">All Time</option>
         {monthOptions.map((m) => (
           <option key={m} value={m}>{m}</option>
         ))}
-      </select>
+      </Select>
 
       {report.rows.length === 0 ? (
         <p className="text-center text-sm text-slate-400 py-8">No expenses in this period</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card } from "@/components/ui";
+import { Card, Select } from "@/components/ui";
 import { BarChart3 } from "lucide-react";
 
 interface MetricsTableProps {
@@ -141,16 +141,17 @@ export function MetricsTable({ attendanceRecords, subscriptions, profiles, group
           <BarChart3 className="w-5 h-5 text-secondary" />
           Key Metrics
         </h2>
-        <select
+        <Select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="text-xs border border-primary-200 rounded-lg px-2.5 py-1.5 bg-white text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-800/20 focus:border-primary-800"
+          size="sm"
+          className="w-auto border-primary-200 text-primary-900 focus:ring-primary-800/20 focus:border-primary-800"
         >
           <option value="all">All Time</option>
           {monthOptions.map((key) => (
             <option key={key} value={key}>{monthLabel(key)}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="overflow-x-auto -mx-6 px-6">

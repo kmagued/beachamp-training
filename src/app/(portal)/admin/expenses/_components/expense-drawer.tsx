@@ -1,6 +1,6 @@
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { Drawer } from "@/components/ui/drawer";
-import { Input, Label, Button, DatePicker } from "@/components/ui";
+import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createExpense, updateExpense, createExpenseCategory } from "@/app/_actions/expenses";
@@ -262,16 +262,16 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
               </button>
             </div>
           ) : (
-            <select
+            <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="h-10 py-0"
             >
               <option value="">Select category</option>
               {activeCategories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
 
@@ -431,15 +431,15 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         {/* Payment status */}
         <div>
           <Label>Payment Status</Label>
-          <select
+          <Select
             value={paymentStatus}
             onChange={(e) => setPaymentStatus(e.target.value as "paid_full" | "partially_paid" | "payment_due")}
-            className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="h-10 py-0"
           >
             <option value="paid_full">Paid in Full</option>
             <option value="partially_paid">Partially Paid</option>
             <option value="payment_due">Payment Due</option>
-          </select>
+          </Select>
         </div>
 
         {paymentStatus === "partially_paid" && (
@@ -492,14 +492,14 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
         {isRecurring && (
           <div>
             <Label required>Recurrence</Label>
-            <select
+            <Select
               value={recurrenceType}
               onChange={(e) => setRecurrenceType(e.target.value)}
-              className="w-full h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="h-10 py-0"
             >
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
-            </select>
+            </Select>
           </div>
         )}
 

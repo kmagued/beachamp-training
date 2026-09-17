@@ -1,4 +1,7 @@
-import { Card, Badge, EmptyState } from "@/components/ui";
+"use client";
+
+import { useMemo, useState } from "react";
+import { Card, Badge, EmptyState, Pagination } from "@/components/ui";
 import { ClipboardCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import type { AttendanceRow } from "./types";
@@ -25,9 +28,15 @@ interface SessionHistoryProps {
 }
 
 export function SessionHistory({ attendance }: SessionHistoryProps) {
-  const entries = [...attendance].sort((a, b) =>
-    b.session_date.localeCompare(a.session_date),
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const entries = useMemo(
+    () => [...attendance].sort((a, b) => b.session_date.localeCompare(a.session_date)),
+    [attendance],
   );
+  const totalPages = Math.ceil(entries.length / pageSize);
+  const pageEntries = entries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <Card className="mb-6">
@@ -54,7 +63,7 @@ export function SessionHistory({ attendance }: SessionHistoryProps) {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((a) => (
+                {pageEntries.map((a) => (
                   <tr key={a.id} className="border-b border-primary-100/60 last:border-0">
                     <td className="py-3 font-semibold text-primary-900">{formatDate(a.session_date)}</td>
                     <td className="py-3 text-primary-700/70">
@@ -77,7 +86,7 @@ export function SessionHistory({ attendance }: SessionHistoryProps) {
 
           {/* Mobile cards */}
           <div className="sm:hidden space-y-3">
-            {entries.map((a) => (
+            {pageEntries.map((a) => (
               <div key={a.id} className="border border-primary-100 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-primary-900 text-sm">
@@ -104,6 +113,16 @@ export function SessionHistory({ attendance }: SessionHistoryProps) {
               </div>
             ))}
           </div>
+
+          {entries.length > 10 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </>
       ) : (
         <EmptyState

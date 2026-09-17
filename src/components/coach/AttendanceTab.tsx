@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Button, Badge, Skeleton, Drawer } from "@/components/ui";
+import { Button, Badge, Skeleton, Drawer, Select } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
+import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 import {
   Check,
   X,
@@ -218,7 +219,7 @@ export function AttendanceTab({
         .select("id, price, name, session_count")
         .eq("is_active", true)
         .order("session_count", { ascending: true });
-      if (pkgs) setPackages(pkgs);
+      if (pkgs) setPackages(withSingleSessionFirst(pkgs));
 
       setLoadingPlayers(false);
     }
@@ -317,7 +318,7 @@ export function AttendanceTab({
 
     // Pre-compute zero-balance players so they show in the confirm drawer
     const zeroBalancePlayers = getZeroBalancePresentPlayers();
-    const defaultPkg = packages.find((p) => p.session_count === 1) || packages[0];
+    const defaultPkg = packages[0];
     if (zeroBalancePlayers.length > 0 && defaultPkg) {
       const playerPackages: Record<string, string> = {};
       zeroBalancePlayers.forEach((p) => { playerPackages[p.id] = defaultPkg.id; });
@@ -808,10 +809,11 @@ export function AttendanceTab({
                             {p.first_name} {p.last_name}
                           </span>
                         </div>
-                        <select
+                        <Select
                           value={chosenSubs[p.id] || activeSubs[0]?.id || ""}
                           onChange={(e) => setChosenSubs((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          size="sm"
+                          className="border-slate-200"
                         >
                           {activeSubs.map((sub) => (
                             <option key={sub.id} value={sub.id}>
@@ -819,7 +821,7 @@ export function AttendanceTab({
                               {sub.end_date && ` · Exp ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     );
                   })}
@@ -856,20 +858,21 @@ export function AttendanceTab({
                             <span className="ml-auto text-[11px] font-medium text-slate-500">{playerPkg.price} EGP</span>
                           )}
                         </div>
-                        <select
+                        <Select
                           value={pkgId}
                           onChange={(e) => setPaymentDialog((prev) => prev ? {
                             ...prev,
                             playerPackages: { ...prev.playerPackages, [p.id]: e.target.value }
                           } : null)}
-                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          size="sm"
+                          className="border-slate-200"
                         >
                           {packages.map((pkg) => (
                             <option key={pkg.id} value={pkg.id}>
                               {pkg.name} — {pkg.price} EGP
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     );
                   })}

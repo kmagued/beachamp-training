@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { Badge } from "@/components/ui";
+import { Badge, Select } from "@/components/ui";
 import { X, Mail, Phone, MapPin, Calendar, Shield, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
@@ -176,7 +176,7 @@ function DrawerContent({ user, onClose, onRoleChange, changingRoleId, isSelf }: 
                     <span className="text-xs text-slate-400">Updating...</span>
                   </div>
                 ) : (
-                  <select
+                  <Select
                     value={user.role}
                     onChange={(e) => {
                       const newRole = e.target.value as UserRole;
@@ -185,19 +185,17 @@ function DrawerContent({ user, onClose, onRoleChange, changingRoleId, isSelf }: 
                         const confirmed = window.confirm(
                           `Are you sure you want to change this user's role ${user.role === "admin" ? "from" : "to"} Admin?`
                         );
-                        if (!confirmed) {
-                          e.target.value = user.role;
-                          return;
-                        }
+                        if (!confirmed) return;
                       }
                       onRoleChange(user.id, newRole);
                     }}
-                    className="mt-0.5 text-sm border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+                    size="sm"
+                    className="mt-0.5 w-auto px-2 py-1 text-sm border-slate-200"
                   >
                     <option value="player">Player</option>
                     <option value="coach">Coach</option>
                     <option value="admin">Admin</option>
-                  </select>
+                  </Select>
                 )}
               </div>
             </div>

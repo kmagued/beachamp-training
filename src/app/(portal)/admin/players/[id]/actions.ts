@@ -209,6 +209,58 @@ export async function updateSubscriptionEndDate(
   return { success: true };
 }
 
+/** Permanently delete a subscription (e.g. one added by mistake). Its payments and
+ *  freeze history cascade with it. Attendance stays as session history but is
+ *  unlinked, and promo code uses tied to it are removed so the code's use is freed —
+ *  both reference the subscription without ON DELETE and would block the delete. */
+export async function deleteSubscription(subscriptionId: string) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: sub } = await admin
+    .from("subscriptions")
+    .select("id, player_id")
+    .eq("id", subscriptionId)
+    .single();
+  if (!sub) return { error: "Subscription not found" };
+
+  const { data: payments } = await admin
+    .from("payments")
+    .select("id")
+    .eq("subscription_id", subscriptionId);
+  const paymentIds: string[] = (payments || []).map((p: { id: string }) => p.id);
+
+  const { error: attendanceError } = await admin
+    .from("attendance")
+    .update({ subscription_id: null })
+    .eq("subscription_id", subscriptionId);
+  if (attendanceError) return { error: attendanceError.message };
+
+  const { error: promoError } = await admin
+    .from("promo_code_uses")
+    .delete()
+    .or(
+      paymentIds.length > 0
+        ? `subscription_id.eq.${subscriptionId},payment_id.in.(${paymentIds.join(",")})`
+        : `subscription_id.eq.${subscriptionId}`,
+    );
+  if (promoError) return { error: promoError.message };
+
+  const { error } = await admin.from("subscriptions").delete().eq("id", subscriptionId);
+  if (error) return { error: error.message };
+
+  if (sub.player_id) revalidatePath(`/admin/players/${sub.player_id}`);
+  revalidatePath("/admin/players");
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/player/subscriptions");
+  revalidatePath("/player/dashboard");
+  return { success: true };
+}
+
 export async function deletePlayer(playerId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

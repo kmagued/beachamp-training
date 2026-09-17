@@ -585,16 +585,11 @@ export async function submitAttendance(data: {
   const authErr = requireCoachOrAdmin(user);
   if (authErr) return authErr;
 
-  // Validate date is within last 14 days
+  // Past dates are allowed without limit; only future dates are rejected
   const sessionDate = new Date(data.session_date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const fourteenDaysAgo = new Date(today);
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-  if (sessionDate < fourteenDaysAgo) {
-    return { error: "Cannot log attendance more than 14 days in the past" };
-  }
   if (sessionDate > today) {
     return { error: "Cannot log attendance for future dates" };
   }

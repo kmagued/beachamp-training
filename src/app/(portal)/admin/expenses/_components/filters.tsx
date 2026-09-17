@@ -1,4 +1,4 @@
-import { Input, MobileFilterSheet } from "@/components/ui";
+import { Input, MobileFilterSheet, Select } from "@/components/ui";
 import { Search, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
@@ -52,45 +52,45 @@ export function ExpensesFilters({
 
   const filterDropdowns = (
     <>
-      <select
+      <Select
         value={monthFilter}
         onChange={(e) => onMonthFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-44"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-44"
       >
         <option value="">All Months</option>
         {monthOptions.map((m) => (
           <option key={m} value={m}>{m}</option>
         ))}
-      </select>
-      <select
+      </Select>
+      <Select
         value={categoryFilter}
         onChange={(e) => onCategoryFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-44"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-44"
       >
         <option value="">All Categories</option>
         {categoryOptions.map((c) => (
           <option key={c} value={c}>{c}</option>
         ))}
-      </select>
-      <select
+      </Select>
+      <Select
         value={typeFilter}
         onChange={(e) => onTypeFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
       >
         <option value="">All Types</option>
         <option value="one-time">One-time</option>
         <option value="recurring">Recurring</option>
-      </select>
-      <select
+      </Select>
+      <Select
         value={paymentStatusFilter}
         onChange={(e) => onPaymentStatusFilterChange(e.target.value)}
-        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer sm:w-36"
+        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
       >
         <option value="">All Payment</option>
         <option value="paid_full">Paid</option>
         <option value="partially_paid">Partial</option>
         <option value="payment_due">Due</option>
-      </select>
+      </Select>
       {hasActiveFilters && (
         <button
           onClick={onReset}

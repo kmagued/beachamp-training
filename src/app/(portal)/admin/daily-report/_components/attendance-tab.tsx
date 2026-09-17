@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Badge, Button, Toast, Drawer } from "@/components/ui";
+import { Card, Badge, Button, Toast, Drawer, Select } from "@/components/ui";
 import { Loader2, Check, Clock, Users, X, AlertTriangle, CheckCircle2, XCircle, Search, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
+import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 
 interface ScheduleSession {
   id: string;
@@ -244,7 +245,7 @@ export function AttendanceTab({ date }: { date: string }) {
         .select("id, price, name, session_count")
         .eq("is_active", true)
         .order("session_count", { ascending: true });
-      if (pkgs) setPackages(pkgs);
+      if (pkgs) setPackages(withSingleSessionFirst(pkgs));
 
       // Collapse all sessions by default
       setCollapsedSessions(new Set(sessionsData.map((s) => s.id)));
@@ -320,7 +321,7 @@ export function AttendanceTab({ date }: { date: string }) {
 
     // Check for players with no balance being marked present
     const zeroBalancePlayers = getZeroBalancePresentPlayers(session);
-    const defaultPkg = packages.find((p) => p.session_count === 1) || packages[0];
+    const defaultPkg = packages[0];
 
     // Pre-select default subscription for multi-sub players
     if (multiSubPlayers.length > 0) {
@@ -882,10 +883,11 @@ export function AttendanceTab({ date }: { date: string }) {
                             {gp.profiles.first_name} {gp.profiles.last_name}
                           </span>
                         </div>
-                        <select
+                        <Select
                           value={chosenSubs[gp.player_id] || subs[0]?.id || ""}
                           onChange={(e) => setChosenSubs((prev) => ({ ...prev, [gp.player_id]: e.target.value }))}
-                          className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          size="sm"
+                          className="border-slate-200"
                         >
                           {subs.map((sub) => (
                             <option key={sub.id} value={sub.id}>
@@ -893,7 +895,7 @@ export function AttendanceTab({ date }: { date: string }) {
                               {sub.end_date && ` · Exp ${new Date(sub.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     );
                   })}
@@ -929,20 +931,21 @@ export function AttendanceTab({ date }: { date: string }) {
                               <span className="ml-auto text-[11px] font-medium text-slate-500">{playerPkg.price} EGP</span>
                             )}
                           </div>
-                          <select
+                          <Select
                             value={pkgId}
                             onChange={(e) => setPaymentDialog((prev) => prev ? {
                               ...prev,
                               playerPackages: { ...prev.playerPackages, [gp.player_id]: e.target.value }
                             } : null)}
-                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            size="sm"
+                          className="border-slate-200"
                           >
                             {packages.map((pkg) => (
                               <option key={pkg.id} value={pkg.id}>
                                 {pkg.name} — {pkg.price} EGP
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </div>
                       );
                     })}
