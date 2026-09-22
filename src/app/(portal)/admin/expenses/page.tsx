@@ -3,16 +3,19 @@
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { StatCard, Pagination, Button, Toast } from "@/components/ui";
-import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings, Download } from "lucide-react";
+import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings, Download, TrendingUp, Scale, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { deleteExpense } from "@/app/_actions/expenses";
-import type { ExpenseRow, CategoryRow, SortField, SortDir, ExpenseTab } from "./_components/types";
+import { deleteIncome } from "@/app/_actions/income";
+import type { ExpenseRow, CategoryRow, IncomeRow, SortField, SortDir, ExpenseTab } from "./_components/types";
 import { ExpensesPageSkeleton } from "./_components/skeleton";
 import { ExpensesFilters } from "./_components/filters";
 import { ExpensesTableView } from "./_components/table";
 import { ExpenseDrawer } from "./_components/expense-drawer";
 import { CategoryDrawer } from "./_components/category-drawer";
 import { CategoryReport } from "./_components/category-report";
+import { IncomeDrawer } from "./_components/income-drawer";
+import { IncomeTableView } from "./_components/income-table";
 
 export default function AdminExpensesPage() {
   return (
@@ -28,11 +31,14 @@ const TABS: { key: ExpenseTab; label: string }[] = [
   { key: "recurring", label: "Recurring" },
   { key: "by-category", label: "By Category" },
   { key: "categories", label: "Categories" },
+  { key: "income", label: "Income" },
 ];
 
 function AdminExpensesContent() {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [income, setIncome] = useState<IncomeRow[]>([]);
+  const [incomeCategories, setIncomeCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [tab, setTab] = useState<ExpenseTab>("all");
@@ -45,14 +51,18 @@ function AdminExpensesContent() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [incomePage, setIncomePage] = useState(1);
 
   // Drawer state
   const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
   const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
+  const [incomeDrawerOpen, setIncomeDrawerOpen] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<IncomeRow | null>(null);
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
@@ -61,7 +71,7 @@ function AdminExpensesContent() {
   );
 
   const fetchData = useCallback(async () => {
-    const [{ data: expenseData }, { data: categoryData }] = await Promise.all([
+    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }] = await Promise.all([
       supabase
         .from("expenses")
         .select("*, expense_categories(id, name, icon)")
@@ -72,10 +82,23 @@ function AdminExpensesContent() {
         .select("*")
         .order("is_default", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("income")
+        .select("*, income_categories(id, name, icon)")
+        .eq("is_active", true)
+        .order("income_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("income_categories")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true }),
     ]);
 
     if (expenseData) setExpenses(expenseData as unknown as ExpenseRow[]);
     if (categoryData) setCategories(categoryData as unknown as CategoryRow[]);
+    if (incomeData) setIncome(incomeData as unknown as IncomeRow[]);
+    if (incomeCategoryData) setIncomeCategories(incomeCategoryData as unknown as CategoryRow[]);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -118,6 +141,25 @@ function AdminExpensesContent() {
   }, [expenses]);
 
   const activeCategoryCount = categories.filter((c) => c.is_active).length;
+
+  // Income calculations
+  const { incomeThisMonth, incomeAllTime } = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      incomeThisMonth: income
+        .filter((i) => {
+          const d = new Date(i.income_date);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((sum, i) => sum + i.amount, 0),
+      incomeAllTime: income.reduce((sum, i) => sum + i.amount, 0),
+    };
+  }, [income]);
+
+  const incomeTotalPages = Math.ceil(income.length / pageSize);
+  const paginatedIncome = income.slice((incomePage - 1) * pageSize, incomePage * pageSize);
 
   // Derive filter options
   const categoryOptions = useMemo(() => {
@@ -213,6 +255,35 @@ function AdminExpensesContent() {
     setDeletingId(id);
   }
 
+  function openAddExpense() {
+    setIncomeDrawerOpen(false);
+    setEditingExpense(null);
+    setExpenseDrawerOpen(true);
+  }
+
+  function openAddIncome() {
+    setExpenseDrawerOpen(false);
+    setEditingIncome(null);
+    setIncomeDrawerOpen(true);
+  }
+
+  function handleEditIncome(item: IncomeRow) {
+    setEditingIncome(item);
+    setIncomeDrawerOpen(true);
+  }
+
+  async function confirmDeleteIncome() {
+    if (!deletingIncomeId) return;
+    const res = await deleteIncome(deletingIncomeId);
+    setDeletingIncomeId(null);
+    if ("error" in res) {
+      setToast({ message: res.error ?? "Failed to delete income", variant: "error" });
+    } else {
+      setToast({ message: "Income deleted", variant: "success" });
+    }
+    fetchData();
+  }
+
   async function confirmDelete() {
     if (!deletingId) return;
     const res = await deleteExpense(deletingId);
@@ -242,9 +313,9 @@ function AdminExpensesContent() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Expenses</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Finances</h1>
           <p className="text-slate-500 text-sm">
-            Track court reservations, salaries, and other costs
+            Track income, court reservations, salaries, and other costs
           </p>
         </div>
         <div className="flex gap-1.5 sm:gap-2">
@@ -279,7 +350,16 @@ function AdminExpensesContent() {
             Categories
           </Button>
           <Button
-            onClick={() => { setEditingExpense(null); setExpenseDrawerOpen(true); }}
+            variant="outline"
+            onClick={openAddIncome}
+            aria-label="Add income"
+            className="!px-3 sm:!px-4 text-emerald-600"
+          >
+            <TrendingUp className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Add Income</span>
+          </Button>
+          <Button
+            onClick={openAddExpense}
             aria-label="Add expense"
             className="!px-3 sm:!px-4"
           >
@@ -346,7 +426,51 @@ function AdminExpensesContent() {
       </div>
 
       {/* Tab content */}
-      {tab === "categories" ? (
+      {tab === "income" ? (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <StatCard
+              label={`Income (${currentMonth})`}
+              value={`${incomeThisMonth.toLocaleString()} EGP`}
+              accentColor="bg-emerald-500"
+              icon={<TrendingUp className="w-5 h-5" />}
+              subtitle={`All Time: ${incomeAllTime.toLocaleString()} EGP`}
+            />
+            <StatCard
+              label={`Net (${currentMonth})`}
+              value={`${(incomeThisMonth - totalThisMonth).toLocaleString()} EGP`}
+              accentColor={incomeThisMonth - totalThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"}
+              icon={<Scale className="w-5 h-5" />}
+              subtitle="Manual income minus expenses"
+            />
+            <StatCard
+              label="Income Categories"
+              value={incomeCategories.filter((c) => c.is_active).length}
+              accentColor="bg-slate-400"
+              icon={<Wallet className="w-5 h-5" />}
+            />
+          </div>
+          <div className="flex-1">
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-sm">Loading income...</div>
+            ) : (
+              <IncomeTableView
+                income={paginatedIncome}
+                onEdit={handleEditIncome}
+                onDelete={setDeletingIncomeId}
+                grandTotal={incomeAllTime}
+              />
+            )}
+          </div>
+          <Pagination
+            currentPage={incomePage}
+            totalPages={incomeTotalPages}
+            onPageChange={setIncomePage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => { setPageSize(size); setIncomePage(1); }}
+          />
+        </>
+      ) : tab === "categories" ? (
         <CategoriesView categories={categories} onManage={() => setCategoryDrawerOpen(true)} />
       ) : tab === "by-category" ? (
         <CategoryReport expenses={filteredExpenses} categories={categories} />
@@ -412,6 +536,21 @@ function AdminExpensesContent() {
         categories={categories}
         editingExpense={editingExpense}
         onSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
+        onSwitchToIncome={openAddIncome}
+      />
+
+      {/* Income drawer */}
+      <IncomeDrawer
+        open={incomeDrawerOpen}
+        onClose={() => {
+          setIncomeDrawerOpen(false);
+          setEditingIncome(null);
+        }}
+        categories={incomeCategories}
+        editingIncome={editingIncome}
+        onSuccess={() => { setToast({ message: "Income saved successfully", variant: "success" }); fetchData(); }}
+        onCategoriesChange={fetchData}
+        onSwitchToExpense={openAddExpense}
       />
 
       {/* Category drawer */}
@@ -421,6 +560,28 @@ function AdminExpensesContent() {
         categories={categories}
         onSuccess={() => { setToast({ message: "Category updated", variant: "success" }); fetchData(); }}
       />
+
+      {/* Delete income confirmation */}
+      {deletingIncomeId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDeletingIncomeId(null)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-slate-900 mb-2">Delete Income</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Are you sure you want to delete this income entry? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setDeletingIncomeId(null)}>Cancel</Button>
+              <button
+                onClick={confirmDeleteIncome}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation */}
       {deletingId && (

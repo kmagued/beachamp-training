@@ -33,6 +33,8 @@ export default async function AdminDashboard() {
     { data: groupsData },
     { data: groupPlayersData },
     { data: attendanceAll },
+    // Manually recorded income (merch, sponsorships, ...) — added to revenue alongside payments
+    { data: otherIncomeData },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -67,6 +69,10 @@ export default async function AdminDashboard() {
     supabase
       .from("attendance")
       .select("status, session_date, group_id"),
+    supabase
+      .from("income")
+      .select("amount, income_date, income_categories(name)")
+      .eq("is_active", true),
   ]);
 
   // Derive everything else in JS — no extra queries
@@ -82,15 +88,23 @@ export default async function AdminDashboard() {
     .filter((e) => e.is_recurring);
   const allExpenseData = allExpensesWithDates;
 
+  // Other income — income_date is a DATE, so its YYYY-MM prefix is the month it was logged for
+  const otherIncomeRows = ((otherIncomeData || []) as { amount: number; income_date: string; income_categories: { name: string } | null }[])
+    .filter((i) => i.income_date);
+  const monthlyOtherIncome = otherIncomeRows
+    .filter((i) => i.income_date.slice(0, 7) === currentMonthKey)
+    .reduce((sum, i) => sum + Number(i.amount), 0);
+  const allTimeOtherIncome = otherIncomeRows.reduce((sum, i) => sum + Number(i.amount), 0);
+
   const monthlyRevenue = (revenueData || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
-  );
+  ) + monthlyOtherIncome;
 
   const totalRevenue = (revenuePayments || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
-  );
+  ) + allTimeOtherIncome;
 
   // Expenses calculation
   const oneTimeExpenses = (oneTimeExpenseData || []).reduce(
@@ -148,6 +162,15 @@ export default async function AdminDashboard() {
     entry.amount += Number(p.amount);
     incomeByPackageKey.set(key, entry);
   }
+  // Other income shows as its own series per category
+  for (const i of otherIncomeRows) {
+    const month = i.income_date.slice(0, 7);
+    const pkg = i.income_categories?.name || "Other income";
+    const key = `${month}|${pkg}`;
+    const entry = incomeByPackageKey.get(key) ?? { month, pkg, amount: 0 };
+    entry.amount += Number(i.amount);
+    incomeByPackageKey.set(key, entry);
+  }
   const incomeByPackage = [...incomeByPackageKey.values()];
 
   // --- Monthly financial table data ---
@@ -166,6 +189,10 @@ export default async function AdminDashboard() {
     if (isNaN(d.getTime())) continue;
     const k = cairoMonthKey(d);
     incomeByMonth[k] = (incomeByMonth[k] || 0) + p.amount;
+  }
+  for (const i of otherIncomeRows) {
+    const k = i.income_date.slice(0, 7);
+    incomeByMonth[k] = (incomeByMonth[k] || 0) + Number(i.amount);
   }
 
   // Expenses by month
@@ -290,12 +317,14 @@ export default async function AdminDashboard() {
 
         {/* Charts */}
         <DashboardCharts
-        revenuePayments={(revenuePayments || [])
-          .map((p: { amount: number; confirmed_at: string | null }) => ({
+        revenuePayments={[
+          ...(revenuePayments || []).map((p: { amount: number; confirmed_at: string | null }) => ({
             amount: p.amount,
             date: p.confirmed_at || "",
-          }))
-          .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
+          })),
+          // Midday Cairo so the DATE never shifts to a neighbouring day
+          ...otherIncomeRows.map((i) => ({ amount: Number(i.amount), date: `${i.income_date}T12:00:00+02:00` })),
+        ].filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
         incomeByPackage={incomeByPackage}
         currentMonthKey={currentMonthKey}
       />

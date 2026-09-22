@@ -4,6 +4,7 @@ import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createExpense, updateExpense, createExpenseCategory } from "@/app/_actions/expenses";
+import { EntryTypeSwitch } from "./entry-type-switch";
 import type { ExpenseRow, CategoryRow } from "./types";
 
 export interface CourtSession {
@@ -23,9 +24,11 @@ interface ExpenseDrawerProps {
   defaultDate?: string;
   /** When provided, court calculator shows session-based selection */
   sessions?: CourtSession[];
+  /** When provided, shows the Expense / Income switch (new entries only) */
+  onSwitchToIncome?: () => void;
 }
 
-export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess, defaultDate, sessions }: ExpenseDrawerProps) {
+export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuccess, defaultDate, sessions, onSwitchToIncome }: ExpenseDrawerProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -218,6 +221,10 @@ export function ExpenseDrawer({ open, onClose, categories, editingExpense, onSuc
   return (
     <Drawer open={open} onClose={onClose} title={editingExpense ? "Edit Expense" : "Add Expense"}>
       <div className="space-y-4">
+        {onSwitchToIncome && !editingExpense && (
+          <EntryTypeSwitch value="expense" onChange={(v) => v === "income" && onSwitchToIncome()} />
+        )}
+
         {error && (
           <div className="p-3 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
         )}

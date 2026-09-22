@@ -32,7 +32,7 @@ interface IncomeByPackageProps {
 // the last slot fold into "Other" rather than getting a generated hue.
 const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
 const OTHER_COLOR = "#a8a59d";
-const OTHER_LABEL = "Other packages";
+const OTHER_LABEL = "Other sources";
 const ALL_TIME = "all";
 
 const AXIS_TEXT = "#5A6B73";
@@ -179,7 +179,7 @@ export function IncomeByPackage({ data, currentMonth }: IncomeByPackageProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <h2 className="font-display text-2xl tracking-wide text-primary-900 flex items-center gap-2">
           <Package className="w-5 h-5 text-secondary" />
-          Income by Package
+          Income by Source
         </h2>
         <Select
           aria-label="Period"

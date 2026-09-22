@@ -86,7 +86,7 @@ const adminNav: NavItem[] = [
   { key: "coaches", label: "Coaches", href: "/admin/coaches", section: "People" },
   { key: "groups", label: "Groups", href: "/admin/groups", section: "People" },
   { key: "payments", label: "Payments", href: "/admin/payments", section: "Finance" },
-  { key: "expenses", label: "Expenses", href: "/admin/expenses", section: "Finance" },
+  { key: "expenses", label: "Finances", href: "/admin/expenses", section: "Finance" },
   { key: "packages", label: "Packages", href: "/admin/packages", section: "Finance" },
   { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes", section: "Finance" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
