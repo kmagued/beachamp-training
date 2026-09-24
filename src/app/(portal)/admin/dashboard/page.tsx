@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui";
-import { Users, CreditCard, Receipt, TrendingUp, Wallet } from "lucide-react";
+import { Users, CreditCard, Receipt, TrendingUp } from "lucide-react";
 import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { MonthlyFinancialTable } from "./_components/monthly-financial-table";
@@ -33,6 +33,8 @@ export default async function AdminDashboard() {
     { data: groupsData },
     { data: groupPlayersData },
     { data: attendanceAll },
+    // Manually recorded income (merch, sponsorships, ...) — added to revenue alongside payments
+    { data: otherIncomeData },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -67,6 +69,10 @@ export default async function AdminDashboard() {
     supabase
       .from("attendance")
       .select("status, session_date, group_id"),
+    supabase
+      .from("income")
+      .select("amount, income_date, income_categories(name)")
+      .eq("is_active", true),
   ]);
 
   // Derive everything else in JS — no extra queries
@@ -82,15 +88,23 @@ export default async function AdminDashboard() {
     .filter((e) => e.is_recurring);
   const allExpenseData = allExpensesWithDates;
 
+  // Other income — income_date is a DATE, so its YYYY-MM prefix is the month it was logged for
+  const otherIncomeRows = ((otherIncomeData || []) as { amount: number; income_date: string; income_categories: { name: string } | null }[])
+    .filter((i) => i.income_date);
+  const monthlyOtherIncome = otherIncomeRows
+    .filter((i) => i.income_date.slice(0, 7) === currentMonthKey)
+    .reduce((sum, i) => sum + Number(i.amount), 0);
+  const allTimeOtherIncome = otherIncomeRows.reduce((sum, i) => sum + Number(i.amount), 0);
+
   const monthlyRevenue = (revenueData || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
-  );
+  ) + monthlyOtherIncome;
 
   const totalRevenue = (revenuePayments || []).reduce(
     (sum: number, p: { amount: number }) => sum + p.amount,
     0
-  );
+  ) + allTimeOtherIncome;
 
   // Expenses calculation
   const oneTimeExpenses = (oneTimeExpenseData || []).reduce(
@@ -111,20 +125,6 @@ export default async function AdminDashboard() {
     0
   );
   const allTimeProfit = totalRevenue - allTimeExpenses;
-
-  // Profit without court rentals, which the expenses module files under "Court Reservation".
-  // Same monthly rules as above: this month's one-time rentals plus recurring ones at their monthly rate.
-  const rentalExpenseRows = ((allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null; expense_categories: { name: string } | null }[])
-    .filter((e) => e.expense_categories?.name === "Court Reservation");
-  const monthlyRentalExpenses = rentalExpenseRows.reduce((sum, e) => {
-    if (!e.is_recurring) return e.expense_date?.slice(0, 7) === currentMonthKey ? sum + e.amount : sum;
-    if (e.recurrence_type === "monthly") return sum + e.amount;
-    if (e.recurrence_type === "weekly") return sum + e.amount * 4;
-    return sum;
-  }, 0);
-  const allTimeRentalExpenses = rentalExpenseRows.reduce((sum, e) => sum + e.amount, 0);
-  const monthlyProfitExRentals = monthlyProfit + monthlyRentalExpenses;
-  const allTimeProfitExRentals = allTimeProfit + allTimeRentalExpenses;
 
   const pendingAmount = ((pendingPaymentRows || []) as { amount: number }[]).reduce(
     (sum, p) => sum + Number(p.amount),
@@ -148,10 +148,19 @@ export default async function AdminDashboard() {
     entry.amount += Number(p.amount);
     incomeByPackageKey.set(key, entry);
   }
+  // Other income shows as its own series per category
+  for (const i of otherIncomeRows) {
+    const month = i.income_date.slice(0, 7);
+    const pkg = i.income_categories?.name || "Other income";
+    const key = `${month}|${pkg}`;
+    const entry = incomeByPackageKey.get(key) ?? { month, pkg, amount: 0 };
+    entry.amount += Number(i.amount);
+    incomeByPackageKey.set(key, entry);
+  }
   const incomeByPackage = [...incomeByPackageKey.values()];
 
   // --- Monthly financial table data ---
-  type MonthlyRow = { month: string; key: string; income: number; expenses: number; profit: number };
+  type MonthlyRow = { month: string; key: string; income: number; expenses: number; rentals: number; profit: number; profitExRentals: number };
 
   const monthLabel = (key: string) => {
     const [y, m] = key.split("-");
@@ -167,16 +176,25 @@ export default async function AdminDashboard() {
     const k = cairoMonthKey(d);
     incomeByMonth[k] = (incomeByMonth[k] || 0) + p.amount;
   }
+  for (const i of otherIncomeRows) {
+    const k = i.income_date.slice(0, 7);
+    incomeByMonth[k] = (incomeByMonth[k] || 0) + Number(i.amount);
+  }
 
-  // Expenses by month
+  // Expenses by month, with court rentals tracked separately so the table can
+  // show profit with them added back in. The expenses module files them under
+  // the "Court Reservation" category.
   const expenseByMonth: Record<string, number> = {};
+  const rentalByMonth: Record<string, number> = {};
   const cairoNow = cairoNowYearMonth();
-  for (const e of (allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null }[]) {
+  for (const e of (allExpensesWithDates || []) as { amount: number; expense_date: string; is_recurring: boolean; recurrence_type: string | null; expense_categories: { name: string } | null }[]) {
     if (!e.expense_date) continue;
+    const isRental = e.expense_categories?.name === "Court Reservation";
     if (!e.is_recurring) {
       // expense_date is DATE; use its YYYY-MM directly
       const k = e.expense_date.slice(0, 7);
       expenseByMonth[k] = (expenseByMonth[k] || 0) + e.amount;
+      if (isRental) rentalByMonth[k] = (rentalByMonth[k] || 0) + e.amount;
     } else {
       const monthlyAmount = e.recurrence_type === "weekly" ? e.amount * 4 : e.amount;
       const [startY, startM] = e.expense_date.slice(0, 7).split("-").map(Number);
@@ -185,6 +203,7 @@ export default async function AdminDashboard() {
       while (y < cairoNow.year || (y === cairoNow.year && m <= cairoNow.month)) {
         const k = `${y}-${String(m).padStart(2, "0")}`;
         expenseByMonth[k] = (expenseByMonth[k] || 0) + monthlyAmount;
+        if (isRental) rentalByMonth[k] = (rentalByMonth[k] || 0) + monthlyAmount;
         m += 1;
         if (m > 12) { m = 1; y += 1; }
       }
@@ -198,7 +217,16 @@ export default async function AdminDashboard() {
     .map((k) => {
       const income = incomeByMonth[k] || 0;
       const expenses = expenseByMonth[k] || 0;
-      return { month: monthLabel(k), key: k, income, expenses, profit: income - expenses };
+      const rentals = rentalByMonth[k] || 0;
+      return {
+        month: monthLabel(k),
+        key: k,
+        income,
+        expenses,
+        rentals,
+        profit: income - expenses,
+        profitExRentals: income - expenses + rentals,
+      };
     });
 
   // Groups and memberships for the metrics table
@@ -261,19 +289,13 @@ export default async function AdminDashboard() {
             subtitle={`All Time: ${allTimeProfit.toLocaleString()} EGP`}
           />
           <StatCard
-            label={`Profit excl. Rentals (${currentMonth})`}
-            value={`${monthlyProfitExRentals.toLocaleString()} EGP`}
-            accentColor={monthlyProfitExRentals >= 0 ? "bg-success" : "bg-danger"}
-            icon={<Wallet className="w-5 h-5" />}
-            subtitle={`All Time: ${allTimeProfitExRentals.toLocaleString()} EGP`}
-          />
-          <StatCard
             label="Pending Payments"
             value={pendingPayments ?? 0}
             accentColor={pendingPayments ? "bg-accent" : "bg-primary-200"}
             icon={<CreditCard className="w-5 h-5" />}
             subtitle={`Amount: ${pendingAmount.toLocaleString()} EGP`}
             href="/admin/payments?statusFilter=Pending"
+            className="col-span-2 lg:col-span-1"
           />
         </div>
 
@@ -290,12 +312,14 @@ export default async function AdminDashboard() {
 
         {/* Charts */}
         <DashboardCharts
-        revenuePayments={(revenuePayments || [])
-          .map((p: { amount: number; confirmed_at: string | null }) => ({
+        revenuePayments={[
+          ...(revenuePayments || []).map((p: { amount: number; confirmed_at: string | null }) => ({
             amount: p.amount,
             date: p.confirmed_at || "",
-          }))
-          .filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
+          })),
+          // Midday Cairo so the DATE never shifts to a neighbouring day
+          ...otherIncomeRows.map((i) => ({ amount: Number(i.amount), date: `${i.income_date}T12:00:00+02:00` })),
+        ].filter((p: { date: string }) => p.date && !isNaN(new Date(p.date).getTime()))}
         incomeByPackage={incomeByPackage}
         currentMonthKey={currentMonthKey}
       />

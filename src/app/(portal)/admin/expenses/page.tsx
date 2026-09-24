@@ -1,18 +1,22 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { StatCard, Pagination, Button, Toast } from "@/components/ui";
-import { Receipt, Repeat, CalendarDays, Tag, Plus, Settings, Download } from "lucide-react";
+import { StatCard, Pagination, Button, Toast, ConfirmDrawer, Badge } from "@/components/ui";
+import { Receipt, Repeat, Plus, Settings, Download, TrendingUp, Scale } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/format-date";
 import { deleteExpense } from "@/app/_actions/expenses";
-import type { ExpenseRow, CategoryRow, SortField, SortDir, ExpenseTab } from "./_components/types";
+import { deleteIncome } from "@/app/_actions/income";
+import type { ExpenseRow, CategoryRow, IncomeRow, SortField, SortDir, ExpenseTab, EntryKind } from "./_components/types";
 import { ExpensesPageSkeleton } from "./_components/skeleton";
 import { ExpensesFilters } from "./_components/filters";
 import { ExpensesTableView } from "./_components/table";
-import { ExpenseDrawer } from "./_components/expense-drawer";
+import { EntryDrawer } from "./_components/entry-drawer";
 import { CategoryDrawer } from "./_components/category-drawer";
-import { CategoryReport } from "./_components/category-report";
+import { CategoryReport, type ReportEntry } from "./_components/category-report";
+import { IncomeTableView } from "./_components/income-table";
+import { EntryTypeSwitch } from "./_components/entry-type-switch";
 
 export default function AdminExpensesPage() {
   return (
@@ -23,9 +27,8 @@ export default function AdminExpensesPage() {
 }
 
 const TABS: { key: ExpenseTab; label: string }[] = [
-  { key: "all", label: "All Expenses" },
-  { key: "one-time", label: "One-time" },
-  { key: "recurring", label: "Recurring" },
+  { key: "expenses", label: "Expenses" },
+  { key: "income", label: "Income" },
   { key: "by-category", label: "By Category" },
   { key: "categories", label: "Categories" },
 ];
@@ -33,9 +36,11 @@ const TABS: { key: ExpenseTab; label: string }[] = [
 function AdminExpensesContent() {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [income, setIncome] = useState<IncomeRow[]>([]);
+  const [incomeCategories, setIncomeCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<ExpenseTab>("all");
+  const [tab, setTab] = useState<ExpenseTab>("expenses");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
@@ -45,14 +50,27 @@ function AdminExpensesContent() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [incomePage, setIncomePage] = useState(1);
+
+  // Income tab keeps its own filters — the two sides share no categories or months
+  const [incomeSearch, setIncomeSearch] = useState("");
+  const [incomeCategoryFilter, setIncomeCategoryFilter] = useState("");
+  const [incomeMonthFilter, setIncomeMonthFilter] = useState("");
+
+  // Which side the "By Category" report is charting
+  const [reportKind, setReportKind] = useState<EntryKind>("expense");
 
   // Drawer state
-  const [expenseDrawerOpen, setExpenseDrawerOpen] = useState(false);
+  const [entryDrawerOpen, setEntryDrawerOpen] = useState(false);
+  const [entryKind, setEntryKind] = useState<EntryKind>("expense");
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
+  const [editingIncome, setEditingIncome] = useState<IncomeRow | null>(null);
   const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
+  const [categoryDrawerKind, setCategoryDrawerKind] = useState<EntryKind>("expense");
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
@@ -61,7 +79,7 @@ function AdminExpensesContent() {
   );
 
   const fetchData = useCallback(async () => {
-    const [{ data: expenseData }, { data: categoryData }] = await Promise.all([
+    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }] = await Promise.all([
       supabase
         .from("expenses")
         .select("*, expense_categories(id, name, icon)")
@@ -72,10 +90,23 @@ function AdminExpensesContent() {
         .select("*")
         .order("is_default", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("income")
+        .select("*, income_categories(id, name, icon)")
+        .eq("is_active", true)
+        .order("income_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("income_categories")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true }),
     ]);
 
     if (expenseData) setExpenses(expenseData as unknown as ExpenseRow[]);
     if (categoryData) setCategories(categoryData as unknown as CategoryRow[]);
+    if (incomeData) setIncome(incomeData as unknown as IncomeRow[]);
+    if (incomeCategoryData) setIncomeCategories(incomeCategoryData as unknown as CategoryRow[]);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -85,7 +116,7 @@ function AdminExpensesContent() {
   }, [fetchData]);
 
   // Monthly calculations
-  const { totalThisMonth, recurringMonthly, oneTimeThisMonth } = useMemo(() => {
+  const { totalThisMonth, recurringMonthly } = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -109,7 +140,6 @@ function AdminExpensesContent() {
     return {
       totalThisMonth: oneTime + recurringM + recurringW,
       recurringMonthly: recurringM + recurringW,
-      oneTimeThisMonth: oneTime,
     };
   }, [expenses]);
 
@@ -117,7 +147,24 @@ function AdminExpensesContent() {
     return expenses.reduce((sum, e) => sum + e.amount, 0);
   }, [expenses]);
 
-  const activeCategoryCount = categories.filter((c) => c.is_active).length;
+  // Income calculations
+  const { incomeThisMonth, incomeAllTime } = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      incomeThisMonth: income
+        .filter((i) => {
+          const d = new Date(i.income_date);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((sum, i) => sum + i.amount, 0),
+      incomeAllTime: income.reduce((sum, i) => sum + i.amount, 0),
+    };
+  }, [income]);
+
+  const netThisMonth = incomeThisMonth - totalThisMonth;
+  const netAllTime = incomeAllTime - allTimeTotal;
 
   // Derive filter options
   const categoryOptions = useMemo(() => {
@@ -137,15 +184,27 @@ function AdminExpensesContent() {
     return [...months];
   }, [expenses]);
 
+  const incomeCategoryOptions = useMemo(() => {
+    const names = new Set<string>();
+    income.forEach((i) => {
+      if (i.income_categories?.name) names.add(i.income_categories.name);
+    });
+    return [...names].sort();
+  }, [income]);
+
+  const incomeMonthOptions = useMemo(() => {
+    const months = new Set<string>();
+    income.forEach((i) => {
+      const d = new Date(i.income_date);
+      months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
+    });
+    return [...months];
+  }, [income]);
+
   // Apply tab + filters + sort
   const filteredExpenses = useMemo(() => {
     let result = expenses;
 
-    // Tab filter
-    if (tab === "one-time") result = result.filter((e) => !e.is_recurring);
-    if (tab === "recurring") result = result.filter((e) => e.is_recurring);
-
-    // Type filter (when on "all" tab)
     if (typeFilter === "one-time") result = result.filter((e) => !e.is_recurring);
     if (typeFilter === "recurring") result = result.filter((e) => e.is_recurring);
 
@@ -183,7 +242,43 @@ function AdminExpensesContent() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [expenses, tab, typeFilter, paymentStatusFilter, search, monthFilter, categoryFilter, sortField, sortDir]);
+  }, [expenses, typeFilter, paymentStatusFilter, search, monthFilter, categoryFilter, sortField, sortDir]);
+
+  // Same filters + sort, income side
+  const filteredIncome = useMemo(() => {
+    let result = income;
+
+    if (incomeSearch) {
+      const q = incomeSearch.toLowerCase();
+      result = result.filter((i) =>
+        (i.description || "").toLowerCase().includes(q) ||
+        (i.notes || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (incomeMonthFilter) {
+      result = result.filter((i) => {
+        const d = new Date(i.income_date);
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === incomeMonthFilter;
+      });
+    }
+
+    if (incomeCategoryFilter) {
+      result = result.filter((i) => i.income_categories?.name === incomeCategoryFilter);
+    }
+
+    return [...result].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "date") {
+        cmp = new Date(a.income_date).getTime() - new Date(b.income_date).getTime();
+      } else if (sortField === "amount") {
+        cmp = a.amount - b.amount;
+      } else if (sortField === "category") {
+        cmp = (a.income_categories?.name || "").localeCompare(b.income_categories?.name || "");
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [income, incomeSearch, incomeMonthFilter, incomeCategoryFilter, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.ceil(filteredExpenses.length / pageSize);
@@ -192,9 +287,34 @@ function AdminExpensesContent() {
     currentPage * pageSize
   );
 
+  const incomeTotalPages = Math.ceil(filteredIncome.length / pageSize);
+  const paginatedIncome = filteredIncome.slice((incomePage - 1) * pageSize, incomePage * pageSize);
+
+  // Rows for the By Category report, flattened to whichever side is selected
+  const reportEntries: ReportEntry[] = useMemo(() => {
+    if (reportKind === "income") {
+      return filteredIncome.map((i) => ({
+        categoryId: i.category_id,
+        categoryName: i.income_categories?.name || "",
+        amount: i.amount,
+        date: i.income_date,
+      }));
+    }
+    return filteredExpenses.map((e) => ({
+      categoryId: e.category_id,
+      categoryName: e.expense_categories?.name || "",
+      amount: e.amount,
+      date: e.expense_date,
+    }));
+  }, [reportKind, filteredIncome, filteredExpenses]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, monthFilter, categoryFilter, typeFilter, paymentStatusFilter, tab]);
+
+  useEffect(() => {
+    setIncomePage(1);
+  }, [incomeSearch, incomeMonthFilter, incomeCategoryFilter, tab]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -205,12 +325,52 @@ function AdminExpensesContent() {
   }
 
   function handleEdit(expense: ExpenseRow) {
+    setEditingIncome(null);
     setEditingExpense(expense);
-    setExpenseDrawerOpen(true);
+    setEntryKind("expense");
+    setEntryDrawerOpen(true);
   }
 
   function handleDelete(id: string) {
     setDeletingId(id);
+  }
+
+  function handleEditIncome(item: IncomeRow) {
+    setEditingExpense(null);
+    setEditingIncome(item);
+    setEntryKind("income");
+    setEntryDrawerOpen(true);
+  }
+
+  /** One Add button for both sides — opens on Expense, switchable in the drawer */
+  function openAddEntry() {
+    setEditingExpense(null);
+    setEditingIncome(null);
+    setEntryKind("expense");
+    setEntryDrawerOpen(true);
+  }
+
+  function closeEntryDrawer() {
+    setEntryDrawerOpen(false);
+    setEditingExpense(null);
+    setEditingIncome(null);
+  }
+
+  function openCategoryDrawer(kind: EntryKind) {
+    setCategoryDrawerKind(kind);
+    setCategoryDrawerOpen(true);
+  }
+
+  async function confirmDeleteIncome() {
+    if (!deletingIncomeId) return;
+    const res = await deleteIncome(deletingIncomeId);
+    setDeletingIncomeId(null);
+    if ("error" in res) {
+      setToast({ message: res.error ?? "Failed to delete income", variant: "error" });
+    } else {
+      setToast({ message: "Income deleted", variant: "success" });
+    }
+    fetchData();
   }
 
   async function confirmDelete() {
@@ -233,7 +393,28 @@ function AdminExpensesContent() {
     setPaymentStatusFilter("");
   }
 
+  function resetIncomeFilters() {
+    setIncomeSearch("");
+    setIncomeMonthFilter("");
+    setIncomeCategoryFilter("");
+  }
+
+  // Held in state rather than derived, so the summary stays put while the drawer animates out
+  const [deletingExpense, setDeletingExpense] = useState<ExpenseRow | null>(null);
+  const [deletingIncome, setDeletingIncome] = useState<IncomeRow | null>(null);
+
+  useEffect(() => {
+    const row = expenses.find((e) => e.id === deletingId);
+    if (row) setDeletingExpense(row);
+  }, [deletingId, expenses]);
+
+  useEffect(() => {
+    const row = income.find((i) => i.id === deletingIncomeId);
+    if (row) setDeletingIncome(row);
+  }, [deletingIncomeId, income]);
+
   const hasActiveFilters = !!search || !!monthFilter || !!categoryFilter || !!typeFilter || !!paymentStatusFilter;
+  const hasActiveIncomeFilters = !!incomeSearch || !!incomeMonthFilter || !!incomeCategoryFilter;
   const currentMonth = new Date().toLocaleDateString("en-US", { month: "long" });
 
   return (
@@ -242,9 +423,9 @@ function AdminExpensesContent() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Expenses</h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Finances</h1>
           <p className="text-slate-500 text-sm">
-            Track court reservations, salaries, and other costs
+            Track income, court reservations, salaries, and other costs
           </p>
         </div>
         <div className="flex gap-1.5 sm:gap-2">
@@ -252,6 +433,22 @@ function AdminExpensesContent() {
             variant="outline"
             onClick={async () => {
               const { exportToExcel } = await import("@/lib/utils/export-excel");
+              const monthLabel = tab === "income" ? incomeMonthFilter : monthFilter;
+              const dateStr = monthLabel || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+              const slug = dateStr.replace(/\s/g, "-").toLowerCase();
+
+              if (tab === "income") {
+                const rows = filteredIncome.map((i) => ({
+                  Date: i.income_date,
+                  Category: i.income_categories?.name || "",
+                  Description: i.description || "",
+                  "Amount (EGP)": i.amount,
+                  Notes: i.notes || "",
+                }));
+                exportToExcel(rows, `income-${slug}`, "Income");
+                return;
+              }
+
               const rows = filteredExpenses.map((e) => ({
                 Date: e.expense_date,
                 Category: e.expense_categories?.name || "",
@@ -260,10 +457,9 @@ function AdminExpensesContent() {
                 Type: e.is_recurring ? `Recurring (${e.recurrence_type})` : "One-time",
                 Payment: e.payment_status === "paid_full" ? "Paid" : e.payment_status === "partially_paid" ? `Partial (${e.paid_amount ?? 0} EGP)` : "Due",
               }));
-              const dateStr = monthFilter || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-              exportToExcel(rows, `expenses-${dateStr.replace(/\s/g, "-").toLowerCase()}`, "Expenses");
+              exportToExcel(rows, `expenses-${slug}`, "Expenses");
             }}
-            disabled={filteredExpenses.length === 0}
+            disabled={tab === "income" ? filteredIncome.length === 0 : filteredExpenses.length === 0}
             aria-label="Export to Excel"
             className="!px-3 sm:!px-4"
           >
@@ -271,20 +467,12 @@ function AdminExpensesContent() {
             <span className="hidden sm:inline">Export</span>
           </Button>
           <Button
-            variant="outline"
-            onClick={() => setCategoryDrawerOpen(true)}
-            className="hidden sm:inline-flex"
-          >
-            <Settings className="w-4 h-4 mr-1.5" />
-            Categories
-          </Button>
-          <Button
-            onClick={() => { setEditingExpense(null); setExpenseDrawerOpen(true); }}
-            aria-label="Add expense"
+            onClick={openAddEntry}
+            aria-label="Add income or expense"
             className="!px-3 sm:!px-4"
           >
             <Plus className="w-4 h-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Add Expense</span>
+            <span className="hidden sm:inline">Add</span>
           </Button>
         </div>
       </div>
@@ -293,29 +481,31 @@ function AdminExpensesContent() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard
-          label={`Total (${currentMonth})`}
+          label={`Income (${currentMonth})`}
+          value={`${incomeThisMonth.toLocaleString()} EGP`}
+          accentColor="bg-emerald-500"
+          icon={<TrendingUp className="w-5 h-5" />}
+          subtitle={`All Time: ${incomeAllTime.toLocaleString()} EGP`}
+        />
+        <StatCard
+          label={`Expenses (${currentMonth})`}
           value={`${totalThisMonth.toLocaleString()} EGP`}
           accentColor="bg-red-500"
           icon={<Receipt className="w-5 h-5" />}
           subtitle={`All Time: ${allTimeTotal.toLocaleString()} EGP`}
         />
         <StatCard
+          label={`Net (${currentMonth})`}
+          value={`${netThisMonth.toLocaleString()} EGP`}
+          accentColor={netThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"}
+          icon={<Scale className="w-5 h-5" />}
+          subtitle={`All Time: ${netAllTime.toLocaleString()} EGP`}
+        />
+        <StatCard
           label="Recurring / Month"
           value={`${recurringMonthly.toLocaleString()} EGP`}
           accentColor="bg-amber-500"
           icon={<Repeat className="w-5 h-5" />}
-        />
-        <StatCard
-          label={`One-time (${currentMonth})`}
-          value={`${oneTimeThisMonth.toLocaleString()} EGP`}
-          accentColor="bg-primary"
-          icon={<CalendarDays className="w-5 h-5" />}
-        />
-        <StatCard
-          label="Categories"
-          value={activeCategoryCount}
-          accentColor="bg-slate-400"
-          icon={<Tag className="w-5 h-5" />}
         />
       </div>
 
@@ -335,21 +525,68 @@ function AdminExpensesContent() {
             {t.label}
           </button>
         ))}
-        {/* Mobile categories button */}
-        <button
-          onClick={() => setCategoryDrawerOpen(true)}
-          className="sm:hidden px-4 py-2 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
-        >
-          <Settings className="w-4 h-4 inline mr-1" />
-          Manage
-        </button>
       </div>
 
       {/* Tab content */}
-      {tab === "categories" ? (
-        <CategoriesView categories={categories} onManage={() => setCategoryDrawerOpen(true)} />
+      {tab === "income" ? (
+        <>
+          <ExpensesFilters
+            search={incomeSearch}
+            onSearchChange={setIncomeSearch}
+            categoryFilter={incomeCategoryFilter}
+            onCategoryFilterChange={setIncomeCategoryFilter}
+            categoryOptions={incomeCategoryOptions}
+            monthFilter={incomeMonthFilter}
+            onMonthFilterChange={setIncomeMonthFilter}
+            monthOptions={incomeMonthOptions}
+            searchPlaceholder="Search income..."
+            sortField={sortField}
+            sortDir={sortDir}
+            onSortChange={toggleSort}
+            onReset={resetIncomeFilters}
+            hasActiveFilters={hasActiveIncomeFilters}
+          />
+
+          <div className="flex-1">
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-sm">Loading income...</div>
+            ) : (
+              <IncomeTableView
+                income={paginatedIncome}
+                onEdit={handleEditIncome}
+                onDelete={setDeletingIncomeId}
+                grandTotal={filteredIncome.reduce((sum, i) => sum + i.amount, 0)}
+              />
+            )}
+          </div>
+          <Pagination
+            currentPage={incomePage}
+            totalPages={incomeTotalPages}
+            onPageChange={setIncomePage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => { setPageSize(size); setIncomePage(1); }}
+          />
+        </>
+      ) : tab === "categories" ? (
+        <div className="space-y-8">
+          <CategoriesView
+            title="Expense Categories"
+            categories={categories}
+            onManage={() => openCategoryDrawer("expense")}
+          />
+          <CategoriesView
+            title="Income Categories"
+            categories={incomeCategories}
+            onManage={() => openCategoryDrawer("income")}
+          />
+        </div>
       ) : tab === "by-category" ? (
-        <CategoryReport expenses={filteredExpenses} categories={categories} />
+        <div className="space-y-4">
+          <div className="sm:max-w-xs">
+            <EntryTypeSwitch value={reportKind} onChange={setReportKind} />
+          </div>
+          <CategoryReport entries={reportEntries} kind={reportKind} />
+        </div>
       ) : (
         <>
           {/* Filters */}
@@ -402,63 +639,108 @@ function AdminExpensesContent() {
         </>
       )}
 
-      {/* Expense drawer */}
-      <ExpenseDrawer
-        open={expenseDrawerOpen}
-        onClose={() => {
-          setExpenseDrawerOpen(false);
-          setEditingExpense(null);
-        }}
-        categories={categories}
+      {/* Add / edit drawer — both sides share one drawer so switching type stays in place */}
+      <EntryDrawer
+        open={entryDrawerOpen}
+        onClose={closeEntryDrawer}
+        kind={entryKind}
+        onKindChange={setEntryKind}
+        expenseCategories={categories}
+        incomeCategories={incomeCategories}
         editingExpense={editingExpense}
-        onSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
+        editingIncome={editingIncome}
+        onExpenseSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
+        onIncomeSuccess={() => { setToast({ message: "Income saved successfully", variant: "success" }); fetchData(); }}
+        onCategoriesChange={fetchData}
       />
 
       {/* Category drawer */}
       <CategoryDrawer
         open={categoryDrawerOpen}
         onClose={() => setCategoryDrawerOpen(false)}
-        categories={categories}
+        kind={categoryDrawerKind}
+        categories={categoryDrawerKind === "income" ? incomeCategories : categories}
         onSuccess={() => { setToast({ message: "Category updated", variant: "success" }); fetchData(); }}
       />
 
-      {/* Delete confirmation */}
-      {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDeletingId(null)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-slate-900 mb-2">Delete Expense</h3>
-            <p className="text-sm text-slate-500 mb-4">
-              Are you sure you want to delete this expense? This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete confirmations */}
+      <ConfirmDrawer
+        open={!!deletingIncomeId}
+        onClose={() => setDeletingIncomeId(null)}
+        onConfirm={confirmDeleteIncome}
+        title="Delete Income"
+        description="Are you sure you want to delete this income entry? This action cannot be undone."
+        details={deletingIncome && (
+          <DeleteSummary
+            title={deletingIncome.description || deletingIncome.income_categories?.name || "Income"}
+            meta={[
+              deletingIncome.description ? deletingIncome.income_categories?.name : null,
+              formatDate(deletingIncome.income_date),
+            ]}
+            amount={deletingIncome.amount}
+            notes={deletingIncome.notes}
+          />
+        )}
+      />
+
+      <ConfirmDrawer
+        open={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        onConfirm={confirmDelete}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+        details={deletingExpense && (
+          <DeleteSummary
+            title={deletingExpense.description}
+            meta={[
+              deletingExpense.expense_categories?.name,
+              formatDate(deletingExpense.expense_date),
+            ]}
+            amount={deletingExpense.amount}
+            notes={deletingExpense.notes}
+            badges={
+              <>
+                {deletingExpense.is_recurring ? (
+                  <Badge variant="info">
+                    Recurring ({deletingExpense.recurrence_type === "weekly" ? "weekly" : "monthly"})
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral">One-time</Badge>
+                )}
+                {deletingExpense.payment_status === "paid_full" && <Badge variant="success">Paid</Badge>}
+                {deletingExpense.payment_status === "partially_paid" && (
+                  <Badge variant="warning">
+                    Partial ({(deletingExpense.paid_amount ?? 0).toLocaleString()} EGP paid)
+                  </Badge>
+                )}
+                {deletingExpense.payment_status === "payment_due" && <Badge variant="danger">Due</Badge>}
+              </>
+            }
+          />
+        )}
+      />
     </div>
   );
 }
 
-function CategoriesView({ categories, onManage }: { categories: CategoryRow[]; onManage: () => void }) {
+function CategoriesView({ title, categories, onManage }: { title: string; categories: CategoryRow[]; onManage: () => void }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-slate-500">
-          {categories.length} categories ({categories.filter((c) => c.is_active).length} active)
-        </p>
-        <Button variant="outline" onClick={onManage}>
-          <Settings className="w-4 h-4 mr-1.5" />
-          Manage Categories
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg tracking-tight text-slate-900">{title}</h2>
+          <p className="text-sm text-slate-500">
+            {categories.length} categories ({categories.filter((c) => c.is_active).length} active)
+          </p>
+        </div>
+        <Button variant="outline" onClick={onManage} className="shrink-0">
+          <Settings className="w-4 h-4 sm:mr-1.5" />
+          <span className="hidden sm:inline">Manage</span>
         </Button>
       </div>
+      {categories.length === 0 && (
+        <p className="text-sm text-slate-400 py-4">No categories yet</p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {categories.map((cat) => (
           <div
@@ -481,6 +763,35 @@ function CategoriesView({ categories, onManage }: { categories: CategoryRow[]; o
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Compact read-only summary of the record a delete confirmation is about to remove */
+function DeleteSummary({
+  title,
+  meta,
+  amount,
+  notes,
+  badges,
+}: {
+  title: string;
+  meta: (string | null | undefined)[];
+  amount: number;
+  notes?: string | null;
+  badges?: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900 break-words min-w-0">{title}</p>
+        <p className="text-sm font-bold text-slate-900 shrink-0 tabular-nums">
+          {amount.toLocaleString()} EGP
+        </p>
+      </div>
+      <p className="text-xs text-slate-400 mt-0.5">{meta.filter(Boolean).join(" · ")}</p>
+      {badges && <div className="flex flex-wrap items-center gap-1.5 mt-3">{badges}</div>}
+      {notes && <p className="text-xs text-slate-400 mt-3 break-words">{notes}</p>}
     </div>
   );
 }
