@@ -6,9 +6,27 @@ import { Card, Badge, Button, Input, Select, Skeleton, Drawer } from "@/componen
 import { Ticket, Plus, Pencil, Trash2 } from "lucide-react";
 import { createPromoCode, updatePromoCode, togglePromoCodeStatus, deletePromoCode } from "./actions";
 import { formatDate } from "@/lib/utils/format-date";
+import { cairoToday } from "@/lib/utils/cairo-time";
 import type { PromoCode, Package } from "@/types/database";
 
 type PromoCodeWithCount = PromoCode & { use_count: number };
+
+type PromoStatus = "active" | "expired" | "inactive";
+
+/** is_active is a manual admin toggle, so a code that simply ran out of time still
+ *  carries is_active = true. Expiry is inclusive — a code works through the end of its
+ *  expiry date — matching the redemption checks in ./actions.ts. */
+function promoStatus(code: PromoCode): PromoStatus {
+  if (!code.is_active) return "inactive";
+  if (code.expiry_date && code.expiry_date < cairoToday()) return "expired";
+  return "active";
+}
+
+const STATUS_BADGE: Record<PromoStatus, { label: string; variant: "success" | "danger" | "neutral" }> = {
+  active: { label: "Active", variant: "success" },
+  expired: { label: "Expired", variant: "danger" },
+  inactive: { label: "Inactive", variant: "neutral" },
+};
 
 export default function AdminPromoCodesPage() {
   const [promoCodes, setPromoCodes] = useState<PromoCodeWithCount[]>([]);
@@ -269,8 +287,10 @@ export default function AdminPromoCodesPage() {
         </Card>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {promoCodes.map((code) => (
-            <Card key={code.id} className={!code.is_active ? "opacity-60" : ""}>
+          {promoCodes.map((code) => {
+            const status = promoStatus(code);
+            return (
+            <Card key={code.id} className={status !== "active" ? "opacity-60" : ""}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
@@ -278,8 +298,8 @@ export default function AdminPromoCodesPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-900 font-mono">{code.code}</h3>
-                      <Badge variant={code.is_active ? "success" : "neutral"}>
-                        {code.is_active ? "Active" : "Inactive"}
+                      <Badge variant={STATUS_BADGE[status].variant}>
+                        {STATUS_BADGE[status].label}
                       </Badge>
                     </div>
                   </div>
@@ -348,7 +368,8 @@ export default function AdminPromoCodesPage() {
                   {code.is_active ? "Deactivate" : "Activate"}
                 </button>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
