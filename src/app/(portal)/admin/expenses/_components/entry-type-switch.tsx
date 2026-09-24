@@ -1,10 +1,9 @@
 import { cn } from "@/lib/utils/cn";
-
-export type EntryType = "expense" | "income";
+import type { EntryKind } from "./types";
 
 interface EntryTypeSwitchProps {
-  value: EntryType;
-  onChange: (value: EntryType) => void;
+  value: EntryKind;
+  onChange: (value: EntryKind) => void;
 }
 
 /** Expense / Income toggle shown at the top of the add drawers */

@@ -3,23 +3,47 @@ import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Button, Badge } from "@/components/ui";
 import { Loader2, Plus, Pencil, ToggleLeft, ToggleRight, Check, X } from "lucide-react";
 import { createExpenseCategory, updateExpenseCategory, toggleExpenseCategoryActive } from "@/app/_actions/expenses";
-import type { CategoryRow } from "./types";
+import { createIncomeCategory, updateIncomeCategory, toggleIncomeCategoryActive } from "@/app/_actions/income";
+import type { CategoryRow, EntryKind } from "./types";
 
-const SUGGESTIONS = [
-  "Court Reservation", "Coach Salary", "Equipment", "Utilities",
-  "Marketing", "Transportation", "Maintenance", "Insurance",
-  "Rent", "Water & Electricity", "Supplies", "Snacks & Drinks",
-  "Prizes & Awards", "Uniforms", "Medical", "Other",
-];
+const SUGGESTIONS: Record<EntryKind, string[]> = {
+  expense: [
+    "Court Reservation", "Coach Salary", "Equipment", "Utilities",
+    "Marketing", "Transportation", "Maintenance", "Insurance",
+    "Rent", "Water & Electricity", "Supplies", "Snacks & Drinks",
+    "Prizes & Awards", "Uniforms", "Medical", "Other",
+  ],
+  income: [
+    "Merch", "Sponsorship", "Tournament Fees", "Donations",
+    "Camp Fees", "Private Sessions", "Court Rental", "Events",
+    "Grants", "Other",
+  ],
+};
+
+const ACTIONS = {
+  expense: {
+    create: createExpenseCategory,
+    update: updateExpenseCategory,
+    toggle: toggleExpenseCategoryActive,
+  },
+  income: {
+    create: createIncomeCategory,
+    update: updateIncomeCategory,
+    toggle: toggleIncomeCategoryActive,
+  },
+};
 
 interface CategoryDrawerProps {
   open: boolean;
   onClose: () => void;
   categories: CategoryRow[];
   onSuccess: () => void;
+  /** Which category set this drawer manages */
+  kind?: EntryKind;
 }
 
-export function CategoryDrawer({ open, onClose, categories, onSuccess }: CategoryDrawerProps) {
+export function CategoryDrawer({ open, onClose, categories, onSuccess, kind = "expense" }: CategoryDrawerProps) {
+  const actions = ACTIONS[kind];
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
@@ -31,8 +55,8 @@ export function CategoryDrawer({ open, onClose, categories, onSuccess }: Categor
   // Filter out suggestions that already exist as categories
   const availableSuggestions = useMemo(() => {
     const existing = new Set(categories.map((c) => c.name.toLowerCase()));
-    return SUGGESTIONS.filter((s) => !existing.has(s.toLowerCase()));
-  }, [categories]);
+    return SUGGESTIONS[kind].filter((s) => !existing.has(s.toLowerCase()));
+  }, [categories, kind]);
 
   function handleCreate(name?: string) {
     const catName = (name || newName).trim();
@@ -42,7 +66,7 @@ export function CategoryDrawer({ open, onClose, categories, onSuccess }: Categor
     formData.set("name", catName);
 
     startTransition(async () => {
-      const res = await createExpenseCategory(formData);
+      const res = await actions.create(formData);
       if (res.error) {
         setError(res.error);
       } else {
@@ -59,7 +83,7 @@ export function CategoryDrawer({ open, onClose, categories, onSuccess }: Categor
     formData.set("name", editName.trim());
 
     startTransition(async () => {
-      const res = await updateExpenseCategory(id, formData);
+      const res = await actions.update(id, formData);
       if (res.error) {
         setError(res.error);
       } else {
@@ -73,7 +97,7 @@ export function CategoryDrawer({ open, onClose, categories, onSuccess }: Categor
   function handleToggle(id: string) {
     setError("");
     startTransition(async () => {
-      const res = await toggleExpenseCategoryActive(id);
+      const res = await actions.toggle(id);
       if (res.error) setError(res.error);
       else onSuccess();
     });
@@ -90,7 +114,7 @@ export function CategoryDrawer({ open, onClose, categories, onSuccess }: Categor
   }
 
   return (
-    <Drawer open={open} onClose={onClose} title="Manage Categories">
+    <Drawer open={open} onClose={onClose} title={kind === "income" ? "Manage Income Categories" : "Manage Expense Categories"}>
       <div className="space-y-5">
         {error && (
           <div className="p-3 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>

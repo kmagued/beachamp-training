@@ -18,10 +18,13 @@ interface ExpensesFiltersProps {
   monthFilter: string;
   onMonthFilterChange: (value: string) => void;
   monthOptions: readonly string[];
-  typeFilter: string;
-  onTypeFilterChange: (value: string) => void;
-  paymentStatusFilter: string;
-  onPaymentStatusFilterChange: (value: string) => void;
+  /** Expense-only: omit the handler to hide the one-time/recurring filter */
+  typeFilter?: string;
+  onTypeFilterChange?: (value: string) => void;
+  /** Expense-only: omit the handler to hide the payment status filter */
+  paymentStatusFilter?: string;
+  onPaymentStatusFilterChange?: (value: string) => void;
+  searchPlaceholder?: string;
   sortField: SortField;
   sortDir: SortDir;
   onSortChange: (field: SortField) => void;
@@ -38,10 +41,11 @@ export function ExpensesFilters({
   monthFilter,
   onMonthFilterChange,
   monthOptions,
-  typeFilter,
+  typeFilter = "",
   onTypeFilterChange,
-  paymentStatusFilter,
+  paymentStatusFilter = "",
   onPaymentStatusFilterChange,
+  searchPlaceholder = "Search by description...",
   sortField,
   sortDir,
   onSortChange,
@@ -72,25 +76,29 @@ export function ExpensesFilters({
           <option key={c} value={c}>{c}</option>
         ))}
       </Select>
-      <Select
-        value={typeFilter}
-        onChange={(e) => onTypeFilterChange(e.target.value)}
-        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
-      >
-        <option value="">All Types</option>
-        <option value="one-time">One-time</option>
-        <option value="recurring">Recurring</option>
-      </Select>
-      <Select
-        value={paymentStatusFilter}
-        onChange={(e) => onPaymentStatusFilterChange(e.target.value)}
-        className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
-      >
-        <option value="">All Payment</option>
-        <option value="paid_full">Paid</option>
-        <option value="partially_paid">Partial</option>
-        <option value="payment_due">Due</option>
-      </Select>
+      {onTypeFilterChange && (
+        <Select
+          value={typeFilter}
+          onChange={(e) => onTypeFilterChange(e.target.value)}
+          className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
+        >
+          <option value="">All Types</option>
+          <option value="one-time">One-time</option>
+          <option value="recurring">Recurring</option>
+        </Select>
+      )}
+      {onPaymentStatusFilterChange && (
+        <Select
+          value={paymentStatusFilter}
+          onChange={(e) => onPaymentStatusFilterChange(e.target.value)}
+          className="h-10 py-0 px-3 text-sm border-slate-200 sm:w-36"
+        >
+          <option value="">All Payment</option>
+          <option value="paid_full">Paid</option>
+          <option value="partially_paid">Partial</option>
+          <option value="payment_due">Due</option>
+        </Select>
+      )}
       {hasActiveFilters && (
         <button
           onClick={onReset}
@@ -135,7 +143,7 @@ export function ExpensesFilters({
           <Input
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by description..."
+            placeholder={searchPlaceholder}
             className="pl-9"
           />
         </div>

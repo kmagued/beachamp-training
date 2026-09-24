@@ -142,3 +142,59 @@ export async function createIncomeCategory(formData: FormData) {
   revalidatePath("/admin/expenses");
   return { success: true, id: data.id as string };
 }
+
+export async function updateIncomeCategory(id: string, formData: FormData) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) return { error: "Category name is required" };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  const { error } = await supabase
+    .from("income_categories")
+    .update({
+      name,
+      icon: (formData.get("icon") as string)?.trim() || null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    if (error.code === "23505") return { error: "A category with this name already exists" };
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/expenses");
+  return { success: true };
+}
+
+export async function toggleIncomeCategoryActive(id: string) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
+
+  // Get current state
+  const { data: category, error: fetchError } = await supabase
+    .from("income_categories")
+    .select("is_active")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) return { error: fetchError.message };
+
+  const { error } = await supabase
+    .from("income_categories")
+    .update({ is_active: !category.is_active })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/expenses");
+  return { success: true };
+}
