@@ -720,6 +720,72 @@ export interface Database {
         };
         Relationships: [];
       };
+      income_categories: {
+        Row: {
+          id: string;
+          name: string;
+          icon: string | null;
+          is_default: boolean;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          icon?: string | null;
+          is_default?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          icon?: string | null;
+          is_default?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      income: {
+        Row: {
+          id: string;
+          category_id: string;
+          description: string | null;
+          amount: number;
+          income_date: string;
+          is_active: boolean;
+          created_by: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          description?: string | null;
+          amount: number;
+          income_date: string;
+          is_active?: boolean;
+          created_by: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          description?: string | null;
+          amount?: number;
+          income_date?: string;
+          is_active?: boolean;
+          created_by?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -986,6 +1052,8 @@ export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
 export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
 export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+export type IncomeCategory = Database["public"]["Tables"]["income_categories"]["Row"];
+export type Income = Database["public"]["Tables"]["income"]["Row"];
 export type PromoCode = Database["public"]["Tables"]["promo_codes"]["Row"];
 export type PromoCodeUse = Database["public"]["Tables"]["promo_code_uses"]["Row"];
 export type PrivateSessionRequest = Database["public"]["Tables"]["private_session_requests"]["Row"];
