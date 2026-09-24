@@ -1,3 +1,5 @@
+import { hasLapsed } from "@/lib/subscriptions/expiry";
+
 export interface PlayerRow {
   id: string;
   first_name: string;
@@ -51,8 +53,29 @@ export type SortDir = "asc" | "desc";
 export function isEffectivelyActive(s: { status: string; sessions_remaining: number; sessions_total: number; end_date: string | null }) {
   if (s.status !== "active" && s.status !== "pending") return false;
   if (s.sessions_remaining <= 0) return false;
-  if (s.end_date && new Date(s.end_date).getTime() < Date.now()) return false;
+  if (hasLapsed(s.end_date)) return false;
   return true;
+}
+
+/** A multi-session subscription that has run out — by date or by balance —
+ *  while still stored as 'active'.
+ *
+ *  Nothing in the system flips `status` to 'expired' when `end_date` passes or
+ *  the last session is used: the only auto-expiry is the attendance trigger for
+ *  single-session packages. So "expired" has to be derived here, or a lapsed
+ *  player falls through to "No Sub" and the Expired filter misses them.
+ *
+ *  Narrow on purpose, because it only breaks the tie for players who would
+ *  otherwise read as "No Sub":
+ *  - 'active' only — a 'pending' sub has no dates until payment is confirmed
+ *  - multi-session only — a single-session package has no expiry concept and is
+ *    expired on use by the attendance trigger, which reads as "attended" */
+export function hasRunOut(s: { status: string; sessions_remaining: number; sessions_total: number; end_date: string | null }) {
+  return (
+    s.status === "active" &&
+    s.sessions_total > 1 &&
+    (s.sessions_remaining <= 0 || hasLapsed(s.end_date))
+  );
 }
 
 /** Pick the most recent subscription (by start_date, falling back to end_date). */
@@ -137,5 +160,8 @@ export function getSubscriptionStatus(player: PlayerRow): SubscriptionStatus {
   if (pendingPaymentSub) return "pending_payment";
   const pendingSub = player.subscriptions?.find((s) => s.status === "pending");
   if (pendingSub) return "pending";
+  // Last resort, so no other status is displaced: a subscription that lapsed
+  // without the database ever recording it. See hasRunOut.
+  if (player.subscriptions?.some(hasRunOut)) return "expired";
   return "none";
 }
