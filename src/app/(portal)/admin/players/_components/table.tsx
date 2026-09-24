@@ -210,7 +210,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                   <span className="inline-flex items-center gap-1">Subscription <SortIcon field="subscription" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 <th className={cn(thSortable, "sticky right-[72px] z-20 bg-white !px-2 w-14 text-center")} onClick={() => toggleSort("activity")}>
-                  <span className="inline-flex items-center gap-1">Active <SortIcon field="activity" sortField={sortField} sortDir={sortDir} /></span>
+                  <span className="inline-flex items-center gap-1">Training <SortIcon field="activity" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
                 <th className={cn(thBase, "sticky right-0 z-20 bg-white")}>
                   Contact

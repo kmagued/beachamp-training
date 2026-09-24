@@ -3,7 +3,10 @@ import { Search, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { SortField, SortDir } from "./types";
 
-const ACTIVITY_OPTIONS = ["Active", "Inactive"] as const;
+// "Active" here means the player is still turning up (trained in the last 30 days
+// or holds a valid sub) — a different question from the subscription status below,
+// which also had an "Active". Labelled apart so the two filters cannot be confused.
+const ACTIVITY_OPTIONS = ["Training", "Not Training"] as const;
 const SUBSCRIPTION_OPTIONS = ["Active", "Attended", "Expiring Soon", "Expired", "Pending", "No Sub"] as const;
 const LEVEL_OPTIONS = ["Rookies", "Challengers", "Pro"] as const;
 
