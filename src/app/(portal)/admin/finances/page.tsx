@@ -17,6 +17,9 @@ import { CategoryDrawer } from "./_components/category-drawer";
 import { CategoryReport, type ReportEntry } from "./_components/category-report";
 import { IncomeTableView } from "./_components/income-table";
 import { EntryTypeSwitch } from "./_components/entry-type-switch";
+import { PaymentsView } from "@/app/(portal)/admin/payments/_components/payments-view";
+import { cairoMonthKey } from "@/lib/utils/cairo-time";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function AdminExpensesPage() {
   return (
@@ -26,9 +29,17 @@ export default function AdminExpensesPage() {
   );
 }
 
+interface PaymentIncomeRow {
+  id: string;
+  amount: number;
+  confirmed_at: string | null;
+  subscriptions: { packages: { name: string } | null } | null;
+}
+
 const TABS: { key: ExpenseTab; label: string }[] = [
+  { key: "payments", label: "Payments" },
   { key: "expenses", label: "Expenses" },
-  { key: "income", label: "Income" },
+  { key: "income", label: "Manual Income" },
   { key: "by-category", label: "By Category" },
   { key: "categories", label: "Categories" },
 ];
@@ -38,9 +49,35 @@ function AdminExpensesContent() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [income, setIncome] = useState<IncomeRow[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<CategoryRow[]>([]);
+  // Subscription revenue. Confirmed only, bucketed by confirmed_at in Cairo time —
+  // the same rule the dashboard uses, so the two pages agree.
+  const [paymentIncome, setPaymentIncome] = useState<PaymentIncomeRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<ExpenseTab>("expenses");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<ExpenseTab>(
+    TABS.some((t) => t.key === initialTab) ? (initialTab as ExpenseTab) : "payments"
+  );
+  const router = useRouter();
+  const pathname = usePathname();
+
+  /** Keep `?tab=` in step with the active tab so the page can be linked and reloaded. */
+  const changeTab = useCallback((key: ExpenseTab) => {
+    setTab(key);
+    const params = new URLSearchParams(window.location.search);
+    // Payments is the default tab, so it needs no param
+    if (key === "payments") params.delete("tab");
+    else params.set("tab", key);
+    // Filters owned by the payments view are meaningless once we leave it
+    if (key !== "payments") {
+      for (const k of ["q", "statusFilter", "status", "package", "method", "type", "sort", "dir", "page", "size", "highlight"]) {
+        params.delete(k);
+      }
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [router, pathname]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
@@ -79,7 +116,7 @@ function AdminExpensesContent() {
   );
 
   const fetchData = useCallback(async () => {
-    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }] = await Promise.all([
+    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }, { data: paymentData }] = await Promise.all([
       supabase
         .from("expenses")
         .select("*, expense_categories(id, name, icon)")
@@ -101,12 +138,17 @@ function AdminExpensesContent() {
         .select("*")
         .order("is_default", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("payments")
+        .select("id, amount, confirmed_at, subscriptions(packages(name))")
+        .eq("status", "confirmed"),
     ]);
 
     if (expenseData) setExpenses(expenseData as unknown as ExpenseRow[]);
     if (categoryData) setCategories(categoryData as unknown as CategoryRow[]);
     if (incomeData) setIncome(incomeData as unknown as IncomeRow[]);
     if (incomeCategoryData) setIncomeCategories(incomeCategoryData as unknown as CategoryRow[]);
+    if (paymentData) setPaymentIncome(paymentData as unknown as PaymentIncomeRow[]);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -163,8 +205,25 @@ function AdminExpensesContent() {
     };
   }, [income]);
 
-  const netThisMonth = incomeThisMonth - totalThisMonth;
-  const netAllTime = incomeAllTime - allTimeTotal;
+  // Subscription revenue, split the same way
+  const { paymentsThisMonth, paymentsAllTime } = useMemo(() => {
+    const currentKey = cairoMonthKey(new Date());
+    let thisMonth = 0;
+    let allTime = 0;
+    for (const p of paymentIncome) {
+      if (!p.confirmed_at) continue;
+      allTime += p.amount;
+      if (cairoMonthKey(new Date(p.confirmed_at)) === currentKey) thisMonth += p.amount;
+    }
+    return { paymentsThisMonth: thisMonth, paymentsAllTime: allTime };
+  }, [paymentIncome]);
+
+  // What the stat cards and Net show: manual income plus subscription revenue
+  const totalIncomeThisMonth = incomeThisMonth + paymentsThisMonth;
+  const totalIncomeAllTime = incomeAllTime + paymentsAllTime;
+
+  const netThisMonth = totalIncomeThisMonth - totalThisMonth;
+  const netAllTime = totalIncomeAllTime - allTimeTotal;
 
   // Derive filter options
   const categoryOptions = useMemo(() => {
@@ -293,12 +352,21 @@ function AdminExpensesContent() {
   // Rows for the By Category report, flattened to whichever side is selected
   const reportEntries: ReportEntry[] = useMemo(() => {
     if (reportKind === "income") {
-      return filteredIncome.map((i) => ({
+      const manual = filteredIncome.map((i) => ({
         categoryId: i.category_id,
         categoryName: i.income_categories?.name || "",
         amount: i.amount,
         date: i.income_date,
       }));
+      // Subscription revenue joins the breakdown under its package name, the same
+      // grouping the dashboard's income-by-package chart uses.
+      const subs = paymentIncome
+        .filter((p) => p.confirmed_at)
+        .map((p) => {
+          const name = p.subscriptions?.packages?.name || "Subscriptions";
+          return { categoryId: `package:${name}`, categoryName: name, amount: p.amount, date: p.confirmed_at as string };
+        });
+      return [...manual, ...subs];
     }
     return filteredExpenses.map((e) => ({
       categoryId: e.category_id,
@@ -306,7 +374,7 @@ function AdminExpensesContent() {
       amount: e.amount,
       date: e.expense_date,
     }));
-  }, [reportKind, filteredIncome, filteredExpenses]);
+  }, [reportKind, filteredIncome, filteredExpenses, paymentIncome]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -428,6 +496,7 @@ function AdminExpensesContent() {
             Track income, court reservations, salaries, and other costs
           </p>
         </div>
+        {tab !== "payments" && (
         <div className="flex gap-1.5 sm:gap-2">
           <Button
             variant="outline"
@@ -475,6 +544,7 @@ function AdminExpensesContent() {
             <span className="hidden sm:inline">Add</span>
           </Button>
         </div>
+        )}
       </div>
 
 
@@ -482,10 +552,10 @@ function AdminExpensesContent() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard
           label={`Income (${currentMonth})`}
-          value={`${incomeThisMonth.toLocaleString()} EGP`}
+          value={`${totalIncomeThisMonth.toLocaleString()} EGP`}
           accentColor="bg-emerald-500"
           icon={<TrendingUp className="w-5 h-5" />}
-          subtitle={`All Time: ${incomeAllTime.toLocaleString()} EGP`}
+          subtitle={`All Time: ${totalIncomeAllTime.toLocaleString()} EGP`}
         />
         <StatCard
           label={`Expenses (${currentMonth})`}
@@ -514,7 +584,7 @@ function AdminExpensesContent() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => changeTab(t.key)}
             className={cn(
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
               tab === t.key
@@ -528,7 +598,9 @@ function AdminExpensesContent() {
       </div>
 
       {/* Tab content */}
-      {tab === "income" ? (
+      {tab === "payments" ? (
+        <PaymentsView />
+      ) : tab === "income" ? (
         <>
           <ExpensesFilters
             search={incomeSearch}

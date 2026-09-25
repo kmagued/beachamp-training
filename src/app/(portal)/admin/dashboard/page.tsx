@@ -279,7 +279,7 @@ export default async function AdminDashboard() {
             accentColor="bg-danger"
             icon={<Receipt className="w-5 h-5" />}
             subtitle={`All Time: ${allTimeExpenses.toLocaleString()} EGP`}
-            href="/admin/expenses"
+            href="/admin/finances"
           />
           <StatCard
             label={`Profit (${currentMonth})`}
