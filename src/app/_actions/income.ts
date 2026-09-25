@@ -68,7 +68,7 @@ export async function createIncome(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -88,7 +88,7 @@ export async function updateIncome(id: string, formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -108,7 +108,7 @@ export async function deleteIncome(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -139,7 +139,7 @@ export async function createIncomeCategory(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true, id: data.id as string };
 }
 
@@ -167,7 +167,7 @@ export async function updateIncomeCategory(id: string, formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true };
 }
 
@@ -195,6 +195,6 @@ export async function toggleIncomeCategoryActive(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true };
 }

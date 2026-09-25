@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Toast } from "@/components/ui";
 import { Receipt, Plus, Trash2 } from "lucide-react";
-import { ExpenseDrawer, type CourtSession } from "../../expenses/_components/expense-drawer";
+import { ExpenseDrawer, type CourtSession } from "../../finances/_components/expense-drawer";
 import { deleteExpense } from "@/app/_actions/expenses";
-import type { ExpenseRow, CategoryRow } from "../../expenses/_components/types";
+import type { ExpenseRow, CategoryRow } from "../../finances/_components/types";
 
 export function ExpensesTab({ date }: { date: string }) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);

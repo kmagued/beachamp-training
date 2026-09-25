@@ -40,6 +40,7 @@ interface PaymentsTableProps {
   search: string;
   statusFilter: string;
   grandTotal: number;
+  totalDiscount: number;
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -56,11 +57,14 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant} className="capitalize">{status}</Badge>;
 }
 
+/** What a promo took off this payment; `amount` is already net of it. */
+const discountOf = (p: PaymentRow) => p.promo_code_uses?.[0]?.discount_amount ?? 0;
+
 export function PaymentsTableView(props: PaymentsTableProps) {
   const {
     payments, selectedIds, toggleSelect, toggleSelectAll, allPageSelected,
     selectAllRef, getRowId, isHighlighted, sortField, sortDir, toggleSort,
-    onConfirm, onReject, isPending, actionId, onViewScreenshot, onRowClick, search, statusFilter, grandTotal,
+    onConfirm, onReject, isPending, actionId, onViewScreenshot, onRowClick, search, statusFilter, grandTotal, totalDiscount,
   } = props;
 
   const selectionMode = selectedIds.size > 0;
@@ -79,6 +83,8 @@ export function PaymentsTableView(props: PaymentsTableProps) {
   function handleRowClick(e: React.MouseEvent, payment: PaymentRow) {
     const target = e.target as HTMLElement;
     if (target.closest("input, button, a")) return;
+    // No payments row behind a free grant — nothing to open or select
+    if (payment.is_free_grant) return;
     if (selectionMode) {
       toggleSelect(payment.id);
     } else {
@@ -116,6 +122,7 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 <th className={thSortable} onClick={() => toggleSort("amount")}>
                   <span className="inline-flex items-center gap-1">Amount <SortIcon field="amount" sortField={sortField} sortDir={sortDir} /></span>
                 </th>
+                <th className={thBase}>Promo</th>
                 <th className={thBase}>Method</th>
                 <th className={thSortable} onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1">Date <SortIcon field="date" sortField={sortField} sortDir={sortDir} /></span>
@@ -152,7 +159,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                         type="checkbox"
                         checked={selected}
                         onChange={() => toggleSelect(payment.id)}
-                        className="table-checkbox"
+                        disabled={payment.is_free_grant}
+                        title={payment.is_free_grant ? "Free promo subscription — no payment to act on" : undefined}
+                        className="table-checkbox disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>
                     {/* Sticky left: player */}
@@ -168,14 +177,28 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
                       {payment.amount.toLocaleString()} EGP
                     </td>
+                    <td className={cn(tdBase, "text-sm whitespace-nowrap")}>
+                      {payment.promo_codes ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-medium text-slate-700">{payment.promo_codes.code}</span>
+                          {discountOf(payment) > 0 && (
+                            <span className="text-emerald-600">&minus;{discountOf(payment).toLocaleString()} EGP</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">&mdash;</span>
+                      )}
+                    </td>
                     <td className={cn(tdBase, "text-sm text-slate-700 capitalize")}>
-                      {payment.method.replace("_", " ")}
+                      {payment.is_free_grant ? <span className="text-slate-400">&mdash;</span> : payment.method.replace("_", " ")}
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-500")}>
                       {payment.confirmed_at ? formatDate(payment.confirmed_at) : "—"}
                     </td>
                     <td className={tdBase}>
-                      <StatusBadge status={payment.status} />
+                      {payment.is_free_grant
+                        ? <Badge variant="neutral">Free</Badge>
+                        : <StatusBadge status={payment.status} />}
                     </td>
                     <td className={cn(tdBase, "text-sm")}>
                       {payment.status === "rejected" && payment.rejection_reason ? (
@@ -251,6 +274,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                   <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">
                     {grandTotal.toLocaleString()} EGP
                   </td>
+                  <td className="px-4 py-3 text-sm font-bold text-emerald-600 whitespace-nowrap">
+                    {totalDiscount > 0 ? `−${totalDiscount.toLocaleString()} EGP` : ""}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap" colSpan={4} />
                   <td className="sticky right-0 z-10 bg-slate-50 px-4 py-3 border-l border-l-slate-200 whitespace-nowrap" />
                 </tr>
@@ -280,7 +306,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                 type="checkbox"
                 checked={selectedIds.has(payment.id)}
                 onChange={() => toggleSelect(payment.id)}
-                className="table-checkbox mt-0.5"
+                disabled={payment.is_free_grant}
+                title={payment.is_free_grant ? "Free promo subscription — no payment to act on" : undefined}
+                className="table-checkbox mt-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
               />
               <div className="flex items-start justify-between flex-1 min-w-0">
                 <div>
@@ -297,7 +325,9 @@ export function PaymentsTableView(props: PaymentsTableProps) {
                   {payment.player_id && payment.profiles && (
                     <WhatsAppButton onClick={() => openWhatsApp(payment)} />
                   )}
-                  <StatusBadge status={payment.status} />
+                  {payment.is_free_grant
+                    ? <Badge variant="neutral">Free</Badge>
+                    : <StatusBadge status={payment.status} />}
                 </div>
               </div>
             </div>
@@ -308,8 +338,21 @@ export function PaymentsTableView(props: PaymentsTableProps) {
               </div>
               <div>
                 <span className="text-slate-400">Method</span>
-                <p className="text-slate-700 font-medium capitalize">{payment.method.replace("_", " ")}</p>
+                <p className="text-slate-700 font-medium capitalize">
+                  {payment.is_free_grant ? "—" : payment.method.replace("_", " ")}
+                </p>
               </div>
+              {payment.promo_codes && (
+                <div className="col-span-2">
+                  <span className="text-slate-400">Promo</span>
+                  <p className="text-slate-700 font-medium">
+                    {payment.promo_codes.code}
+                    {discountOf(payment) > 0 && (
+                      <span className="text-emerald-600 font-normal"> &minus;{discountOf(payment).toLocaleString()} EGP</span>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
               <div>
@@ -361,7 +404,14 @@ export function PaymentsTableView(props: PaymentsTableProps) {
         {payments.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</span>
-            <span className="text-sm font-bold text-slate-900">{grandTotal.toLocaleString()} EGP</span>
+            <span className="text-right">
+              <span className="block text-sm font-bold text-slate-900">{grandTotal.toLocaleString()} EGP</span>
+              {totalDiscount > 0 && (
+                <span className="block text-xs font-medium text-emerald-600">
+                  &minus;{totalDiscount.toLocaleString()} EGP in promos
+                </span>
+              )}
+            </span>
           </div>
         )}
         {payments.length === 0 && (

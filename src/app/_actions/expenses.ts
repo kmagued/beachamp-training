@@ -76,7 +76,7 @@ export async function createExpense(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -127,7 +127,7 @@ export async function updateExpense(id: string, formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -147,7 +147,7 @@ export async function deleteExpense(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -177,7 +177,7 @@ export async function createExpenseCategory(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true };
 }
 
@@ -205,7 +205,7 @@ export async function updateExpenseCategory(id: string, formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true };
 }
 
@@ -233,6 +233,6 @@ export async function toggleExpenseCategoryActive(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/admin/finances");
   return { success: true };
 }

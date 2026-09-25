@@ -47,4 +47,4 @@ export type SortField = "date" | "amount" | "category";
 export type SortDir = "asc" | "desc";
 /** Expenses and income are the two sides the Finances page treats equally */
 export type EntryKind = "expense" | "income";
-export type ExpenseTab = "expenses" | "income" | "by-category" | "categories";
+export type ExpenseTab = "payments" | "expenses" | "income" | "by-category" | "categories";

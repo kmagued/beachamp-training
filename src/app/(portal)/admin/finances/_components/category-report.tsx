@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Select } from "@/components/ui";
 import type { EntryKind } from "./types";
+import { cairoMonthKey } from "@/lib/utils/cairo-time";
+
+/** Month label in Cairo time, so it matches the key the options sort on. */
+const monthLabelFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Cairo",
+  year: "numeric",
+  month: "long",
+});
 
 /** One expense or income row, flattened so the report can chart either side */
 export interface ReportEntry {
@@ -35,28 +43,41 @@ const COLORS = [
 ];
 
 export function CategoryReport({ entries, kind }: CategoryReportProps) {
+  // Holds a "YYYY-MM" key rather than a label, so months sort chronologically
   const [monthFilter, setMonthFilter] = useState("");
   const noun = NOUNS[kind];
 
-  // Reset the month filter when switching sides — months differ between them
-  useEffect(() => {
-    setMonthFilter("");
-  }, [kind]);
-
   const monthOptions = useMemo(() => {
-    const months = new Set<string>();
+    const months = new Map<string, string>();
     entries.forEach((e) => {
       const d = new Date(e.date);
-      months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
+      if (Number.isNaN(d.getTime())) return;
+      months.set(cairoMonthKey(d), monthLabelFmt.format(d));
     });
-    return [...months];
+    // Newest first — sorting the "YYYY-MM" key, since labels sort alphabetically
+    return [...months.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => b.key.localeCompare(a.key));
   }, [entries]);
+
+  // Open on the current month. Falls back to the most recent month with data, so the
+  // chart is never empty on arrival. Re-runs when switching between income and expenses,
+  // but leaves a choice the user made on this side alone.
+  const defaultedFor = useRef<EntryKind | null>(null);
+  useEffect(() => {
+    if (defaultedFor.current === kind) return;
+    if (monthOptions.length === 0) return;
+    const current = cairoMonthKey(new Date());
+    const hasCurrent = monthOptions.some((m) => m.key === current);
+    setMonthFilter(hasCurrent ? current : monthOptions[0].key);
+    defaultedFor.current = kind;
+  }, [kind, monthOptions]);
 
   const filteredEntries = useMemo(() => {
     if (!monthFilter) return entries;
     return entries.filter((e) => {
       const d = new Date(e.date);
-      return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === monthFilter;
+      return !Number.isNaN(d.getTime()) && cairoMonthKey(d) === monthFilter;
     });
   }, [entries, monthFilter]);
 
@@ -102,7 +123,7 @@ export function CategoryReport({ entries, kind }: CategoryReportProps) {
       >
         <option value="">All Time</option>
         {monthOptions.map((m) => (
-          <option key={m} value={m}>{m}</option>
+          <option key={m.key} value={m.key}>{m.label}</option>
         ))}
       </Select>
 
