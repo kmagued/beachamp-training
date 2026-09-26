@@ -8,6 +8,18 @@ export type MerchCategory = (typeof MERCH_CATEGORIES)[number]["value"];
 
 export const MERCH_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "One size"] as const;
 
+/** Caps, bottles, balls: a single count, left out of per-size sales */
+export const ONE_SIZE = "One size";
+
+/** A size with this many or fewer (but not zero) counts as low stock */
+export const LOW_STOCK_THRESHOLD = 2;
+
+/** Units on hand for one size of a product */
+export interface MerchStockLevel {
+  size: string;
+  quantity: number;
+}
+
 export function getMerchCategoryLabel(value: string): string {
   return MERCH_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
