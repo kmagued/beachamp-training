@@ -10,7 +10,13 @@
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "db:clone": "./scripts/db/clone-prod-to-staging.sh",
+    "db:copy-storage": "tsx scripts/db/copy-storage.ts",
+    "db:password": "./scripts/db/set-db-password.sh",
+    "env": "./scripts/db/use-env.sh",
+    "env:staging": "./scripts/db/use-env.sh staging",
+    "env:prod": "./scripts/db/use-env.sh prod"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",

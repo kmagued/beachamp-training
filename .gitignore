@@ -12,6 +12,8 @@ build/
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.staging
 
 # debug
 npm-debug.log*
@@ -25,3 +27,7 @@ npm-debug.log*
 
 # supabase
 supabase/.temp/
+
+# db clone tooling — credentials and production dumps
+scripts/db/.env.db
+scripts/db/dumps/
