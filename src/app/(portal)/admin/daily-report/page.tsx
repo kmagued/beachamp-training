@@ -2,16 +2,18 @@
 
 import { useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { CalendarDays, ClipboardCheck, Receipt, CreditCard } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Receipt, CreditCard, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { DatePicker } from "@/components/ui";
 import { AttendanceTab } from "./_components/attendance-tab";
+import { CoachesTab } from "./_components/coaches-tab";
 import { ExpensesTab } from "./_components/expenses-tab";
 import { PaymentsTab } from "./_components/payments-tab";
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
+  { key: "coaches", label: "Coaches", icon: UserCheck },
   { key: "expenses", label: "Expenses", icon: Receipt },
   { key: "payments", label: "Payments", icon: CreditCard },
 ] as const;
@@ -81,6 +83,7 @@ export default function DailyReportPage() {
       </div>
 
       {activeTab === "attendance" && <AttendanceTab date={selectedDate} />}
+      {activeTab === "coaches" && <CoachesTab date={selectedDate} />}
       {activeTab === "expenses" && <ExpensesTab date={selectedDate} />}
       {activeTab === "payments" && <PaymentsTab date={selectedDate} />}
     </div>

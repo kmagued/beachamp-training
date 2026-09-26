@@ -16,11 +16,11 @@ interface StatCardProps {
 export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800", icon, className, href }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-center gap-2.5 sm:gap-4 h-full">
+      <div className="flex items-center gap-2 sm:gap-4 h-full">
         {icon && (
           <div
             className={cn(
-              "shrink-0 w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-5 sm:[&_svg]:h-5",
+              "shrink-0 w-7 h-7 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-5 sm:[&_svg]:h-5",
               accentColor
             )}
           >
@@ -31,11 +31,11 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
           <p className="text-[9px] sm:text-[11px] font-semibold text-primary-700/60 uppercase tracking-wider leading-tight line-clamp-2">
             {label}
           </p>
-          <p className="text-sm sm:text-xl font-bold text-primary-900 mt-0.5 capitalize break-words">
+          <p className="text-xs sm:text-xl font-bold text-primary-900 mt-0.5 capitalize break-words">
             {value}
           </p>
           {subtitle && (
-            <p className="text-[10px] sm:text-[11px] text-primary-700/50 mt-0.5 break-words">{subtitle}</p>
+            <p className="text-[9px] sm:text-[11px] text-primary-700/50 mt-0.5 break-words">{subtitle}</p>
           )}
         </div>
         {href && (
@@ -50,7 +50,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
       <Link
         href={href}
         className={cn(
-          "group block h-full bg-white rounded-2xl border border-primary-100 p-4 sm:p-5 hover:border-primary-300 hover:shadow-md hover:shadow-primary-900/5 transition-all",
+          "group block h-full bg-white rounded-2xl border border-primary-100 p-3.5 sm:p-5 hover:border-primary-300 hover:shadow-md hover:shadow-primary-900/5 transition-all",
           className
         )}
       >
@@ -62,7 +62,7 @@ export function StatCard({ label, value, subtitle, accentColor = "bg-primary-800
   return (
     <div
       className={cn(
-        "h-full bg-white rounded-2xl border border-primary-100 p-4 sm:p-5",
+        "h-full bg-white rounded-2xl border border-primary-100 p-3.5 sm:p-5",
         className
       )}
     >

@@ -1000,3 +1000,61 @@ export async function upsertSessionPlan(data: {
   revalidatePath("/coach/sessions");
   return { success: true };
 }
+
+// ── Coach attendance ──
+// Who actually ran a session, as opposed to `schedule_sessions.coach_id`, which
+// only says who was assigned. Admin-only: coaches can read their own rows but the
+// RLS policy does not let them write, so this goes through the admin client.
+export async function submitCoachAttendance(data: {
+  schedule_session_id: string;
+  session_date: string;
+  records: { coach_id: string; status: "present" | "absent" | "excused"; notes?: string }[];
+  /** Coaches the admin cleared — their rows are removed rather than left stale */
+  cleared_coach_ids?: string[];
+}) {
+  const user = await getCurrentUserRole();
+  // Admin-only, matching the RLS policy: a coach can read their own record but not write it
+  const authErr = requireAdmin(user);
+  if (authErr) return authErr;
+
+  // Same rule as player attendance: backfilling the past is fine, the future is not
+  const sessionDate = new Date(data.session_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (sessionDate > today) {
+    return { error: "Cannot log coach attendance for future dates" };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  if (data.cleared_coach_ids && data.cleared_coach_ids.length > 0) {
+    const { error: delErr } = await admin
+      .from("coach_attendance")
+      .delete()
+      .eq("schedule_session_id", data.schedule_session_id)
+      .eq("session_date", data.session_date)
+      .in("coach_id", data.cleared_coach_ids);
+    if (delErr) return { error: delErr.message };
+  }
+
+  if (data.records.length > 0) {
+    const rows = data.records.map((r) => ({
+      coach_id: r.coach_id,
+      schedule_session_id: data.schedule_session_id,
+      session_date: data.session_date,
+      status: r.status,
+      notes: r.notes ?? null,
+      marked_by: user!.id,
+    }));
+
+    // Upsert on the unique key so re-saving a session updates in place
+    const { error } = await admin
+      .from("coach_attendance")
+      .upsert(rows, { onConflict: "coach_id,schedule_session_id,session_date" });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/daily-report");
+  return { success: true };
+}

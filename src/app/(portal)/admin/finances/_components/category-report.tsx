@@ -1,12 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Select } from "@/components/ui";
-import type { ExpenseRow, CategoryRow } from "./types";
+import type { EntryKind } from "./types";
+import { cairoMonthKey } from "@/lib/utils/cairo-time";
+
+/** Month label in Cairo time, so it matches the key the options sort on. */
+const monthLabelFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Cairo",
+  year: "numeric",
+  month: "long",
+});
+
+/** One expense or income row, flattened so the report can chart either side */
+export interface ReportEntry {
+  categoryId: string;
+  categoryName: string;
+  amount: number;
+  date: string;
+}
 
 interface CategoryReportProps {
-  expenses: ExpenseRow[];
-  categories: CategoryRow[];
+  entries: ReportEntry[];
+  kind: EntryKind;
 }
+
+const NOUNS: Record<EntryKind, { one: string; many: string }> = {
+  expense: { one: "expense", many: "expenses" },
+  income: { one: "income entry", many: "income entries" },
+};
 
 const COLORS = [
   "#6366f1", // primary/indigo
@@ -21,48 +42,67 @@ const COLORS = [
   "#a855f7", // purple
 ];
 
-export function CategoryReport({ expenses, categories }: CategoryReportProps) {
+export function CategoryReport({ entries, kind }: CategoryReportProps) {
+  // Holds a "YYYY-MM" key rather than a label, so months sort chronologically
   const [monthFilter, setMonthFilter] = useState("");
+  const noun = NOUNS[kind];
 
   const monthOptions = useMemo(() => {
-    const months = new Set<string>();
-    expenses.forEach((e) => {
-      const d = new Date(e.expense_date);
-      months.add(d.toLocaleDateString("en-US", { year: "numeric", month: "long" }));
+    const months = new Map<string, string>();
+    entries.forEach((e) => {
+      const d = new Date(e.date);
+      if (Number.isNaN(d.getTime())) return;
+      months.set(cairoMonthKey(d), monthLabelFmt.format(d));
     });
-    return [...months];
-  }, [expenses]);
+    // Newest first — sorting the "YYYY-MM" key, since labels sort alphabetically
+    return [...months.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => b.key.localeCompare(a.key));
+  }, [entries]);
 
-  const filteredExpenses = useMemo(() => {
-    if (!monthFilter) return expenses;
-    return expenses.filter((e) => {
-      const d = new Date(e.expense_date);
-      return d.toLocaleDateString("en-US", { year: "numeric", month: "long" }) === monthFilter;
+  // Open on the current month. Falls back to the most recent month with data, so the
+  // chart is never empty on arrival. Re-runs when switching between income and expenses,
+  // but leaves a choice the user made on this side alone.
+  const defaultedFor = useRef<EntryKind | null>(null);
+  useEffect(() => {
+    if (defaultedFor.current === kind) return;
+    if (monthOptions.length === 0) return;
+    const current = cairoMonthKey(new Date());
+    const hasCurrent = monthOptions.some((m) => m.key === current);
+    setMonthFilter(hasCurrent ? current : monthOptions[0].key);
+    defaultedFor.current = kind;
+  }, [kind, monthOptions]);
+
+  const filteredEntries = useMemo(() => {
+    if (!monthFilter) return entries;
+    return entries.filter((e) => {
+      const d = new Date(e.date);
+      return !Number.isNaN(d.getTime()) && cairoMonthKey(d) === monthFilter;
     });
-  }, [expenses, monthFilter]);
+  }, [entries, monthFilter]);
 
   const report = useMemo(() => {
     const byCategory: Record<string, { name: string; count: number; total: number }> = {};
 
-    for (const expense of filteredExpenses) {
-      const catName = expense.expense_categories?.name || "Uncategorized";
-      const catId = expense.category_id;
+    for (const entry of filteredEntries) {
+      const catName = entry.categoryName || "Uncategorized";
+      const catId = entry.categoryId;
       if (!byCategory[catId]) {
         byCategory[catId] = { name: catName, count: 0, total: 0 };
       }
       byCategory[catId].count += 1;
-      byCategory[catId].total += expense.amount;
+      byCategory[catId].total += entry.amount;
     }
 
     const rows = Object.values(byCategory).sort((a, b) => b.total - a.total);
     const grandTotal = rows.reduce((sum, r) => sum + r.total, 0);
 
     return { rows, grandTotal };
-  }, [filteredExpenses]);
+  }, [filteredEntries]);
 
   if (report.rows.length === 0 && !monthFilter) {
     return (
-      <p className="text-center text-sm text-slate-400 py-8">No expenses to report</p>
+      <p className="text-center text-sm text-slate-400 py-8">No {noun.many} to report</p>
     );
   }
 
@@ -83,12 +123,12 @@ export function CategoryReport({ expenses, categories }: CategoryReportProps) {
       >
         <option value="">All Time</option>
         {monthOptions.map((m) => (
-          <option key={m} value={m}>{m}</option>
+          <option key={m.key} value={m.key}>{m.label}</option>
         ))}
       </Select>
 
       {report.rows.length === 0 ? (
-        <p className="text-center text-sm text-slate-400 py-8">No expenses in this period</p>
+        <p className="text-center text-sm text-slate-400 py-8">No {noun.many} in this period</p>
       ) : (
         <>
           {/* Pie chart + total */}
@@ -130,7 +170,7 @@ export function CategoryReport({ expenses, categories }: CategoryReportProps) {
                 <div className="text-center sm:text-left mb-4">
                   <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Total</p>
                   <p className="text-2xl font-bold text-slate-900">{report.grandTotal.toLocaleString()} EGP</p>
-                  <p className="text-xs text-slate-400">{report.rows.reduce((s, r) => s + r.count, 0)} expenses</p>
+                  <p className="text-xs text-slate-400">{report.rows.reduce((s, r) => s + r.count, 0)} {noun.many}</p>
                 </div>
                 {/* Legend */}
                 <div className="space-y-2">
@@ -171,7 +211,7 @@ export function CategoryReport({ expenses, categories }: CategoryReportProps) {
                     </div>
                     <span className="text-xs text-slate-400 w-8 text-right">{pct}%</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">{row.count} expense{row.count !== 1 ? "s" : ""}</p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">{row.count} {row.count === 1 ? noun.one : noun.many}</p>
                 </Card>
               );
             })}

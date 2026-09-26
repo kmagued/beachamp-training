@@ -28,49 +28,41 @@ function requireAdmin(user: { role: string } | null) {
   return null;
 }
 
-// ═══════════════════════════════════════
-// EXPENSE MANAGEMENT
-// ═══════════════════════════════════════
-
-export async function createExpense(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
+function parseIncomeForm(formData: FormData) {
   const amount = parseFloat(formData.get("amount") as string);
   if (!amount || amount <= 0) return { error: "Amount must be greater than 0" };
-
-  const description = (formData.get("description") as string)?.trim() || null;
 
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };
 
-  const expenseDate = (formData.get("expense_date") as string) || new Date().toISOString().split("T")[0];
+  return {
+    values: {
+      category_id: categoryId,
+      description: (formData.get("description") as string)?.trim() || null,
+      amount,
+      income_date: (formData.get("income_date") as string) || new Date().toISOString().split("T")[0],
+      notes: (formData.get("notes") as string)?.trim() || null,
+    },
+  };
+}
 
-  const isRecurring = formData.get("is_recurring") === "true";
-  const recurrenceType = isRecurring ? (formData.get("recurrence_type") as string) : null;
+// ═══════════════════════════════════════
+// INCOME MANAGEMENT
+// ═══════════════════════════════════════
 
-  if (isRecurring && !recurrenceType) {
-    return { error: "Recurrence type is required for recurring expenses" };
-  }
+export async function createIncome(formData: FormData) {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  const parsed = parseIncomeForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { error } = await supabase.from("expenses").insert({
-    category_id: categoryId,
-    description,
-    amount,
-    expense_date: expenseDate,
-    is_recurring: isRecurring,
-    recurrence_type: recurrenceType,
-    notes: (formData.get("notes") as string)?.trim() || null,
-    court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
-    court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
-    court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
-    payment_status: (formData.get("payment_status") as string) || "paid_full",
-    paid_amount: formData.get("paid_amount") ? Number(formData.get("paid_amount")) : null,
-    due_date: (formData.get("due_date") as string) || null,
+  const { error } = await supabase.from("income").insert({
+    ...parsed.values,
     created_by: user!.id,
   });
 
@@ -81,49 +73,18 @@ export async function createExpense(formData: FormData) {
   return { success: true };
 }
 
-export async function updateExpense(id: string, formData: FormData) {
+export async function updateIncome(id: string, formData: FormData) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
   if (authError) return authError;
 
-  const amount = parseFloat(formData.get("amount") as string);
-  if (!amount || amount <= 0) return { error: "Amount must be greater than 0" };
-
-  const description = (formData.get("description") as string)?.trim() || null;
-
-  const categoryId = formData.get("category_id") as string;
-  if (!categoryId) return { error: "Category is required" };
-
-  const expenseDate = (formData.get("expense_date") as string) || new Date().toISOString().split("T")[0];
-
-  const isRecurring = formData.get("is_recurring") === "true";
-  const recurrenceType = isRecurring ? (formData.get("recurrence_type") as string) : null;
-
-  if (isRecurring && !recurrenceType) {
-    return { error: "Recurrence type is required for recurring expenses" };
-  }
+  const parsed = parseIncomeForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { error } = await supabase
-    .from("expenses")
-    .update({
-      category_id: categoryId,
-      description,
-      amount,
-      expense_date: expenseDate,
-      is_recurring: isRecurring,
-      recurrence_type: recurrenceType,
-      notes: (formData.get("notes") as string)?.trim() || null,
-      court_count: formData.get("court_count") ? Number(formData.get("court_count")) : null,
-      court_hours: formData.get("court_hours") ? Number(formData.get("court_hours")) : null,
-      court_hourly_rate: formData.get("court_hourly_rate") ? Number(formData.get("court_hourly_rate")) : null,
-      payment_status: (formData.get("payment_status") as string) || "paid_full",
-      paid_amount: formData.get("paid_amount") ? Number(formData.get("paid_amount")) : null,
-      due_date: (formData.get("due_date") as string) || null,
-    })
-    .eq("id", id);
+  const { error } = await supabase.from("income").update(parsed.values).eq("id", id);
 
   if (error) return { error: error.message };
 
@@ -132,7 +93,7 @@ export async function updateExpense(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteExpense(id: string) {
+export async function deleteIncome(id: string) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
   if (authError) return authError;
@@ -141,7 +102,7 @@ export async function deleteExpense(id: string) {
   const supabase = (await createClient()) as any;
 
   const { error } = await supabase
-    .from("expenses")
+    .from("income")
     .update({ is_active: false })
     .eq("id", id);
 
@@ -153,10 +114,10 @@ export async function deleteExpense(id: string) {
 }
 
 // ═══════════════════════════════════════
-// EXPENSE CATEGORY MANAGEMENT
+// INCOME CATEGORY MANAGEMENT
 // ═══════════════════════════════════════
 
-export async function createExpenseCategory(formData: FormData) {
+export async function createIncomeCategory(formData: FormData) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
   if (authError) return authError;
@@ -167,10 +128,11 @@ export async function createExpenseCategory(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { error } = await supabase.from("expense_categories").insert({
-    name,
-    icon: (formData.get("icon") as string)?.trim() || null,
-  });
+  const { data, error } = await supabase
+    .from("income_categories")
+    .insert({ name, icon: (formData.get("icon") as string)?.trim() || null })
+    .select("id")
+    .single();
 
   if (error) {
     if (error.code === "23505") return { error: "A category with this name already exists" };
@@ -178,10 +140,10 @@ export async function createExpenseCategory(formData: FormData) {
   }
 
   revalidatePath("/admin/finances");
-  return { success: true };
+  return { success: true, id: data.id as string };
 }
 
-export async function updateExpenseCategory(id: string, formData: FormData) {
+export async function updateIncomeCategory(id: string, formData: FormData) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
   if (authError) return authError;
@@ -193,7 +155,7 @@ export async function updateExpenseCategory(id: string, formData: FormData) {
   const supabase = (await createClient()) as any;
 
   const { error } = await supabase
-    .from("expense_categories")
+    .from("income_categories")
     .update({
       name,
       icon: (formData.get("icon") as string)?.trim() || null,
@@ -209,7 +171,7 @@ export async function updateExpenseCategory(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function toggleExpenseCategoryActive(id: string) {
+export async function toggleIncomeCategoryActive(id: string) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
   if (authError) return authError;
@@ -219,7 +181,7 @@ export async function toggleExpenseCategoryActive(id: string) {
 
   // Get current state
   const { data: category, error: fetchError } = await supabase
-    .from("expense_categories")
+    .from("income_categories")
     .select("is_active")
     .eq("id", id)
     .single();
@@ -227,7 +189,7 @@ export async function toggleExpenseCategoryActive(id: string) {
   if (fetchError) return { error: fetchError.message };
 
   const { error } = await supabase
-    .from("expense_categories")
+    .from("income_categories")
     .update({ is_active: !category.is_active })
     .eq("id", id);
 

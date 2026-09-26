@@ -193,7 +193,12 @@ function AdminPlayersContent() {
         if (!matchesSearch) return false;
       }
       if (activityFilter) {
-        const selected = activityFilter.split(",").map((s) => s.toLowerCase());
+        // Display labels differ from the underlying status values
+        const labelToStatus: Record<string, string> = { training: "active", "not training": "inactive" };
+        const selected = activityFilter.split(",").map((s) => {
+          const lower = s.toLowerCase();
+          return labelToStatus[lower] || lower;
+        });
         if (!selected.includes(getActivityStatus(p))) return false;
       }
       if (subscriptionFilter) {
