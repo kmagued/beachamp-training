@@ -2,7 +2,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EntryTypeSwitch } from "./entry-type-switch";
 import { ExpenseForm } from "./expense-drawer";
 import { IncomeForm } from "./income-drawer";
-import type { CategoryRow, EntryKind, ExpenseRow, IncomeRow } from "./types";
+import type { CategoryRow, EntryKind, ExpenseRow, IncomeRow, MerchOption } from "./types";
 
 interface EntryDrawerProps {
   open: boolean;
@@ -12,6 +12,7 @@ interface EntryDrawerProps {
   onKindChange: (kind: EntryKind) => void;
   expenseCategories: CategoryRow[];
   incomeCategories: CategoryRow[];
+  merchItems: MerchOption[];
   editingExpense: ExpenseRow | null;
   editingIncome: IncomeRow | null;
   onExpenseSuccess: () => void;
@@ -31,6 +32,7 @@ export function EntryDrawer({
   onKindChange,
   expenseCategories,
   incomeCategories,
+  merchItems,
   editingExpense,
   editingIncome,
   onExpenseSuccess,
@@ -58,6 +60,7 @@ export function EntryDrawer({
             open={open}
             onClose={onClose}
             categories={incomeCategories}
+            merchItems={merchItems}
             editingIncome={editingIncome}
             onSuccess={onIncomeSuccess}
             onCategoriesChange={onCategoriesChange}

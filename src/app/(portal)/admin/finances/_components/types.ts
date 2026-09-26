@@ -26,7 +26,22 @@ export interface CategoryRow {
   icon: string | null;
   is_default: boolean;
   is_active: boolean;
+  /** Income categories only: catalog items show as sub-categories */
+  is_merch?: boolean;
   created_at: string;
+}
+
+/** Merch catalog item offered as a sub-category of the Merch income category */
+export interface MerchOption {
+  id: string;
+  name: string;
+  category: string;
+  subcategory_id: string | null;
+  subcategory_name: string | null;
+  price: number;
+  is_active: boolean;
+  /** Deleted from the catalog; kept so past income can still show it */
+  deleted_at: string | null;
 }
 
 export interface IncomeRow {
@@ -40,7 +55,15 @@ export interface IncomeRow {
   created_at: string;
   updated_at: string;
   category_id: string;
+  merch_item_id: string | null;
+  merch_quantity: number | null;
   income_categories: { id: string; name: string; icon: string | null };
+  merch_items: {
+    id: string;
+    name: string;
+    category: string;
+    merch_subcategories: { name: string } | null;
+  } | null;
 }
 
 export type SortField = "date" | "amount" | "category";

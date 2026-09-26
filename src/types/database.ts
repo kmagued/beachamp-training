@@ -534,6 +534,81 @@ export interface Database {
         };
         Relationships: [];
       };
+      merch_subcategories: {
+        Row: {
+          id: string;
+          category: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      merch_items: {
+        Row: {
+          id: string;
+          name: string;
+          category: string;
+          subcategory_id: string | null;
+          price: number;
+          description: string | null;
+          sizes: string[];
+          image_path: string | null;
+          is_active: boolean;
+          is_sold_out: boolean;
+          sort_order: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          category: string;
+          subcategory_id?: string | null;
+          price: number;
+          description?: string | null;
+          sizes?: string[];
+          image_path?: string | null;
+          is_active?: boolean;
+          is_sold_out?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          category?: string;
+          subcategory_id?: string | null;
+          price?: number;
+          description?: string | null;
+          sizes?: string[];
+          image_path?: string | null;
+          is_active?: boolean;
+          is_sold_out?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       coach_groups: {
         Row: {
           id: string;
@@ -727,6 +802,7 @@ export interface Database {
           icon: string | null;
           is_default: boolean;
           is_active: boolean;
+          is_merch: boolean;
           created_at: string;
         };
         Insert: {
@@ -735,6 +811,7 @@ export interface Database {
           icon?: string | null;
           is_default?: boolean;
           is_active?: boolean;
+          is_merch?: boolean;
           created_at?: string;
         };
         Update: {
@@ -743,6 +820,7 @@ export interface Database {
           icon?: string | null;
           is_default?: boolean;
           is_active?: boolean;
+          is_merch?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -757,6 +835,8 @@ export interface Database {
           is_active: boolean;
           created_by: string;
           notes: string | null;
+          merch_item_id: string | null;
+          merch_quantity: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -769,6 +849,8 @@ export interface Database {
           is_active?: boolean;
           created_by: string;
           notes?: string | null;
+          merch_item_id?: string | null;
+          merch_quantity?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -781,6 +863,8 @@ export interface Database {
           is_active?: boolean;
           created_by?: string;
           notes?: string | null;
+          merch_item_id?: string | null;
+          merch_quantity?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1048,6 +1132,8 @@ export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
 export type Feedback = Database["public"]["Tables"]["feedback"]["Row"];
 export type CoachFeedback = Database["public"]["Tables"]["coach_feedback"]["Row"];
 export type SchedulePhoto = Database["public"]["Tables"]["schedule_photos"]["Row"];
+export type MerchItem = Database["public"]["Tables"]["merch_items"]["Row"];
+export type MerchSubcategoryRow = Database["public"]["Tables"]["merch_subcategories"]["Row"];
 export type CoachGroup = Database["public"]["Tables"]["coach_groups"]["Row"];
 export type ScheduleSession = Database["public"]["Tables"]["schedule_sessions"]["Row"];
 export type ExpenseCategory = Database["public"]["Tables"]["expense_categories"]["Row"];

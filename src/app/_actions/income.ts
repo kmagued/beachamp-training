@@ -42,6 +42,8 @@ function parseIncomeForm(formData: FormData) {
       amount,
       income_date: (formData.get("income_date") as string) || new Date().toISOString().split("T")[0],
       notes: (formData.get("notes") as string)?.trim() || null,
+      merch_item_id: (formData.get("merch_item_id") as string) || null,
+      merch_quantity: formData.get("merch_item_id") ? Math.max(1, parseInt(formData.get("merch_quantity") as string) || 1) : null,
     },
   };
 }

@@ -3,13 +3,19 @@ import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { createIncome, updateIncome, createIncomeCategory } from "@/app/_actions/income";
-import type { IncomeRow, CategoryRow } from "./types";
+import type { IncomeRow, CategoryRow, MerchOption } from "./types";
+import { MERCH_CATEGORIES } from "@/lib/config/merch";
+
+/** Sub-category select value for catalog items saved before sub-categories existed */
+const NO_SUBCATEGORY = "none";
 
 export interface IncomeFormProps {
   /** Drives the reset-on-open effect; the form itself renders no chrome */
   open: boolean;
   onClose: () => void;
   categories: CategoryRow[];
+  /** Catalog items listed as sub-categories when the Merch category is picked */
+  merchItems: MerchOption[];
   editingIncome: IncomeRow | null;
   onSuccess: () => void;
   /** Refetch categories after one is created inline (no toast) */
@@ -17,11 +23,17 @@ export interface IncomeFormProps {
 }
 
 /** Income form body — rendered inside a Drawer by IncomeDrawer or EntryDrawer */
-export function IncomeForm({ open, onClose, categories, editingIncome, onSuccess, onCategoriesChange }: IncomeFormProps) {
+export function IncomeForm({ open, onClose, categories, merchItems, editingIncome, onSuccess, onCategoriesChange }: IncomeFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
   const [categoryId, setCategoryId] = useState("");
+  const [merchCategory, setMerchCategory] = useState("");
+  const [merchSubId, setMerchSubId] = useState("");
+  const [merchItemId, setMerchItemId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  // True while the amount holds price × quantity, so changing either keeps it in step
+  const [amountAuto, setAmountAuto] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split("T")[0]);
@@ -33,18 +45,45 @@ export function IncomeForm({ open, onClose, categories, editingIncome, onSuccess
   const [categoryPending, setCategoryPending] = useState(false);
 
   const activeCategories = categories.filter((c) => c.is_active);
+  const isMerchCategory = !!categories.find((c) => c.id === categoryId)?.is_merch;
+
+  // Catalog cascade: category → sub-category → item. Deleted items stay out of the picker,
+  // except the one an entry being edited already points at (so saving keeps its link)
+  const pickableItems = merchItems.filter((m) => !m.deleted_at || m.id === editingIncome?.merch_item_id);
+  const subOptions = Array.from(
+    new Map(
+      pickableItems
+        .filter((m) => m.category === merchCategory)
+        .map((m) => [m.subcategory_id ?? NO_SUBCATEGORY, m.subcategory_name ?? "Other"] as const),
+    ),
+    ([id, name]) => ({ id, name }),
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  const itemOptions = pickableItems.filter(
+    (m) => m.category === merchCategory && (m.subcategory_id ?? NO_SUBCATEGORY) === merchSubId,
+  );
 
   // Reset form when opening/editing
   useEffect(() => {
     if (open) {
       if (editingIncome) {
         setCategoryId(editingIncome.category_id);
+        const item = merchItems.find((m) => m.id === editingIncome.merch_item_id);
+        setMerchCategory(item?.category ?? "");
+        setMerchSubId(item ? item.subcategory_id ?? NO_SUBCATEGORY : "");
+        setMerchItemId(item?.id ?? "");
+        setQuantity(String(editingIncome.merch_quantity ?? 1));
+        setAmountAuto(false);
         setDescription(editingIncome.description || "");
         setAmount(String(editingIncome.amount));
         setIncomeDate(editingIncome.income_date || new Date().toISOString().split("T")[0]);
         setNotes(editingIncome.notes || "");
       } else {
         setCategoryId("");
+        setMerchCategory("");
+        setMerchSubId("");
+        setMerchItemId("");
+        setQuantity("1");
+        setAmountAuto(false);
         setDescription("");
         setAmount("");
         setIncomeDate(new Date().toISOString().split("T")[0]);
@@ -60,6 +99,9 @@ export function IncomeForm({ open, onClose, categories, editingIncome, onSuccess
     setError("");
     const formData = new FormData();
     formData.set("category_id", categoryId);
+    const linkItem = isMerchCategory && !!merchItemId;
+    formData.set("merch_item_id", linkItem ? merchItemId : "");
+    formData.set("merch_quantity", linkItem ? quantity : "");
     formData.set("description", description);
     formData.set("amount", amount);
     formData.set("income_date", incomeDate);
@@ -158,6 +200,93 @@ export function IncomeForm({ open, onClose, categories, editingIncome, onSuccess
         )}
       </div>
 
+      {isMerchCategory && (
+        <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Merch category</Label>
+              <Select
+                value={merchCategory}
+                onChange={(e) => {
+                  setMerchCategory(e.target.value);
+                  setMerchSubId("");
+                  setMerchItemId("");
+                }}
+                className="h-10 py-0"
+              >
+                <option value="">Not a catalog item</option>
+                {MERCH_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label>Sub-category</Label>
+              <Select
+                value={merchSubId}
+                onChange={(e) => {
+                  setMerchSubId(e.target.value);
+                  setMerchItemId("");
+                }}
+                disabled={!merchCategory}
+                className="h-10 py-0"
+              >
+                <option value="">Select</option>
+                {subOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Item</Label>
+            <Select
+              value={merchItemId}
+              onChange={(e) => {
+                setMerchItemId(e.target.value);
+                const item = merchItems.find((m) => m.id === e.target.value);
+                if (item && (!amount || amountAuto)) {
+                  setAmount(String(item.price * (Number(quantity) || 1)));
+                  setAmountAuto(true);
+                }
+              }}
+              disabled={!merchSubId}
+              className="h-10 py-0"
+            >
+              <option value="">Select item</option>
+              {/* Hidden items stay pickable: they can still be sold in person */}
+              {itemOptions.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} · {m.price.toLocaleString()} EGP{m.deleted_at ? " (deleted)" : m.is_active ? "" : " (hidden)"}
+                </option>
+              ))}
+            </Select>
+            {merchCategory && subOptions.length === 0 && (
+              <p className="text-xs text-slate-400 mt-1">No catalog items in this category yet. Add them in Merch.</p>
+            )}
+          </div>
+
+          {merchItemId && (
+            <div className="w-32">
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onChange={(e) => {
+                  setQuantity(e.target.value);
+                  const item = merchItems.find((m) => m.id === merchItemId);
+                  const qty = Number(e.target.value);
+                  if (item && amountAuto && qty > 0) setAmount(String(item.price * qty));
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <div>
         <Label>Description</Label>
         <Input
@@ -174,7 +303,10 @@ export function IncomeForm({ open, onClose, categories, editingIncome, onSuccess
           min="0.01"
           step="0.01"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            setAmountAuto(false);
+          }}
           placeholder="0.00"
         />
       </div>
