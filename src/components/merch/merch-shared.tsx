@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Shirt } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { MERCH_CATEGORIES } from "@/lib/config/merch";
+import type { MerchCatalogSize } from "@/lib/config/merch";
 
 export function MerchThumb({
   url,
@@ -28,12 +28,20 @@ export function MerchThumb({
   );
 }
 
-export function MerchSizes({ sizes }: { sizes: string[] }) {
+/** Sizes as players see them: sold-out sizes are crossed out, counts are never shown */
+export function MerchSizes({ sizes }: { sizes: MerchCatalogSize[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {sizes.map((s) => (
-        <span key={s} className="text-[11px] font-semibold text-slate-600 bg-slate-100 rounded px-1.5 py-0.5">
-          {s}
+        <span
+          key={s.size}
+          aria-label={s.in_stock ? s.size : `${s.size}, sold out`}
+          className={cn(
+            "text-[11px] font-semibold rounded px-1.5 py-0.5",
+            s.in_stock ? "text-slate-600 bg-slate-100" : "text-slate-300 bg-slate-50 line-through",
+          )}
+        >
+          {s.size}
         </span>
       ))}
     </div>
@@ -49,39 +57,42 @@ export function MerchPrice({ price, className }: { price: number; className?: st
 }
 
 export function MerchCategoryChips({
+  categories,
   counts,
   value,
   onChange,
 }: {
+  categories: { id: string; name: string }[];
+  /** Keyed by category id, plus "all" */
   counts: Record<string, number>;
   value: string;
   onChange: (value: string) => void;
 }) {
-  const options = [{ value: "all", label: "All" }, ...MERCH_CATEGORIES];
+  const options = [{ id: "all", name: "All" }, ...categories];
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((c) => (
         <button
-          key={c.value}
+          key={c.id}
           type="button"
-          onClick={() => onChange(c.value)}
+          onClick={() => onChange(c.id)}
           className={cn(
             "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-            value === c.value
+            value === c.id
               ? "bg-primary border-primary text-white"
               : "bg-white border-primary-100 text-primary-700 hover:border-primary-300",
           )}
         >
-          {c.label}
-          <span className="ml-1 opacity-60">{counts[c.value] ?? 0}</span>
+          {c.name}
+          <span className="ml-1 opacity-60">{counts[c.id] ?? 0}</span>
         </button>
       ))}
     </div>
   );
 }
 
-export function countByCategory(items: { category: string }[]) {
+export function countByCategory(items: { category_id: string }[]) {
   const counts: Record<string, number> = { all: items.length };
-  for (const c of MERCH_CATEGORIES) counts[c.value] = items.filter((i) => i.category === c.value).length;
+  for (const i of items) counts[i.category_id] = (counts[i.category_id] ?? 0) + 1;
   return counts;
 }

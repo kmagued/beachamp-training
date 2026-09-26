@@ -1,11 +1,3 @@
-export const MERCH_CATEGORIES = [
-  { value: "apparel", label: "Apparel" },
-  { value: "accessories", label: "Accessories" },
-  { value: "equipment", label: "Equipment" },
-] as const;
-
-export type MerchCategory = (typeof MERCH_CATEGORIES)[number]["value"];
-
 export const MERCH_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "One size"] as const;
 
 /** Caps, bottles, balls: a single count, left out of per-size sales */
@@ -20,67 +12,88 @@ export interface MerchStockLevel {
   quantity: number;
 }
 
+/**
+ * @deprecated The hardcoded list merch used before categories became rows. Finances still
+ * reads it until it moves to merch_categories; nothing new should use it.
+ */
+export const MERCH_CATEGORIES = [
+  { value: "apparel", label: "Apparel" },
+  { value: "accessories", label: "Accessories" },
+  { value: "equipment", label: "Equipment" },
+] as const;
+
+/** @deprecated See MERCH_CATEGORIES */
 export function getMerchCategoryLabel(value: string): string {
   return MERCH_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
+
+/** A merch category (Apparel, Accessories, …), managed on the Categories page */
+export interface MerchCategory {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
 }
 
 /** Sub-category (item type) within a category, e.g. Apparel → Hoodie */
 export interface MerchSubcategory {
   id: string;
-  category: string;
+  category_id: string;
   name: string;
 }
 
-/** Shape passed from server pages to the merch client components. */
+/** A product as the admin pages see it, stock included */
 export interface MerchItemView {
   id: string;
   name: string;
-  category: string;
+  category_id: string;
+  category_name: string;
   subcategory_id: string | null;
   subcategory_name: string | null;
   price: number;
   description: string | null;
-  sizes: string[];
   image_url: string | null;
   is_active: boolean;
-  is_sold_out: boolean;
+  /** In MERCH_SIZES order */
+  stock: MerchStockLevel[];
 }
 
-/** Columns to select for toMerchView */
-export const MERCH_ITEM_SELECT = "*, merch_subcategories(name)";
+/** A size as players see it: available or not, never the count */
+export interface MerchCatalogSize {
+  size: string;
+  in_stock: boolean;
+}
 
-interface MerchRow {
+/** A product as the player catalog sees it */
+export interface MerchCatalogItem {
   id: string;
   name: string;
-  category: string;
-  subcategory_id: string | null;
-  merch_subcategories?: { name: string } | null;
-  price: number | string;
+  category_id: string;
+  category_name: string;
+  subcategory_name: string | null;
+  price: number;
   description: string | null;
-  sizes: string[] | null;
-  image_path: string | null;
-  is_active: boolean;
+  image_url: string | null;
+  sizes: MerchCatalogSize[];
+  /** Has sizes and none is in stock */
   is_sold_out: boolean;
 }
 
-export function toMerchView(row: MerchRow, publicUrl: (path: string) => string): MerchItemView {
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    subcategory_id: row.subcategory_id,
-    subcategory_name: row.merch_subcategories?.name ?? null,
-    price: Number(row.price),
-    description: row.description,
-    sizes: row.sizes || [],
-    image_url: row.image_path ? publicUrl(row.image_path) : null,
-    is_active: row.is_active,
-    is_sold_out: row.is_sold_out,
-  };
+const MERCH_ITEM_COLUMNS =
+  "id, name, category_id, subcategory_id, price, description, image_path, is_active, merch_categories(name), merch_subcategories(name)";
+
+/** Columns for toMerchItemView (admins can read stock) */
+export const MERCH_ITEM_SELECT = `${MERCH_ITEM_COLUMNS}, merch_stock(size, quantity)`;
+
+/** Columns for toMerchCatalogItem (players can't read merch_stock; availability comes from merch_available_sizes) */
+export const MERCH_CATALOG_SELECT = MERCH_ITEM_COLUMNS;
+
+/** Display order set on the Categories page, then creation order */
+export function sortCategories<T extends { sort_order: number; created_at: string }>(categories: T[]): T[] {
+  return [...categories].sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
 }
 
 /** "Apparel · Hoodie", or just "Apparel" when there's no sub-category */
-export function merchTypeLabel(category: string, subcategoryName: string | null | undefined): string {
-  const cat = getMerchCategoryLabel(category);
-  return subcategoryName ? `${cat} · ${subcategoryName}` : cat;
+export function merchTypeLabel(categoryName: string, subcategoryName?: string | null): string {
+  return subcategoryName ? `${categoryName} · ${subcategoryName}` : categoryName;
 }

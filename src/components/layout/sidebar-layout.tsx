@@ -30,6 +30,8 @@ import {
   PanelLeftOpen,
   ImageIcon,
   Shirt,
+  Tags,
+  BarChart3,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -62,6 +64,8 @@ const iconMap = {
   "private-sessions": UserCheck,
   "schedule-photos": ImageIcon,
   merch: Shirt,
+  "merch-categories": Tags,
+  "merch-analytics": BarChart3,
 } as const;
 
 type NavItem = { key: string; label: string; href: string; section?: string };
@@ -70,7 +74,7 @@ const playerNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
   { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
-  { key: "merch", label: "Merch", href: "/player/merch", section: "Academy" },
+  { key: "merch", label: "Products", href: "/player/merch", section: "Merch" },
   { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
   { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },
   { key: "profile", label: "Profile", href: "/player/profile", section: "Account" },
@@ -91,7 +95,9 @@ const adminNav: NavItem[] = [
   { key: "finances", label: "Finances", href: "/admin/finances", section: "Finance" },
   { key: "packages", label: "Packages", href: "/admin/packages", section: "Finance" },
   { key: "promo-codes", label: "Promo Codes", href: "/admin/promo-codes", section: "Finance" },
-  { key: "merch", label: "Merch", href: "/admin/merch", section: "Merch" },
+  { key: "merch", label: "Products", href: "/admin/merch", section: "Merch" },
+  { key: "merch-categories", label: "Categories", href: "/admin/merch/categories", section: "Merch" },
+  { key: "merch-analytics", label: "Analytics", href: "/admin/merch/analytics", section: "Merch" },
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
   { key: "schedule-photos", label: "Schedule Photos", href: "/admin/schedule-photos", section: "Training" },
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },

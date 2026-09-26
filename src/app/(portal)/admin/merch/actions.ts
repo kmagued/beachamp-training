@@ -1,64 +1,15 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import { MERCH_CATEGORIES, MERCH_SIZES } from "@/lib/config/merch";
+import { parseProductForm, planSizeChanges } from "@/lib/merch/product-form";
+import { assertAdmin, revalidateMerch } from "./_lib/admin";
 
 const BUCKET = "merch-images";
 
-async function assertAdmin() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated", supabase: null, userId: null } as const;
-  const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (!me || me.role !== "admin") return { error: "Not authorized", supabase: null, userId: null } as const;
-  return { error: null, supabase, userId: user.id } as const;
-}
-
-function revalidate() {
-  revalidatePath("/admin/merch");
-  revalidatePath("/player/merch");
-}
-
-function parseFields(formData: FormData) {
-  const name = ((formData.get("name") as string) || "").trim();
-  const category = (formData.get("category") as string) || "";
-  const subcategoryId = (formData.get("subcategory_id") as string) || "";
-  const priceRaw = (formData.get("price") as string) ?? "";
-  const price = Number(priceRaw);
-  const description = ((formData.get("description") as string) || "").trim() || null;
-  const sizes = formData
-    .getAll("sizes")
-    .map(String)
-    .filter((s) => (MERCH_SIZES as readonly string[]).includes(s));
-
-  if (!name) return { error: "Add a name for the item" } as const;
-  if (!MERCH_CATEGORIES.some((c) => c.value === category)) return { error: "Choose a category" } as const;
-  if (!subcategoryId) return { error: "Choose a sub-category, e.g. Hoodie" } as const;
-  if (priceRaw === "" || !Number.isFinite(price) || price < 0) return { error: "Enter a price of 0 or more" } as const;
-  if (sizes.length === 0) return { error: "Pick at least one size, or choose One size" } as const;
-
-  return {
-    error: null,
-    fields: {
-      name,
-      category,
-      subcategory_id: subcategoryId,
-      price,
-      description,
-      sizes,
-      is_active: formData.get("is_active") === "on",
-      is_sold_out: formData.get("is_sold_out") === "on",
-    },
-  } as const;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function checkSubcategory(supabase: any, subcategoryId: string, category: string) {
-  const { data } = await supabase.from("merch_subcategories").select("category").eq("id", subcategoryId).maybeSingle();
+async function checkSubcategory(supabase: any, subcategoryId: string, categoryId: string) {
+  const { data } = await supabase.from("merch_subcategories").select("category_id").eq("id", subcategoryId).maybeSingle();
   if (!data) return "That sub-category no longer exists";
-  if (data.category !== category) return "The sub-category doesn't belong to the chosen category";
+  if (data.category_id !== categoryId) return "The sub-category doesn't belong to the chosen category";
   return null;
 }
 
@@ -77,9 +28,10 @@ export async function createMerchItem(formData: FormData) {
   const { error: authErr, supabase, userId } = await assertAdmin();
   if (authErr) return { error: authErr };
 
-  const parsed = parseFields(formData);
-  if (parsed.error) return { error: parsed.error };
-  const subErr = await checkSubcategory(supabase, parsed.fields.subcategory_id, parsed.fields.category);
+  const parsed = parseProductForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const { sizes, opening, ...fields } = parsed.fields;
+  const subErr = await checkSubcategory(supabase, fields.subcategory_id, fields.category_id);
   if (subErr) return { error: subErr };
 
   let imagePath: string | null = null;
@@ -97,19 +49,28 @@ export async function createMerchItem(formData: FormData) {
     .limit(1)
     .maybeSingle();
 
-  const { error } = await supabase.from("merch_items").insert({
-    ...parsed.fields,
-    image_path: imagePath,
-    sort_order: (maxRow?.sort_order ?? -1) + 1,
-    created_by: userId,
-  });
-  if (error) {
+  const { data: item, error } = await supabase
+    .from("merch_items")
+    .insert({ ...fields, image_path: imagePath, sort_order: (maxRow?.sort_order ?? -1) + 1, created_by: userId })
+    .select("id")
+    .single();
+  if (error || !item) {
     if (imagePath) await supabase.storage.from(BUCKET).remove([imagePath]);
-    return { error: error.message };
+    return { error: error?.message ?? "Couldn't create the product" };
   }
 
-  revalidate();
-  return { success: true };
+  const { error: stockErr } = await supabase
+    .from("merch_stock")
+    .insert(sizes.map((size) => ({ item_id: item.id, size, quantity: opening[size] ?? 0 })));
+  if (stockErr) {
+    // A product without stock rows has no sizes; undo rather than leave it half-made
+    await supabase.from("merch_items").delete().eq("id", item.id);
+    if (imagePath) await supabase.storage.from(BUCKET).remove([imagePath]);
+    return { error: stockErr.message };
+  }
+
+  revalidateMerch();
+  return { success: true as const, id: item.id as string };
 }
 
 export async function updateMerchItem(formData: FormData) {
@@ -117,15 +78,20 @@ export async function updateMerchItem(formData: FormData) {
   if (authErr) return { error: authErr };
 
   const id = formData.get("id") as string;
-  if (!id) return { error: "Item not found" };
+  if (!id) return { error: "Product not found" };
 
-  const parsed = parseFields(formData);
-  if (parsed.error) return { error: parsed.error };
-  const subErr = await checkSubcategory(supabase, parsed.fields.subcategory_id, parsed.fields.category);
+  const parsed = parseProductForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const { sizes, opening, ...fields } = parsed.fields;
+  const subErr = await checkSubcategory(supabase, fields.subcategory_id, fields.category_id);
   if (subErr) return { error: subErr };
 
-  const { data: existing } = await supabase.from("merch_items").select("image_path").eq("id", id).single();
-  if (!existing) return { error: "Item not found" };
+  const { data: existing } = await supabase
+    .from("merch_items")
+    .select("image_path, merch_stock(size)")
+    .eq("id", id)
+    .single();
+  if (!existing) return { error: "Product not found" };
 
   let imagePath: string | null = existing.image_path;
   const file = formData.get("image") as File | null;
@@ -138,7 +104,7 @@ export async function updateMerchItem(formData: FormData) {
 
   const { error } = await supabase
     .from("merch_items")
-    .update({ ...parsed.fields, image_path: imagePath, updated_at: new Date().toISOString() })
+    .update({ ...fields, image_path: imagePath, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) {
     if (replacingImage && imagePath) await supabase.storage.from(BUCKET).remove([imagePath]);
@@ -149,8 +115,23 @@ export async function updateMerchItem(formData: FormData) {
     await supabase.storage.from(BUCKET).remove([existing.image_path]);
   }
 
-  revalidate();
-  return { success: true };
+  // Counts of sizes the product already had are never written here: stock changes go
+  // through Restock / Recount so they can't overwrite a sale that just came in
+  const existingSizes = ((existing.merch_stock ?? []) as { size: string }[]).map((s) => s.size);
+  const { add, remove } = planSizeChanges(existingSizes, sizes);
+  if (add.length) {
+    const { error: addErr } = await supabase
+      .from("merch_stock")
+      .insert(add.map((size) => ({ item_id: id, size, quantity: opening[size] ?? 0 })));
+    if (addErr) return { error: `Saved, but the new sizes couldn't be added: ${addErr.message}` };
+  }
+  if (remove.length) {
+    const { error: removeErr } = await supabase.from("merch_stock").delete().eq("item_id", id).in("size", remove);
+    if (removeErr) return { error: `Saved, but the removed sizes are still listed: ${removeErr.message}` };
+  }
+
+  revalidateMerch();
+  return { success: true as const };
 }
 
 export async function toggleMerchVisibility(id: string, isActive: boolean) {
@@ -163,8 +144,8 @@ export async function toggleMerchVisibility(id: string, isActive: boolean) {
     .eq("id", id);
   if (error) return { error: error.message };
 
-  revalidate();
-  return { success: true };
+  revalidateMerch();
+  return { success: true as const };
 }
 
 export async function deleteMerchItem(id: string) {
@@ -172,51 +153,29 @@ export async function deleteMerchItem(id: string) {
   if (authErr) return { error: authErr };
 
   const { data: item } = await supabase.from("merch_items").select("image_path").eq("id", id).single();
-  if (!item) return { error: "Item not found" };
+  if (!item) return { error: "Product not found" };
 
-  // Items with income logged are only marked deleted, so past income keeps its item
+  // Products with income logged are only marked deleted, so past sales keep their product
   const { count } = await supabase
     .from("income")
     .select("id", { count: "exact", head: true })
     .eq("merch_item_id", id);
   if (count) {
+    const now = new Date().toISOString();
     const { error } = await supabase
       .from("merch_items")
-      .update({ deleted_at: new Date().toISOString(), is_active: false, updated_at: new Date().toISOString() })
+      .update({ deleted_at: now, is_active: false, updated_at: now })
       .eq("id", id);
     if (error) return { error: error.message };
-    revalidate();
-    revalidatePath("/admin/finances");
-    return { success: true };
+    revalidateMerch();
+    return { success: true as const };
   }
 
+  // Stock rows go with the product (ON DELETE CASCADE)
   const { error } = await supabase.from("merch_items").delete().eq("id", id);
   if (error) return { error: error.message };
   if (item.image_path) await supabase.storage.from(BUCKET).remove([item.image_path]);
 
-  revalidate();
-  return { success: true };
-}
-
-export async function createMerchSubcategory(category: string, name: string) {
-  const { error: authErr, supabase } = await assertAdmin();
-  if (authErr) return { error: authErr };
-
-  const trimmed = name.trim();
-  if (!trimmed) return { error: "Enter a sub-category name" };
-  if (!MERCH_CATEGORIES.some((c) => c.value === category)) return { error: "Choose a category first" };
-
-  const { data, error } = await supabase
-    .from("merch_subcategories")
-    .insert({ category, name: trimmed })
-    .select("id, category, name")
-    .single();
-
-  if (error) {
-    if (error.code === "23505") return { error: `"${trimmed}" already exists in this category` };
-    return { error: error.message };
-  }
-
-  revalidate();
-  return { success: true, subcategory: data as { id: string; category: string; name: string } };
+  revalidateMerch();
+  return { success: true as const };
 }

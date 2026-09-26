@@ -4,15 +4,21 @@ import { useState } from "react";
 import { Card, Badge, Drawer } from "@/components/ui";
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { merchTypeLabel, type MerchItemView } from "@/lib/config/merch";
+import { merchTypeLabel, type MerchCatalogItem } from "@/lib/config/merch";
 import { MerchThumb, MerchSizes, MerchPrice, MerchCategoryChips, countByCategory } from "@/components/merch/merch-shared";
 
-export function MerchCatalogClient({ items }: { items: MerchItemView[] }) {
+export function MerchCatalogClient({
+  items,
+  categories,
+}: {
+  items: MerchCatalogItem[];
+  categories: { id: string; name: string }[];
+}) {
   const [filter, setFilter] = useState("all");
-  const [selected, setSelected] = useState<MerchItemView | null>(null);
+  const [selected, setSelected] = useState<MerchCatalogItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
+  const filtered = filter === "all" ? items : items.filter((i) => i.category_id === filter);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -36,7 +42,7 @@ export function MerchCatalogClient({ items }: { items: MerchItemView[] }) {
       ) : (
         <>
           <div className="mb-4">
-            <MerchCategoryChips counts={countByCategory(items)} value={filter} onChange={setFilter} />
+            <MerchCategoryChips categories={categories} counts={countByCategory(items)} value={filter} onChange={setFilter} />
           </div>
 
           {filtered.length === 0 ? (
@@ -70,7 +76,7 @@ export function MerchCatalogClient({ items }: { items: MerchItemView[] }) {
                     <div>
                       <h3 className="font-semibold text-slate-900 text-sm leading-snug">{item.name}</h3>
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary mt-0.5">
-                        {merchTypeLabel(item.category, item.subcategory_name)}
+                        {merchTypeLabel(item.category_name, item.subcategory_name)}
                       </p>
                     </div>
                     <MerchPrice price={item.price} className="text-base sm:text-xl" />
@@ -100,7 +106,7 @@ export function MerchCatalogClient({ items }: { items: MerchItemView[] }) {
             </MerchThumb>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary">
-                {merchTypeLabel(selected.category, selected.subcategory_name)}
+                {merchTypeLabel(selected.category_name, selected.subcategory_name)}
               </p>
               <MerchPrice price={selected.price} className="text-2xl mt-1" />
             </div>
@@ -108,7 +114,7 @@ export function MerchCatalogClient({ items }: { items: MerchItemView[] }) {
               <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{selected.description}</p>
             )}
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Available sizes</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Sizes</p>
               <MerchSizes sizes={selected.sizes} />
             </div>
             <div className="bg-sand rounded-lg px-4 py-3 text-sm text-primary-900">
