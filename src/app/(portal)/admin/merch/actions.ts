@@ -1,6 +1,7 @@
 "use server";
 
 import { parseProductForm, planSizeChanges } from "@/lib/merch/product-form";
+import { areValidCounts, restockTotal, type RecountChange } from "@/lib/merch/stock";
 import { assertAdmin, revalidateMerch } from "./_lib/admin";
 
 const BUCKET = "merch-images";
@@ -178,4 +179,38 @@ export async function deleteMerchItem(id: string) {
 
   revalidateMerch();
   return { success: true as const };
+}
+
+/** Adds what arrived, e.g. { M: 10, L: 5 }, to the product's stock */
+export async function restockMerch(itemId: string, added: Record<string, number>) {
+  const { error: authErr, supabase } = await assertAdmin();
+  if (authErr) return { error: authErr };
+  if (!areValidCounts(Object.values(added))) return { error: "Arrivals must be whole numbers, 0 or more" };
+  if (restockTotal(added) === 0) return { error: "Enter how many arrived" };
+
+  const { error } = await supabase.rpc("merch_restock", { p_item_id: itemId, p_added: added });
+  if (error) return { error: error.message };
+
+  revalidateMerch();
+  return { success: true as const };
+}
+
+/**
+ * Sets exact counts after a shelf count. Each change carries the count the admin started
+ * from; if a sale moved any of them meanwhile nothing is written (ok: false) and the
+ * current counts come back so the panel can show them.
+ */
+export async function recountMerch(itemId: string, changes: RecountChange[]) {
+  const { error: authErr, supabase } = await assertAdmin();
+  if (authErr) return { error: authErr };
+  if (changes.length === 0) return { error: "No counts changed" };
+  if (!areValidCounts(changes.flatMap((c) => [c.expected, c.counted]))) {
+    return { error: "Counts must be whole numbers, 0 or more" };
+  }
+
+  const { data, error } = await supabase.rpc("merch_recount", { p_item_id: itemId, p_counts: changes });
+  if (error) return { error: error.message };
+
+  revalidateMerch();
+  return { success: true as const, ok: data.ok as boolean, stock: data.stock as Record<string, number> };
 }

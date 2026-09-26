@@ -5,7 +5,12 @@ import { MERCH_ITEM_SELECT, sortCategories, type MerchCategory, type MerchSubcat
 import { toMerchItemView, type MerchItemRow } from "@/lib/merch/views";
 import { ProductsClient } from "./_components/products-client";
 
-export default async function AdminMerchProductsPage() {
+export default async function AdminMerchProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ restock?: string }>;
+}) {
+  const { restock } = await searchParams;
   const currentUser = await getCurrentUser();
   if (!currentUser) redirect("/login");
 
@@ -31,6 +36,7 @@ export default async function AdminMerchProductsPage() {
       items={((rows || []) as MerchItemRow[]).map((r) => toMerchItemView(r, publicUrl))}
       categories={sortCategories((categoryRows || []) as MerchCategory[])}
       subcategories={(subRows || []) as MerchSubcategory[]}
+      restockId={restock ?? null}
     />
   );
 }

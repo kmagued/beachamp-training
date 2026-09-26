@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { maxSellable, recountChanges, restockTotal, sortSizes, stockStatus, stockSummary } from "./stock";
+import {
+  areValidCounts,
+  changedSizes,
+  maxSellable,
+  mergeRecountInput,
+  parseCount,
+  recountChanges,
+  restockTotal,
+  sortSizes,
+  stockStatus,
+  stockSummary,
+} from "./stock";
 
 test("stockStatus: 0 is out, 1-2 are low, 3 and up are fine", () => {
   assert.equal(stockStatus(0), "out");
@@ -78,4 +89,39 @@ test("recountChanges keeps only stocked sizes whose count differs", () => {
 test("restockTotal adds up positive arrivals only", () => {
   assert.equal(restockTotal({ M: 10, L: 5, S: 0, XL: -2 }), 15);
   assert.equal(restockTotal({}), 0);
+});
+
+test("parseCount reads whole numbers of 0 or more, and nothing else", () => {
+  assert.equal(parseCount("4"), 4);
+  assert.equal(parseCount(" 12 "), 12);
+  assert.equal(parseCount("0"), 0);
+  assert.equal(parseCount(""), null);
+  assert.equal(parseCount("-1"), null);
+  assert.equal(parseCount("2.5"), null);
+  assert.equal(parseCount("abc"), null);
+});
+
+test("areValidCounts accepts whole numbers of 0 or more only", () => {
+  assert.equal(areValidCounts([0, 3, 10]), true);
+  assert.equal(areValidCounts([1, -1]), false);
+  assert.equal(areValidCounts([1.5]), false);
+  assert.equal(areValidCounts([Number.NaN]), false);
+  assert.equal(areValidCounts(["3" as unknown]), false);
+});
+
+test("changedSizes lists sizes whose count moved underneath, including ones that disappeared", () => {
+  assert.deepEqual(changedSizes(hoodie, { S: 4, M: 1, L: 7 }), ["M"]);
+  assert.deepEqual(changedSizes(hoodie, { S: 4, M: 0 }), ["L"]);
+  assert.deepEqual(changedSizes(hoodie, { S: 4, M: 0, L: 7 }), []);
+});
+
+test("mergeRecountInput: after a stale recount, edited rows keep what was typed and untouched rows follow the new count", () => {
+  // The admin typed L=6; meanwhile a sale took S from 4 to 3
+  const typed = { S: "4", M: "0", L: "6" };
+  const latest = [
+    { size: "S", quantity: 3 },
+    { size: "M", quantity: 0 },
+    { size: "L", quantity: 7 },
+  ];
+  assert.deepEqual(mergeRecountInput(hoodie, typed, latest), { S: "3", M: "0", L: "6" });
 });

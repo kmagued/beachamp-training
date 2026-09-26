@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Boxes, CircleX, Package, Plus, Search, Shirt, ShoppingBag, TriangleAlert } from "lucide-react";
 import { Button, Card, EmptyState, Input, Select, StatCard, Toast } from "@/components/ui";
@@ -10,6 +10,7 @@ import { MerchCategoryChips, countByCategory } from "@/components/merch/merch-sh
 import { toggleMerchVisibility } from "../actions";
 import { ProductCard } from "./product-card";
 import { ProductDrawer, type ProductDrawerMode } from "./product-drawer";
+import { StockDrawer } from "./stock-drawer";
 
 type DrawerState = { mode: ProductDrawerMode; item: MerchItemView | null; key: number };
 
@@ -17,10 +18,13 @@ export function ProductsClient({
   items,
   categories,
   subcategories,
+  restockId,
 }: {
   items: MerchItemView[];
   categories: MerchCategory[];
   subcategories: MerchSubcategory[];
+  /** Opens the stock panel for this product on arrival (Analytics' Restock links) */
+  restockId?: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -30,6 +34,8 @@ export function ProductsClient({
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const [stockTarget, setStockTarget] = useState<{ item: MerchItemView; key: number } | null>(null);
+  const [stockOpen, setStockOpen] = useState(false);
 
   const stats = useMemo(() => productStats(items), [items]);
   const filtered = useMemo(() => filterProducts(items, { search, categoryId, stock }), [items, search, categoryId, stock]);
@@ -60,9 +66,22 @@ export function ProductsClient({
     });
   }
 
-  // Wired up by the stock and sale drawers
-  const openStock = (item: MerchItemView) => void item;
+  function openStock(item: MerchItemView) {
+    setStockTarget((prev) => ({ item, key: (prev?.key ?? 0) + 1 }));
+    setStockOpen(true);
+  }
+
+  // Wired up by the sale drawer
   const openSale = (item: MerchItemView | null) => void item;
+
+  useEffect(() => {
+    if (!restockId) return;
+    const item = items.find((i) => i.id === restockId);
+    if (item) openStock(item);
+    // Drop the parameter so a refresh doesn't reopen the panel
+    router.replace("/admin/merch", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restockId]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -199,6 +218,20 @@ export function ProductsClient({
             openStock(item);
           }}
           onDuplicate={(item) => openDrawer("duplicate", item)}
+        />
+      )}
+
+      {stockTarget && (
+        <StockDrawer
+          key={stockTarget.key}
+          item={stockTarget.item}
+          open={stockOpen}
+          onClose={() => setStockOpen(false)}
+          onSaved={(message) => {
+            setToast({ message, variant: "success" });
+            setStockOpen(false);
+            router.refresh();
+          }}
         />
       )}
     </div>

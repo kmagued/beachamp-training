@@ -72,3 +72,40 @@ export function recountChanges(current: MerchStockLevel[], counted: Record<strin
 export function restockTotal(added: Record<string, number>): number {
   return Object.values(added).reduce((sum, n) => sum + (n > 0 ? n : 0), 0);
 }
+
+/** A typed stock count: a whole number of 0 or more, otherwise null */
+export function parseCount(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  return Number(trimmed);
+}
+
+/** Server-side check for counts arriving from the client */
+export function areValidCounts(values: unknown[]): boolean {
+  return values.every((v) => typeof v === "number" && Number.isInteger(v) && v >= 0);
+}
+
+/** Sizes whose count in `latest` differs from what the admin was looking at (a missing size counts as changed) */
+export function changedSizes(before: MerchStockLevel[], latest: Record<string, number>): string[] {
+  return before.filter((s) => latest[s.size] !== s.quantity).map((s) => s.size);
+}
+
+/**
+ * Recount inputs after the counts moved underneath (a sale landed while counting): a row the
+ * admin edited keeps what they typed; a row they left alone takes the new count, so saving
+ * again can't quietly undo that sale.
+ */
+export function mergeRecountInput(
+  before: MerchStockLevel[],
+  typed: Record<string, string>,
+  latest: MerchStockLevel[],
+): Record<string, string> {
+  const was = new Map(before.map((s) => [s.size, String(s.quantity)]));
+  return Object.fromEntries(
+    latest.map((s) => {
+      const value = typed[s.size];
+      const edited = value !== undefined && was.has(s.size) && value.trim() !== was.get(s.size);
+      return [s.size, edited ? value : String(s.quantity)];
+    }),
+  );
+}
