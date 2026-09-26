@@ -2,6 +2,8 @@
 
 import { parseProductForm, planSizeChanges } from "@/lib/merch/product-form";
 import { areValidCounts, restockTotal, type RecountChange } from "@/lib/merch/stock";
+import { validateSale, type SaleInput } from "@/lib/merch/sale";
+import { revalidatePath } from "next/cache";
 import { assertAdmin, revalidateMerch } from "./_lib/admin";
 
 const BUCKET = "merch-images";
@@ -213,4 +215,50 @@ export async function recountMerch(itemId: string, changes: RecountChange[]) {
 
   revalidateMerch();
   return { success: true as const, ok: data.ok as boolean, stock: data.stock as Record<string, number> };
+}
+
+/**
+ * Records a sale as Merch income. The income trigger takes the units from stock, or refuses
+ * with MS001 (not enough left) / MS002 (size no longer stocked); `code` lets the drawer
+ * refresh the counts it's showing.
+ */
+export async function recordMerchSale(input: SaleInput) {
+  const { error: authErr, supabase, userId } = await assertAdmin();
+  if (authErr) return { error: authErr };
+
+  const invalid = validateSale(input);
+  if (invalid) return { error: invalid };
+
+  const { data: merchCategory } = await supabase
+    .from("income_categories")
+    .select("id")
+    .eq("is_merch", true)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!merchCategory) return { error: "Set up the Merch income category in Finances first" };
+
+  const { error } = await supabase.from("income").insert({
+    category_id: merchCategory.id,
+    amount: input.amount,
+    income_date: input.date,
+    description: input.note.trim() || null,
+    merch_item_id: input.itemId,
+    merch_size: input.size,
+    merch_quantity: input.quantity,
+    created_by: userId,
+  });
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
+
+  const { data: left } = await supabase
+    .from("merch_stock")
+    .select("quantity")
+    .eq("item_id", input.itemId)
+    .eq("size", input.size)
+    .maybeSingle();
+
+  revalidateMerch();
+  revalidatePath("/admin/dashboard");
+  return { success: true as const, remaining: (left?.quantity as number | undefined) ?? null };
 }

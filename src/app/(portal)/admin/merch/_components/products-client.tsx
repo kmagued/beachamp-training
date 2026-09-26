@@ -11,6 +11,7 @@ import { toggleMerchVisibility } from "../actions";
 import { ProductCard } from "./product-card";
 import { ProductDrawer, type ProductDrawerMode } from "./product-drawer";
 import { StockDrawer } from "./stock-drawer";
+import { SaleDrawer } from "./sale-drawer";
 
 type DrawerState = { mode: ProductDrawerMode; item: MerchItemView | null; key: number };
 
@@ -36,6 +37,8 @@ export function ProductsClient({
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const [stockTarget, setStockTarget] = useState<{ item: MerchItemView; key: number } | null>(null);
   const [stockOpen, setStockOpen] = useState(false);
+  const [saleTarget, setSaleTarget] = useState<{ itemId: string | null; key: number } | null>(null);
+  const [saleOpen, setSaleOpen] = useState(false);
 
   const stats = useMemo(() => productStats(items), [items]);
   const filtered = useMemo(() => filterProducts(items, { search, categoryId, stock }), [items, search, categoryId, stock]);
@@ -71,8 +74,11 @@ export function ProductsClient({
     setStockOpen(true);
   }
 
-  // Wired up by the sale drawer
-  const openSale = (item: MerchItemView | null) => void item;
+  /** From a card's Sell (product chosen) or the header's Record sale (pick one first) */
+  function openSale(item: MerchItemView | null) {
+    setSaleTarget((prev) => ({ itemId: item?.id ?? null, key: (prev?.key ?? 0) + 1 }));
+    setSaleOpen(true);
+  }
 
   useEffect(() => {
     if (!restockId) return;
@@ -218,6 +224,22 @@ export function ProductsClient({
             openStock(item);
           }}
           onDuplicate={(item) => openDrawer("duplicate", item)}
+        />
+      )}
+
+      {saleTarget && (
+        <SaleDrawer
+          key={saleTarget.key}
+          open={saleOpen}
+          items={items}
+          initialItemId={saleTarget.itemId}
+          onClose={() => setSaleOpen(false)}
+          onSaved={(message, keepOpen) => {
+            setToast({ message, variant: "success" });
+            if (!keepOpen) setSaleOpen(false);
+            router.refresh();
+          }}
+          onStale={() => router.refresh()}
         />
       )}
 
