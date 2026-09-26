@@ -19,7 +19,7 @@ import { IncomeTableView } from "./_components/income-table";
 import { EntryTypeSwitch } from "./_components/entry-type-switch";
 import { PaymentsView } from "@/app/(portal)/admin/payments/_components/payments-view";
 import { cairoMonthKey } from "@/lib/utils/cairo-time";
-import { getMerchCategoryLabel } from "@/lib/config/merch";
+import { sortSizes } from "@/lib/merch/stock";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function AdminExpensesPage() {
@@ -131,7 +131,7 @@ function AdminExpensesContent() {
         .order("name", { ascending: true }),
       supabase
         .from("income")
-        .select("*, income_categories(id, name, icon), merch_items(id, name, category, merch_subcategories(name))")
+        .select("*, income_categories(id, name, icon), merch_items(id, name, category_id, merch_categories(name), merch_subcategories(name))")
         .eq("is_active", true)
         .order("income_date", { ascending: false })
         .order("created_at", { ascending: false }),
@@ -146,7 +146,7 @@ function AdminExpensesContent() {
         .eq("status", "confirmed"),
       supabase
         .from("merch_items")
-        .select("id, name, category, subcategory_id, price, is_active, deleted_at, merch_subcategories(name)")
+        .select("id, name, category_id, subcategory_id, price, is_active, deleted_at, merch_categories(name), merch_subcategories(name), merch_stock(size, quantity)")
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true }),
     ]);
@@ -157,12 +157,18 @@ function AdminExpensesContent() {
     if (incomeCategoryData) setIncomeCategories(incomeCategoryData as unknown as CategoryRow[]);
     if (paymentData) setPaymentIncome(paymentData as unknown as PaymentIncomeRow[]);
     if (merchData) {
-      type MerchRow = Omit<MerchOption, "subcategory_name"> & { merch_subcategories: { name: string } | null };
+      type MerchRow = Omit<MerchOption, "category_name" | "subcategory_name" | "stock"> & {
+        merch_categories: { name: string } | null;
+        merch_subcategories: { name: string } | null;
+        merch_stock: { size: string; quantity: number }[] | null;
+      };
       setMerchItems(
-        (merchData as unknown as MerchRow[]).map(({ merch_subcategories, ...m }) => ({
+        (merchData as unknown as MerchRow[]).map(({ merch_categories, merch_subcategories, merch_stock, ...m }) => ({
           ...m,
           price: Number(m.price),
+          category_name: merch_categories?.name ?? "",
           subcategory_name: merch_subcategories?.name ?? null,
+          stock: sortSizes(merch_stock ?? []),
         })),
       );
     }
@@ -529,9 +535,10 @@ function AdminExpensesContent() {
                 const rows = filteredIncome.map((i) => ({
                   Date: i.income_date,
                   Category: i.income_categories?.name || "",
-                  "Merch Category": i.merch_items ? getMerchCategoryLabel(i.merch_items.category) : "",
+                  "Merch Category": i.merch_items?.merch_categories?.name || "",
                   "Sub-category": i.merch_items?.merch_subcategories?.name || "",
                   Item: i.merch_items?.name || "",
+                  Size: i.merch_size || "",
                   Qty: i.merch_quantity ?? "",
                   Description: i.description || "",
                   "Amount (EGP)": i.amount,

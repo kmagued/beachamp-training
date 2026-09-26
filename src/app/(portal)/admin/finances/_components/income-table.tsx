@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import type { IncomeRow } from "./types";
-import { getMerchCategoryLabel } from "@/lib/config/merch";
+import { merchSaleLine } from "@/lib/merch/income-fields";
 
 interface IncomeTableProps {
   income: IncomeRow[];
@@ -12,12 +12,17 @@ interface IncomeTableProps {
   grandTotal: number;
 }
 
-/** "Apparel › Hoodie › Beachamp Black Hoodie ×3" */
+/** "Apparel › Hoodie › Beachamp Black Hoodie · L ×3" */
 function merchPath(item: IncomeRow) {
   const m = item.merch_items;
   if (!m) return "";
-  const parts = [getMerchCategoryLabel(m.category), m.merch_subcategories?.name, m.name].filter(Boolean);
-  return parts.join(" › ") + (item.merch_quantity && item.merch_quantity > 1 ? ` ×${item.merch_quantity}` : "");
+  return merchSaleLine({
+    categoryName: m.merch_categories?.name,
+    subcategoryName: m.merch_subcategories?.name,
+    itemName: m.name,
+    size: item.merch_size,
+    quantity: item.merch_quantity,
+  });
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";

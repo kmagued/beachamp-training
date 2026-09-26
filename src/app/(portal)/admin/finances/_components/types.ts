@@ -1,3 +1,5 @@
+import type { MerchStockLevel } from "@/lib/config/merch";
+
 export interface ExpenseRow {
   id: string;
   description: string;
@@ -35,13 +37,16 @@ export interface CategoryRow {
 export interface MerchOption {
   id: string;
   name: string;
-  category: string;
+  category_id: string;
+  category_name: string;
   subcategory_id: string | null;
   subcategory_name: string | null;
   price: number;
   is_active: boolean;
   /** Deleted from the catalog; kept so past income can still show it */
   deleted_at: string | null;
+  /** Units on hand per size, in size order */
+  stock: MerchStockLevel[];
 }
 
 export interface IncomeRow {
@@ -57,11 +62,13 @@ export interface IncomeRow {
   category_id: string;
   merch_item_id: string | null;
   merch_quantity: number | null;
+  merch_size: string | null;
   income_categories: { id: string; name: string; icon: string | null };
   merch_items: {
     id: string;
     name: string;
-    category: string;
+    category_id: string;
+    merch_categories: { name: string } | null;
     merch_subcategories: { name: string } | null;
   } | null;
 }

@@ -12,21 +12,6 @@ export interface MerchStockLevel {
   quantity: number;
 }
 
-/**
- * @deprecated The hardcoded list merch used before categories became rows. Finances still
- * reads it until it moves to merch_categories; nothing new should use it.
- */
-export const MERCH_CATEGORIES = [
-  { value: "apparel", label: "Apparel" },
-  { value: "accessories", label: "Accessories" },
-  { value: "equipment", label: "Equipment" },
-] as const;
-
-/** @deprecated See MERCH_CATEGORIES */
-export function getMerchCategoryLabel(value: string): string {
-  return MERCH_CATEGORIES.find((c) => c.value === value)?.label ?? value;
-}
-
 /** A merch category (Apparel, Accessories, …), managed on the Categories page */
 export interface MerchCategory {
   id: string;

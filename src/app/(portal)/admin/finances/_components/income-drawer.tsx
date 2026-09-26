@@ -4,7 +4,8 @@ import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { createIncome, updateIncome, createIncomeCategory } from "@/app/_actions/income";
 import type { IncomeRow, CategoryRow, MerchOption } from "./types";
-import { MERCH_CATEGORIES } from "@/lib/config/merch";
+import { maxSellable } from "@/lib/merch/stock";
+import { cn } from "@/lib/utils/cn";
 
 /** Sub-category select value for catalog items saved before sub-categories existed */
 const NO_SUBCATEGORY = "none";
@@ -31,6 +32,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
   const [merchCategory, setMerchCategory] = useState("");
   const [merchSubId, setMerchSubId] = useState("");
   const [merchItemId, setMerchItemId] = useState("");
+  const [merchSize, setMerchSize] = useState("");
   const [quantity, setQuantity] = useState("1");
   // True while the amount holds price × quantity, so changing either keeps it in step
   const [amountAuto, setAmountAuto] = useState(false);
@@ -50,17 +52,29 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
   // Catalog cascade: category → sub-category → item. Deleted items stay out of the picker,
   // except the one an entry being edited already points at (so saving keeps its link)
   const pickableItems = merchItems.filter((m) => !m.deleted_at || m.id === editingIncome?.merch_item_id);
+  const categoryOptions = Array.from(
+    new Map(pickableItems.map((m) => [m.category_id, m.category_name] as const)),
+    ([id, name]) => ({ id, name }),
+  ).sort((a, b) => a.name.localeCompare(b.name));
   const subOptions = Array.from(
     new Map(
       pickableItems
-        .filter((m) => m.category === merchCategory)
+        .filter((m) => m.category_id === merchCategory)
         .map((m) => [m.subcategory_id ?? NO_SUBCATEGORY, m.subcategory_name ?? "Other"] as const),
     ),
     ([id, name]) => ({ id, name }),
   ).sort((a, b) => a.name.localeCompare(b.name));
   const itemOptions = pickableItems.filter(
-    (m) => m.category === merchCategory && (m.subcategory_id ?? NO_SUBCATEGORY) === merchSubId,
+    (m) => m.category_id === merchCategory && (m.subcategory_id ?? NO_SUBCATEGORY) === merchSubId,
   );
+
+  // Stock limits: an edited sale's own units count as available for its product and size
+  const selectedItem = merchItems.find((m) => m.id === merchItemId) ?? null;
+  const ownSale =
+    editingIncome && editingIncome.merch_item_id === merchItemId && editingIncome.merch_size
+      ? { size: editingIncome.merch_size, quantity: editingIncome.merch_quantity ?? 0 }
+      : null;
+  const sizeMax = (size: string) => (selectedItem ? maxSellable(selectedItem.stock, size, ownSale) : 0);
 
   // Reset form when opening/editing
   useEffect(() => {
@@ -68,7 +82,8 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
       if (editingIncome) {
         setCategoryId(editingIncome.category_id);
         const item = merchItems.find((m) => m.id === editingIncome.merch_item_id);
-        setMerchCategory(item?.category ?? "");
+        setMerchCategory(item?.category_id ?? "");
+        setMerchSize(editingIncome.merch_size ?? "");
         setMerchSubId(item ? item.subcategory_id ?? NO_SUBCATEGORY : "");
         setMerchItemId(item?.id ?? "");
         setQuantity(String(editingIncome.merch_quantity ?? 1));
@@ -82,6 +97,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
         setMerchCategory("");
         setMerchSubId("");
         setMerchItemId("");
+        setMerchSize("");
         setQuantity("1");
         setAmountAuto(false);
         setDescription("");
@@ -100,7 +116,12 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
     const formData = new FormData();
     formData.set("category_id", categoryId);
     const linkItem = isMerchCategory && !!merchItemId;
+    if (linkItem && merchSize && Number(quantity) > sizeMax(merchSize)) {
+      setError(`Only ${sizeMax(merchSize)} × ${merchSize} available`);
+      return;
+    }
     formData.set("merch_item_id", linkItem ? merchItemId : "");
+    formData.set("merch_size", linkItem ? merchSize : "");
     formData.set("merch_quantity", linkItem ? quantity : "");
     formData.set("description", description);
     formData.set("amount", amount);
@@ -211,12 +232,13 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
                   setMerchCategory(e.target.value);
                   setMerchSubId("");
                   setMerchItemId("");
+                  setMerchSize("");
                 }}
                 className="h-10 py-0"
               >
                 <option value="">Not a catalog item</option>
-                {MERCH_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Select>
             </div>
@@ -227,6 +249,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
                 onChange={(e) => {
                   setMerchSubId(e.target.value);
                   setMerchItemId("");
+                  setMerchSize("");
                 }}
                 disabled={!merchCategory}
                 className="h-10 py-0"
@@ -245,6 +268,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
               value={merchItemId}
               onChange={(e) => {
                 setMerchItemId(e.target.value);
+                setMerchSize("");
                 const item = merchItems.find((m) => m.id === e.target.value);
                 if (item && (!amount || amountAuto)) {
                   setAmount(String(item.price * (Number(quantity) || 1)));
@@ -267,12 +291,52 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
             )}
           </div>
 
+          {selectedItem && (
+            <div>
+              <Label>Size</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedItem.stock.map((s) => {
+                  const max = sizeMax(s.size);
+                  const own = ownSale?.size === s.size;
+                  return (
+                    <button
+                      key={s.size}
+                      type="button"
+                      onClick={() => {
+                        setMerchSize(s.size);
+                        setError("");
+                      }}
+                      disabled={max < 1}
+                      aria-pressed={merchSize === s.size}
+                      className={cn(
+                        "min-w-[58px] rounded-lg border px-2 py-1 text-xs font-bold flex flex-col items-center leading-tight transition-colors",
+                        merchSize === s.size
+                          ? "bg-primary border-primary text-white"
+                          : "bg-white border-slate-300 text-slate-700 hover:border-slate-400",
+                        max < 1 && "border-dashed bg-slate-50 text-slate-300 line-through",
+                      )}
+                    >
+                      {s.size}
+                      <span className={cn("text-[10px] font-semibold", merchSize === s.size ? "text-primary-100" : "text-slate-400")}>
+                        {max < 1 ? "none left" : own ? `${max} available` : `${max} left`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedItem.stock.length === 0 && (
+                <p className="text-xs text-slate-400 mt-1">This product has no sizes. Add them in Merch.</p>
+              )}
+            </div>
+          )}
+
           {merchItemId && (
             <div className="w-32">
               <Label>Quantity</Label>
               <Input
                 type="number"
                 min="1"
+                max={merchSize ? sizeMax(merchSize) : undefined}
                 step="1"
                 value={quantity}
                 onChange={(e) => {
@@ -282,6 +346,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
                   if (item && amountAuto && qty > 0) setAmount(String(item.price * qty));
                 }}
               />
+              {merchSize && <p className="text-xs text-slate-400 mt-1">Up to {sizeMax(merchSize)}</p>}
             </div>
           )}
         </div>
