@@ -34,8 +34,8 @@ export default function DailyReportPage() {
   const today = new Date().toISOString().split("T")[0];
   const selectedDate = searchParams.get("date") || today;
 
-  // The open tab lives in ?tab= so a link can open the report on a given tab (the King
-  // of Court leaderboard links straight to Scores). Attendance is the default and is
+  // The open tab lives in ?tab= so a link can open the report on a given tab (the
+  // Leaderboard links straight to Scores). Attendance is the default and is
   // left out of the URL.
   const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTabState] = useState<TabKey>(isTabKey(tabParam) ? tabParam : "attendance");

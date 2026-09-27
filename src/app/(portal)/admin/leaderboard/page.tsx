@@ -9,7 +9,7 @@ import { LeaderboardClient, type LeaderboardGroup, type PlayerName } from "./_co
 /** PostgREST returns at most this many rows per request */
 const PAGE = 1000;
 
-export default async function KingOfCourtPage({
+export default async function LeaderboardPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

@@ -70,7 +70,7 @@ const iconMap = {
   merch: Shirt,
   "merch-categories": Tags,
   "merch-analytics": BarChart3,
-  "king-of-court": Trophy,
+  leaderboard: Trophy,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -107,10 +107,11 @@ const adminNav: NavItem[] = [
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
   { key: "schedule-photos", label: "Schedule Photos", href: "/admin/schedule-photos", section: "Training" },
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
-  { key: "king-of-court", label: "King of Court", href: "/admin/king-of-court", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
   { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
+  // Its own section: competitions will join the leaderboard here
+  { key: "leaderboard", label: "Leaderboard", href: "/admin/leaderboard", section: "Competitions" },
   { key: "whatsapp-templates", label: "WhatsApp Templates", href: "/admin/whatsapp-templates", section: "Messaging" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];

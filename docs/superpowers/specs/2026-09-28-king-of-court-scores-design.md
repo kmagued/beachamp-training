@@ -13,9 +13,10 @@ group's winner of the month.
 
 - A new **Scores** tab on the Daily Report. It lists only players saved as present in
   each group session, with a points box each.
-- A new admin page, **Training → King of Court**, showing one leaderboard card per group
-  for the chosen month. A pinned bar holds group chips for jumping between groups, and
-  tapping a player opens a per-session breakdown.
+- A new admin page, **Competitions → Leaderboard** (`/admin/leaderboard`), with one tab per
+  group for the chosen month. Tapping a player opens a per-session breakdown. *(Revised
+  2026-09-28 at the user's request: it was Training → King of Court, with stacked group
+  cards and a pinned chip bar.)*
 - Admin-only throughout. Coaches and players see nothing new.
 
 ## Decisions (settled during brainstorming)
@@ -48,10 +49,17 @@ group's winner of the month.
     cards, which keeps them out of the save that deducts sessions and creates payments.
 11. **The Scores tab layout uses number boxes** (option 1). Steppers and a variant with
     month-to-date context under each name were rejected.
-12. **The leaderboard layout is group cards** (option 1). On top of that:
-    - A pinned bar holds the month picker and group chips, and highlights the chip for
-      the group in view.
+12. **The leaderboard page is called "Leaderboard"** and sits in a new sidebar section,
+    **Competitions**, placed after Training. Training already has too many entries, and
+    competitions will join this section later. **Each group is a tab**,
+    showing one group at a time. On top of that:
+    - A card highlights the leader or winner.
+    - The ranking is a list that works on phones: rank badge, name, "N sessions · best
+      X" and points.
     - Tapping a player row opens a drawer with their per-session breakdown.
+
+    This revises the original choice of stacked group cards with a pinned chip bar, at the
+    user's request.
 
 ## Existing context (verified)
 
@@ -292,7 +300,7 @@ The action runs these steps in order:
      edited can't move points to the new group.
 6. Delete the rows for `cleared_player_ids`, then upsert the scores on
    `player_id,schedule_session_id,session_date`, with `entered_by` set to the caller.
-7. Call `revalidatePath("/admin/daily-report")` and `revalidatePath("/admin/king-of-court")`.
+7. Call `revalidatePath("/admin/daily-report")` and `revalidatePath("/admin/leaderboard")`.
 
 ### 4. Daily Report — new Scores tab
 
@@ -337,7 +345,7 @@ players, so they stay short and there's no collapse toggle.
   tabs do.
 - A small legend under the list reads: "Blank = didn't play · 0 = played, no points".
 
-### 5. Leaderboard page — `src/app/(portal)/admin/king-of-court/`
+### 5. Leaderboard page — `src/app/(portal)/admin/leaderboard/`
 
 **`page.tsx`** (server)
 - Read `?month=` with `parseMonthParam(param, cairoMonthKey(new Date()))`.
@@ -349,39 +357,44 @@ players, so they stay short and there's no collapse toggle.
   scores. Sort by name.
 - Pass everything to the client component.
 
-**`loading.tsx`** shows a skeleton in the style of the other admin pages.
+**`loading.tsx`** shows a skeleton: header, tab row, leader card and list.
 
 **`_components/leaderboard-client.tsx`**
+- **Header:**
+  - The title "Leaderboard", with the month picker `◂ Sep 2026 ▸` on the right. ▸ is
+    disabled at the current Cairo month. Changing the month pushes `?month=` and keeps
+    `?group=`.
+  - The subtitle "King of Court points by group" goes on its own line below, so it
+    doesn't wrap on phones.
+- **Group tabs,** in the Daily Report's underline style:
+  - The row scrolls sideways on phones and keeps the open tab in view.
+  - Opening a tab updates `?group=<id>` with `window.history.replaceState`.
+  - The page opens the tab named in `?group=`, else the first group with scores that
+    month, else the first group.
+- **Leader card** (amber):
+  - It shows "Leading · September 2026" for the current month, or "Winner · …" for past
+    months.
+  - It names the winner or co-winners, joined as "A & B", with points and sessions.
+  - It is hidden when nobody has more than 0 points.
+- **Ranked list,** with a header row reading "N players · M sessions":
+  - Each row is a button showing a rank badge (gold, silver or bronze for the top three
+    when points are above 0), the name, "N sessions · best X", the points and a `›`.
+- A group with no scores in the month shows "No scores logged this month" and points to
+  the Daily Report's Scores tab.
+- Standings come from `buildStandings`, applied to the open group's rows.
 
-- **Pinned bar** (`sticky top-0`):
-  - The title "King of Court", with the month picker `◂ Sep 2026 ▸` on the right. ▸ is
-    disabled at the current Cairo month. Changing the month pushes `?month=`.
-  - A row of group chips below the title, which scrolls sideways on phones. Tapping a
-    chip smooth-scrolls to that group's card and updates `?group=<id>` with
-    `window.history.replaceState`, so the server data isn't fetched again.
-  - An `IntersectionObserver` highlights the chip for the card on screen.
-  - When the page loads with `?group=`, it scrolls to that card.
-- **One card per group:**
-  - The header shows the group name and level.
-  - **Winner line:** "👑 Leading: Name · N pts" for the current month, or
-    "👑 Winner: …" for past months. Co-winners are listed together, for example
-    "Ahmed Kamal & Mariam Samir".
-  - **Ranked table:** #, Player, Pts, Sessions and Best. Every row is a button with a
-    trailing `›`.
-  - A group with no scores in the month shows "No scores logged this month".
-- Standings come from `buildStandings`, applied to each group's rows.
-
-**`_components/player-breakdown-drawer.tsx`** uses `Drawer` with the player's name as
-its title.
+**`_components/player-breakdown-drawer.tsx`** uses `Drawer` (a bottom sheet on phones)
+with the player's name as its title.
 - **Subtitle:** group name and month, for example "Group A · September 2026".
 - **Stat row:** Rank, Points, Sessions and Best.
-- **SESSIONS list:** one row per `playerBreakdown` entry, for example
-  "Wed 3 Sep · 6:00 PM", then "8 pts", then "2nd of 9", then `›`.
-- Each row links to `/admin/daily-report?date=<session_date>&tab=scores`.
+- **SESSIONS list:** one two-line row per `playerBreakdown` entry, oldest first.
+  - The left side shows the date over the time.
+  - The right side shows the points over the place, for example "2nd of 9".
+  - Each row links to `/admin/daily-report?date=<session_date>&tab=scores`.
 
 **Nav:**
-- Add `{ key: "king-of-court", label: "King of Court", href: "/admin/king-of-court",
-  section: "Training" }` after Daily Report in the `adminNav` array.
+- Add `{ key: "leaderboard", label: "Leaderboard", href: "/admin/leaderboard",
+  section: "Competitions" }` as a new section after Training in the `adminNav` array.
 - Map the `Trophy` icon to it in the icon map.
 
 ## Edge cases
@@ -428,8 +441,8 @@ its title.
   - Enter scores on the Daily Report and check the leaderboard totals, the tiebreak
     order and the drawer.
   - Follow a drawer link to the right date and tab.
-  - Check that the group chips scroll to the right card and highlight while scrolling,
-    at phone width as well.
+  - Check that the group tabs switch the list, keep `?group=` on refresh and month
+    change, and work at phone width.
 
 ## Out of scope
 

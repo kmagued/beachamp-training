@@ -112,6 +112,6 @@ export async function saveKingOfCourtScores(data: {
   }
 
   revalidatePath("/admin/daily-report");
-  revalidatePath("/admin/king-of-court");
+  revalidatePath("/admin/leaderboard");
   return { success: true };
 }

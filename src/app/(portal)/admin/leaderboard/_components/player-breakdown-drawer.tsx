@@ -63,12 +63,15 @@ export function PlayerBreakdownDrawer({
                   href={`/admin/daily-report?date=${r.session_date}&tab=scores`}
                   className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
                 >
-                  <span className="flex-1 min-w-0 truncate text-sm text-slate-700">
-                    {formatDay(r.session_date)} · {formatTime(r.start_time)}
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-slate-800">{formatDay(r.session_date)}</span>
+                    <span className="block text-xs text-slate-400">{formatTime(r.start_time)}</span>
                   </span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{r.points} pts</span>
-                  <span className="w-20 text-right text-xs text-slate-400 tabular-nums">
-                    {ordinal(r.place)} of {r.fieldSize}
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-semibold text-slate-900 tabular-nums">{r.points} pts</span>
+                    <span className="block text-xs text-slate-400 tabular-nums">
+                      {ordinal(r.place)} of {r.fieldSize}
+                    </span>
                   </span>
                   <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
                 </Link>
