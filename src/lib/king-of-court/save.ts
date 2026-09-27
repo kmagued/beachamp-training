@@ -65,3 +65,21 @@ export function checkScoreSave(
   }
   return null;
 }
+
+/**
+ * A Scores card's state once a save returns. The save ran while the page stayed live, so:
+ * - a date change since the click means the result belongs to another page: ignore it;
+ * - the card may be gone (a different weekday has other sessions): ignore it;
+ * - the boxes may have been edited meanwhile: keep them and only record what was stored,
+ *   so the card shows Save again rather than silently reverting the newer typing.
+ */
+export function applySavedScores<T extends { saved: Record<string, number>; inputs: Record<string, string> }>(
+  bySession: Record<string, T>,
+  savedFor: { sessionId: string; date: string },
+  currentDate: string,
+  saved: Record<string, number>
+): Record<string, T> {
+  const card = bySession[savedFor.sessionId];
+  if (savedFor.date !== currentDate || !card) return bySession;
+  return { ...bySession, [savedFor.sessionId]: { ...card, saved } };
+}

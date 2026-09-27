@@ -7,7 +7,7 @@ import { Loader2, Check, Clock, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { saveKingOfCourtScores } from "@/app/_actions/king-of-court";
 import { parsePoints } from "@/lib/king-of-court/points";
-import { buildSavePayload, hasUnsavedChanges } from "@/lib/king-of-court/save";
+import { applySavedScores, buildSavePayload, hasUnsavedChanges } from "@/lib/king-of-court/save";
 import { formatTime } from "@/lib/king-of-court/format";
 
 interface GroupSession {
@@ -52,6 +52,11 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const [, startTransition] = useTransition();
   const boxRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  /** The date on screen now: a save that returns after the date changed must not touch the new page */
+  const dateRef = useRef(date);
+  useEffect(() => {
+    dateRef.current = date;
+  }, [date]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -167,14 +172,23 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
     const payload = buildSavePayload(current.inputs, current.saved);
     if (payload.invalid_player_ids.length > 0) return;
 
+    const savedFor = { sessionId, date };
     setSavingId(sessionId);
     startTransition(async () => {
-      const res = await saveKingOfCourtScores({
-        schedule_session_id: sessionId,
-        session_date: date,
-        scores: payload.scores,
-        cleared_player_ids: payload.cleared_player_ids,
-      });
+      let res: Awaited<ReturnType<typeof saveKingOfCourtScores>>;
+      try {
+        res = await saveKingOfCourtScores({
+          schedule_session_id: sessionId,
+          session_date: date,
+          scores: payload.scores,
+          cleared_player_ids: payload.cleared_player_ids,
+        });
+      } catch {
+        // No connection (common on a phone at the courts): keep the typed scores so Save can be retried
+        setSavingId(null);
+        setToast({ message: "Couldn't reach the server. Your scores are still here, so try Save again.", variant: "error" });
+        return;
+      }
       setSavingId(null);
 
       if ("error" in res) {
@@ -185,11 +199,8 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
       }
 
       const saved = Object.fromEntries(payload.scores.map((sc) => [sc.player_id, sc.points]));
-      setBySession((prev) => ({
-        ...prev,
-        [sessionId]: { ...prev[sessionId], saved, inputs: boxesFor(prev[sessionId].players, saved) },
-      }));
-      setToast({ message: "Scores saved", variant: "success" });
+      setBySession((prev) => applySavedScores(prev, savedFor, dateRef.current, saved));
+      if (savedFor.date === dateRef.current) setToast({ message: "Scores saved", variant: "success" });
     });
   }
 

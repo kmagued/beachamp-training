@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildSavePayload, checkScoreSave, hasUnsavedChanges } from "./save";
+import { applySavedScores, buildSavePayload, checkScoreSave, hasUnsavedChanges } from "./save";
 
 test("buildSavePayload: typed boxes become scores, blank boxes stay out", () => {
   const p = buildSavePayload({ a: "12", b: "0", c: "" }, {});
@@ -77,4 +77,22 @@ test("checkScoreSave: players not marked present reject the save and ask for a r
     checkScoreSave([{ player_id: "b", points: 2 }], [], new Set(["a"])),
     { error: "1 player isn't marked present for this session. Reload and try again.", reload: true }
   );
+});
+
+test("applySavedScores: stores what was saved and keeps the boxes as typed since the click", () => {
+  const before = { s1: { players: ["a", "b"], saved: {}, inputs: { a: "15", b: "9" } } };
+  const after = applySavedScores(before, { sessionId: "s1", date: "2026-09-20" }, "2026-09-20", { a: 12, b: 9 });
+  assert.deepEqual(after.s1.saved, { a: 12, b: 9 });
+  assert.deepEqual(after.s1.inputs, { a: "15", b: "9" }, "a was changed to 15 while saving; it must not snap back to 12");
+  assert.equal(hasUnsavedChanges(after.s1.inputs, after.s1.saved), true);
+});
+
+test("applySavedScores: a save that returns after the date changed leaves the new date alone", () => {
+  const newWeek = { s1: { players: ["a"], saved: {}, inputs: { a: "" } } };
+  assert.equal(applySavedScores(newWeek, { sessionId: "s1", date: "2026-09-20" }, "2026-09-27", { a: 12 }), newWeek);
+});
+
+test("applySavedScores: a save for a card that is no longer shown changes nothing", () => {
+  const other = { s2: { players: ["a"], saved: {}, inputs: { a: "" } } };
+  assert.equal(applySavedScores(other, { sessionId: "s1", date: "2026-09-20" }, "2026-09-20", { a: 12 }), other);
 });
