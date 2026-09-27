@@ -31,3 +31,6 @@ supabase/.temp/
 # db clone tooling — credentials and production dumps
 scripts/db/.env.db
 scripts/db/dumps/
+
+# brainstorming companion mockups
+.superpowers/

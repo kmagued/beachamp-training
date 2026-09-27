@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { deleteExpense } from "@/app/_actions/expenses";
 import { deleteIncome } from "@/app/_actions/income";
-import type { ExpenseRow, CategoryRow, IncomeRow, SortField, SortDir, ExpenseTab, EntryKind } from "./_components/types";
+import type { ExpenseRow, CategoryRow, IncomeRow, MerchOption, SortField, SortDir, ExpenseTab, EntryKind } from "./_components/types";
 import { ExpensesPageSkeleton } from "./_components/skeleton";
 import { ExpensesFilters } from "./_components/filters";
 import { ExpensesTableView } from "./_components/table";
@@ -19,6 +19,7 @@ import { IncomeTableView } from "./_components/income-table";
 import { EntryTypeSwitch } from "./_components/entry-type-switch";
 import { PaymentsView } from "@/app/(portal)/admin/payments/_components/payments-view";
 import { cairoMonthKey } from "@/lib/utils/cairo-time";
+import { sortSizes } from "@/lib/merch/stock";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function AdminExpensesPage() {
@@ -49,6 +50,7 @@ function AdminExpensesContent() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [income, setIncome] = useState<IncomeRow[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<CategoryRow[]>([]);
+  const [merchItems, setMerchItems] = useState<MerchOption[]>([]);
   // Subscription revenue. Confirmed only, bucketed by confirmed_at in Cairo time —
   // the same rule the dashboard uses, so the two pages agree.
   const [paymentIncome, setPaymentIncome] = useState<PaymentIncomeRow[]>([]);
@@ -116,7 +118,7 @@ function AdminExpensesContent() {
   );
 
   const fetchData = useCallback(async () => {
-    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }, { data: paymentData }] = await Promise.all([
+    const [{ data: expenseData }, { data: categoryData }, { data: incomeData }, { data: incomeCategoryData }, { data: paymentData }, { data: merchData }] = await Promise.all([
       supabase
         .from("expenses")
         .select("*, expense_categories(id, name, icon)")
@@ -129,7 +131,7 @@ function AdminExpensesContent() {
         .order("name", { ascending: true }),
       supabase
         .from("income")
-        .select("*, income_categories(id, name, icon)")
+        .select("*, income_categories(id, name, icon), merch_items(id, name, category_id, merch_categories(name), merch_subcategories(name))")
         .eq("is_active", true)
         .order("income_date", { ascending: false })
         .order("created_at", { ascending: false }),
@@ -142,6 +144,11 @@ function AdminExpensesContent() {
         .from("payments")
         .select("id, amount, confirmed_at, subscriptions(packages(name))")
         .eq("status", "confirmed"),
+      supabase
+        .from("merch_items")
+        .select("id, name, category_id, subcategory_id, price, is_active, deleted_at, merch_categories(name), merch_subcategories(name), merch_stock(size, quantity)")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
     ]);
 
     if (expenseData) setExpenses(expenseData as unknown as ExpenseRow[]);
@@ -149,6 +156,22 @@ function AdminExpensesContent() {
     if (incomeData) setIncome(incomeData as unknown as IncomeRow[]);
     if (incomeCategoryData) setIncomeCategories(incomeCategoryData as unknown as CategoryRow[]);
     if (paymentData) setPaymentIncome(paymentData as unknown as PaymentIncomeRow[]);
+    if (merchData) {
+      type MerchRow = Omit<MerchOption, "category_name" | "subcategory_name" | "stock"> & {
+        merch_categories: { name: string } | null;
+        merch_subcategories: { name: string } | null;
+        merch_stock: { size: string; quantity: number }[] | null;
+      };
+      setMerchItems(
+        (merchData as unknown as MerchRow[]).map(({ merch_categories, merch_subcategories, merch_stock, ...m }) => ({
+          ...m,
+          price: Number(m.price),
+          category_name: merch_categories?.name ?? "",
+          subcategory_name: merch_subcategories?.name ?? null,
+          stock: sortSizes(merch_stock ?? []),
+        })),
+      );
+    }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -311,7 +334,9 @@ function AdminExpensesContent() {
       const q = incomeSearch.toLowerCase();
       result = result.filter((i) =>
         (i.description || "").toLowerCase().includes(q) ||
-        (i.notes || "").toLowerCase().includes(q)
+        (i.notes || "").toLowerCase().includes(q) ||
+        (i.merch_items?.name || "").toLowerCase().includes(q) ||
+        (i.merch_items?.merch_subcategories?.name || "").toLowerCase().includes(q)
       );
     }
 
@@ -510,6 +535,11 @@ function AdminExpensesContent() {
                 const rows = filteredIncome.map((i) => ({
                   Date: i.income_date,
                   Category: i.income_categories?.name || "",
+                  "Merch Category": i.merch_items?.merch_categories?.name || "",
+                  "Sub-category": i.merch_items?.merch_subcategories?.name || "",
+                  Item: i.merch_items?.name || "",
+                  Size: i.merch_size || "",
+                  Qty: i.merch_quantity ?? "",
                   Description: i.description || "",
                   "Amount (EGP)": i.amount,
                   Notes: i.notes || "",
@@ -719,11 +749,13 @@ function AdminExpensesContent() {
         onKindChange={setEntryKind}
         expenseCategories={categories}
         incomeCategories={incomeCategories}
+        merchItems={merchItems}
         editingExpense={editingExpense}
         editingIncome={editingIncome}
         onExpenseSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
         onIncomeSuccess={() => { setToast({ message: "Income saved successfully", variant: "success" }); fetchData(); }}
         onCategoriesChange={fetchData}
+        onStockChanged={fetchData}
       />
 
       {/* Category drawer */}

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { parseMerchSaleFields } from "@/lib/merch/income-fields";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -21,6 +22,13 @@ async function getCurrentUserRole() {
   return profile ? { id: profile.id, role: profile.role as string } : null;
 }
 
+/** Merch income moves stock (see the income_merch_stock trigger) */
+function revalidateMerchPages() {
+  revalidatePath("/admin/merch");
+  revalidatePath("/admin/merch/analytics");
+  revalidatePath("/player/merch");
+}
+
 function requireAdmin(user: { role: string } | null) {
   if (!user || user.role !== "admin") {
     return { error: "Unauthorized: admin access required" };
@@ -35,6 +43,9 @@ function parseIncomeForm(formData: FormData) {
   const categoryId = formData.get("category_id") as string;
   if (!categoryId) return { error: "Category is required" };
 
+  const merch = parseMerchSaleFields(formData);
+  if ("error" in merch) return { error: merch.error };
+
   return {
     values: {
       category_id: categoryId,
@@ -42,6 +53,7 @@ function parseIncomeForm(formData: FormData) {
       amount,
       income_date: (formData.get("income_date") as string) || new Date().toISOString().split("T")[0],
       notes: (formData.get("notes") as string)?.trim() || null,
+      ...merch.fields,
     },
   };
 }
@@ -66,10 +78,11 @@ export async function createIncome(formData: FormData) {
     created_by: user!.id,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
+  revalidateMerchPages();
   return { success: true };
 }
 
@@ -86,10 +99,11 @@ export async function updateIncome(id: string, formData: FormData) {
 
   const { error } = await supabase.from("income").update(parsed.values).eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
+  revalidateMerchPages();
   return { success: true };
 }
 
@@ -110,6 +124,7 @@ export async function deleteIncome(id: string) {
 
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
+  revalidateMerchPages();
   return { success: true };
 }
 

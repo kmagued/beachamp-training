@@ -3,12 +3,26 @@ import { Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import type { IncomeRow } from "./types";
+import { merchSaleLine } from "@/lib/merch/income-fields";
 
 interface IncomeTableProps {
   income: IncomeRow[];
   onEdit: (income: IncomeRow) => void;
   onDelete: (id: string) => void;
   grandTotal: number;
+}
+
+/** "Apparel › Hoodie › Beachamp Black Hoodie · L ×3" */
+function merchPath(item: IncomeRow) {
+  const m = item.merch_items;
+  if (!m) return "";
+  return merchSaleLine({
+    categoryName: m.merch_categories?.name,
+    subcategoryName: m.merch_subcategories?.name,
+    itemName: m.name,
+    size: item.merch_size,
+    quantity: item.merch_quantity,
+  });
 }
 
 const thBase = "text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3 border-b border-slate-200";
@@ -38,6 +52,9 @@ export function IncomeTableView({ income, onEdit, onDelete, grandTotal }: Income
                   </td>
                   <td className={cn(tdBase, "text-sm text-slate-700")}>
                     {item.income_categories?.name || "—"}
+                    {item.merch_items && (
+                      <span className="block text-xs text-slate-400">{merchPath(item)}</span>
+                    )}
                   </td>
                   <td className={cn(tdBase, "text-sm text-slate-900 font-medium max-w-[250px] truncate")}>
                     {item.description || "—"}
@@ -101,7 +118,10 @@ export function IncomeTableView({ income, onEdit, onDelete, grandTotal }: Income
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="text-sm font-semibold text-slate-900">{item.description || item.income_categories?.name}</p>
-                <p className="text-xs text-slate-400">{item.income_categories?.name || "—"}</p>
+                <p className="text-xs text-slate-400">
+                  {item.income_categories?.name || "—"}
+                  {item.merch_items && ` · ${merchPath(item)}`}
+                </p>
               </div>
               <p className="text-sm font-semibold text-emerald-600">+{item.amount.toLocaleString()} EGP</p>
             </div>
