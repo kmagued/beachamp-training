@@ -201,13 +201,25 @@ pattern.
     text.
 - Both the Scores tab and the server action use it.
 
+**`save.ts`**
+- `buildSavePayload` turns a card's boxes into scores, cleared players and invalid
+  players.
+- `hasUnsavedChanges` decides whether the card shows Save or the "Saved" badge.
+- `checkScoreSave` is the server's validation.
+
 **`month.ts`**
 - `parseMonthParam(param: string | undefined, fallback: string): string` returns a valid
   `YYYY-MM`, or `fallback` if the parameter isn't one.
 - `monthRange("2026-09")` returns `{ from: "2026-09-01", to: "2026-10-01" }` (end
   exclusive).
 - `shiftMonth("2026-01", -1)` returns `"2025-12"`.
+
+**`format.ts`**
 - `formatMonth("2026-09")` returns `"Sep 2026"`.
+- `formatDay("2026-09-03")` returns `"Thu 3 Sep"`.
+- `formatTime("18:00:00")` returns `"6:00 PM"`.
+- `ordinal(2)` returns `"2nd"`.
+- `joinNames` joins co-winners, for example `"A & B"` or `"A, B & C"`.
 
 **`leaderboard.ts`**
 ```ts
@@ -266,14 +278,18 @@ The action runs these steps in order:
    in `expenses.ts`.
 2. Reject future dates, comparing `session_date` with `cairoToday()`.
 3. Load the session with the admin client. Reject it unless it exists and has
-   `session_type = 'group'`. Take `group_id` from this session row and never from the
-   client.
+   `session_type = 'group'`.
 4. Check every `points` value with `parsePoints` rules. Any value outside 0–999, or
    not a whole number, rejects the whole save.
 5. Load the `attendance` rows with status `present` for this session and date, and
    reject the save if any scored player isn't among them. The message names how many
    players weren't present. The database trigger enforces the same rule, but this check
    gives a readable error.
+   - Each score's `group_id` comes from that player's attendance row, which records the
+     group they attended under. If the attendance row has no `group_id`, the session's
+     is used. It never comes from the client.
+   - Using the attendance row means re-saving an old session after its group was
+     edited can't move points to the new group.
 6. Delete the rows for `cleared_player_ids`, then upsert the scores on
    `player_id,schedule_session_id,session_date`, with `entered_by` set to the caller.
 7. Call `revalidatePath("/admin/daily-report")` and `revalidatePath("/admin/king-of-court")`.
@@ -300,7 +316,8 @@ It loads its data as follows:
   - The rows with `status = 'present'` make up the score list.
 - Existing `king_of_court_scores` for those sessions on that date.
 
-Each session is shown as a card, expanded by default:
+Each session is shown as a card that is always open. Cards list only the present
+players, so they stay short and there's no collapse toggle.
 - **Header:** group name, level badge, time and location. On the right it shows
   "N/M scored" and a Save button, or a "Saved" badge when nothing has changed. This
   matches the Attendance and Coaches tabs.
