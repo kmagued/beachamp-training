@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -32,16 +32,19 @@ import {
   Shirt,
   Tags,
   BarChart3,
+  ChevronRight,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
+import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
 
 type Portal = "player" | "coach" | "admin";
 
-const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string }> = {
-  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
-  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
-  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white" },
+/** foldSections: section headings fold their links away (for portals with long menus) */
+const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string; foldSections: boolean }> = {
+  player: { label: "Player Portal", shortLabel: "PP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white", foldSections: false },
+  coach: { label: "Coach Portal", shortLabel: "CP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white", foldSections: false },
+  admin: { label: "Admin Portal", shortLabel: "AP", avatar: "bg-primary-800", labelColor: "text-primary-800", accentBg: "bg-primary-800", accentText: "text-white", foldSections: true },
 };
 
 const iconMap = {
@@ -142,6 +145,133 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
   const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
 
+  // Fold-away sections: the current page's section opens on arrival; whatever the admin
+  // opens or closes is remembered in this browser
+  const activeSection = sectionOfKey(navItems, activeKey);
+  const sectionsKey = `beachamp:sidebar-sections:${portal}`;
+  const [openSections, setOpenSections] = useState<string[]>(() => (activeSection ? [activeSection] : []));
+  const sectionsRestored = useRef(false);
+
+  useEffect(() => {
+    if (!config.foldSections) return;
+    let saved: string[] | null = null;
+    try {
+      saved = parseOpenSections(localStorage.getItem(sectionsKey));
+    } catch {
+      // Storage blocked (private mode, disabled site data): start from the current section
+    }
+    if (saved) setOpenSections(withSection(saved, activeSection));
+    sectionsRestored.current = true;
+    // Runs once on mount; later visits are handled below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setOpenSections((open) => withSection(open, activeSection));
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (!config.foldSections || !sectionsRestored.current) return;
+    try {
+      localStorage.setItem(sectionsKey, JSON.stringify(openSections));
+    } catch {
+      // Not saved; folding still works for this visit
+    }
+  }, [config.foldSections, sectionsKey, openSections]);
+
+  const desktopLink = (item: NavItem) => {
+    const Icon = iconMap[item.key as keyof typeof iconMap];
+    const isActive = activeKey === item.key;
+    return (
+      <Link
+        key={item.key}
+        href={item.href}
+        title={collapsed ? (item.badge ? `${item.label} (${item.badge.toLowerCase()})` : item.label) : undefined}
+        className={cn(
+          "relative flex items-center rounded-lg text-[13px] font-medium transition-colors",
+          collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+          isActive
+            ? cn(config.accentBg, config.accentText)
+            : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
+        )}
+      >
+        {Icon && <Icon className="w-4 h-4 shrink-0" />}
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {item.badge && !collapsed && <NavBadge label={item.badge} />}
+        {item.badge && collapsed && (
+          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-accent ring-2 ring-white" aria-hidden="true" />
+        )}
+      </Link>
+    );
+  };
+
+  const mobileLink = (item: NavItem) => {
+    const Icon = iconMap[item.key as keyof typeof iconMap];
+    const isActive = activeKey === item.key;
+    return (
+      <Link
+        key={item.key}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
+          isActive
+            ? cn(config.accentBg, config.accentText)
+            : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
+        )}
+      >
+        {Icon && <Icon className="w-[18px] h-[18px]" />}
+        {item.label}
+        {item.badge && <NavBadge label={item.badge} />}
+      </Link>
+    );
+  };
+
+  /** Folded menu: headings are buttons that show or hide their links */
+  const foldedNav = (variant: "desktop" | "mobile") =>
+    groupBySection(navItems).map((group) => {
+      const link = variant === "desktop" ? desktopLink : mobileLink;
+      if (!group.section) {
+        return (
+          <div key={`top-${group.items[0].key}`} className="space-y-1">
+            {group.items.map(link)}
+          </div>
+        );
+      }
+      const section = group.section;
+      const open = openSections.includes(section);
+      const listId = `nav-${variant}-${section.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+      return (
+        <div key={section} className="pt-2">
+          <button
+            type="button"
+            onClick={() => setOpenSections((o) => toggleSection(o, section))}
+            aria-expanded={open}
+            aria-controls={listId}
+            className={cn(
+              "w-full flex items-center justify-between rounded-lg px-3 font-semibold uppercase tracking-wider transition-colors hover:bg-sand/50 hover:text-primary-900",
+              variant === "desktop" ? "py-1.5 text-[10px]" : "py-2.5 text-[11px]",
+              open ? "text-primary-800/70" : "text-primary-700/45",
+            )}
+          >
+            <span>{section}</span>
+            <span className="flex items-center gap-1.5 normal-case tracking-normal">
+              {!open && group.items.some((i) => i.badge) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-label="Has something new" />
+              )}
+              {!open && <span className="font-medium text-primary-700/35">{group.items.length}</span>}
+              <ChevronRight className={cn("w-3.5 h-3.5 transition-transform duration-150", open && "rotate-90")} aria-hidden="true" />
+            </span>
+          </button>
+          {open && (
+            <div id={listId} className="space-y-1 mt-0.5">
+              {group.items.map(link)}
+            </div>
+          )}
+        </div>
+      );
+    });
+
   return (
     <div className="min-h-screen flex bg-sand/10">
       {/* Desktop sidebar */}
@@ -172,40 +302,23 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 px-2 pt-2 overflow-y-auto overflow-x-hidden space-y-1">
-          {navItems.map((item, index) => {
-            const Icon = iconMap[item.key as keyof typeof iconMap];
-            const isActive = activeKey === item.key;
-            const prevItem = index > 0 ? navItems[index - 1] : null;
-            const showSection = item.section && item.section !== prevItem?.section;
-            return (
-              <div key={item.key}>
-                {showSection && !collapsed && (
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
-                    {item.section}
-                  </p>
-                )}
-                {showSection && collapsed && <div className="h-3" />}
-                <Link
-                  href={item.href}
-                  title={collapsed ? (item.badge ? `${item.label} (${item.badge.toLowerCase()})` : item.label) : undefined}
-                  className={cn(
-                    "relative flex items-center rounded-lg text-[13px] font-medium transition-colors",
-                    collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                    isActive
-                      ? cn(config.accentBg, config.accentText)
-                      : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
-                  )}
-                >
-                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                  {item.badge && !collapsed && <NavBadge label={item.badge} />}
-                  {item.badge && collapsed && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-accent ring-2 ring-white" aria-hidden="true" />
-                  )}
-                </Link>
-              </div>
-            );
-          })}
+          {config.foldSections && !collapsed
+            ? foldedNav("desktop")
+            : navItems.map((item, index) => {
+                const prevItem = index > 0 ? navItems[index - 1] : null;
+                const showSection = item.section && item.section !== prevItem?.section;
+                return (
+                  <div key={item.key}>
+                    {showSection && !collapsed && (
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
+                        {item.section}
+                      </p>
+                    )}
+                    {showSection && collapsed && <div className="h-3" />}
+                    {desktopLink(item)}
+                  </div>
+                );
+              })}
         </nav>
 
         {/* Dev portal switcher */}
@@ -323,35 +436,22 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
           </p>
         </div>
         <nav className="flex-1 px-3 pt-2 overflow-y-auto">
-          {navItems.map((item, index) => {
-            const Icon = iconMap[item.key as keyof typeof iconMap];
-            const isActive = activeKey === item.key;
-            const prevItem = index > 0 ? navItems[index - 1] : null;
-            const showSection = item.section && item.section !== prevItem?.section;
-            return (
-              <div key={item.key}>
-                {showSection && (
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
-                    {item.section}
-                  </p>
-                )}
-                <Link
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5",
-                    isActive
-                      ? cn(config.accentBg, config.accentText)
-                      : "text-primary-700/70 hover:text-primary-900 hover:bg-sand/50",
-                  )}
-                >
-                  {Icon && <Icon className="w-[18px] h-[18px]" />}
-                  {item.label}
-                  {item.badge && <NavBadge label={item.badge} />}
-                </Link>
-              </div>
-            );
-          })}
+          {config.foldSections
+            ? foldedNav("mobile")
+            : navItems.map((item, index) => {
+                const prevItem = index > 0 ? navItems[index - 1] : null;
+                const showSection = item.section && item.section !== prevItem?.section;
+                return (
+                  <div key={item.key}>
+                    {showSection && (
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
+                        {item.section}
+                      </p>
+                    )}
+                    {mobileLink(item)}
+                  </div>
+                );
+              })}
         </nav>
 
         {process.env.NODE_ENV === "development" && (
