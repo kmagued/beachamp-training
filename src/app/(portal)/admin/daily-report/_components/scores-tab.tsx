@@ -17,7 +17,7 @@ interface GroupSession {
   location: string | null;
   end_date: string | null;
   created_at: string;
-  groups: { name: string; level: string | null } | null;
+  groups: { name: string; level: string | null; in_leaderboard: boolean } | null;
 }
 
 interface PresentPlayer {
@@ -67,7 +67,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
 
       const { data: sessionData } = await supabase
         .from("schedule_sessions")
-        .select("id, start_time, end_time, location, end_date, created_at, groups(name, level)")
+        .select("id, start_time, end_time, location, end_date, created_at, groups(name, level, in_leaderboard)")
         .eq("day_of_week", dayOfWeek)
         .eq("is_active", true)
         .eq("session_type", "group")
@@ -76,8 +76,10 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
       if (cancelled) return;
 
       // Same rule as the Attendance and Coaches tabs: a recurring session runs from the
-      // day it was created until its end_date
+      // day it was created until its end_date. Groups off the leaderboard (e.g. Private
+      // Session) don't play King of Court, so they get no card.
       const sessionRows = ((sessionData || []) as unknown as GroupSession[]).filter((s) => {
+        if (s.groups?.in_leaderboard === false) return false;
         if (s.end_date && s.end_date < date) return false;
         if (s.created_at.slice(0, 10) > date) return false;
         return true;

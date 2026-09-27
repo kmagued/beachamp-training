@@ -170,4 +170,12 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- ── 10. Groups are on the leaderboard by default; "Private Session" is not ─
+DO $$ BEGIN
+  ASSERT (SELECT in_leaderboard FROM groups WHERE id = current_setting('kt.group')::uuid),
+    '10: a new group should be on the leaderboard by default';
+  ASSERT NOT EXISTS (SELECT 1 FROM groups WHERE lower(btrim(name)) = 'private session' AND in_leaderboard),
+    '10: the Private Session group must be off the leaderboard';
+END $$;
+
 ROLLBACK;

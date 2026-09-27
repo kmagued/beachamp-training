@@ -62,11 +62,12 @@ export default async function LeaderboardPage({
     if (rows.length < PAGE) break;
   }
 
-  // Active groups, plus any inactive group that has scores this month
+  // Groups on the leaderboard: the active ones, plus any inactive one with scores this month
   const scoredGroupIds = new Set(scores.map((s) => s.group_id));
   const { data: groupData } = await supabase
     .from("groups")
-    .select("id, name, level, is_active")
+    .select("id, name, level, is_active, in_leaderboard")
+    .eq("in_leaderboard", true)
     .order("name");
   const groups: LeaderboardGroup[] = ((groupData || []) as (LeaderboardGroup & { is_active: boolean })[])
     .filter((g) => g.is_active || scoredGroupIds.has(g.id))

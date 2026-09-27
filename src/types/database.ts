@@ -356,6 +356,7 @@ export interface Database {
           level: GroupLevel;
           max_players: number;
           is_active: boolean;
+          in_leaderboard: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -366,6 +367,7 @@ export interface Database {
           level: GroupLevel;
           max_players: number;
           is_active?: boolean;
+          in_leaderboard?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -376,6 +378,7 @@ export interface Database {
           level?: GroupLevel;
           max_players?: number;
           is_active?: boolean;
+          in_leaderboard?: boolean;
           created_at?: string;
           updated_at?: string;
         };

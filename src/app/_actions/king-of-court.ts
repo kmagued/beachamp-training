@@ -59,11 +59,14 @@ export async function saveKingOfCourtScores(data: {
 
   const { data: session } = await admin
     .from("schedule_sessions")
-    .select("id, group_id, session_type")
+    .select("id, group_id, session_type, groups(in_leaderboard)")
     .eq("id", data.schedule_session_id)
     .maybeSingle();
   if (!session || session.session_type !== "group" || !session.group_id) {
     return { error: "Scores can only be logged for group sessions" };
+  }
+  if (session.groups?.in_leaderboard === false) {
+    return { error: "This group isn't on the leaderboard, so it has no scores" };
   }
 
   const { data: presentRows, error: attErr } = await admin
