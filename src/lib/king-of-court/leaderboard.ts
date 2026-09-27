@@ -12,6 +12,11 @@ export interface ScoreRow {
   points: number;
 }
 
+export interface PlayerName {
+  first_name: string;
+  last_name: string;
+}
+
 export interface Standing {
   player_id: string;
   total: number;

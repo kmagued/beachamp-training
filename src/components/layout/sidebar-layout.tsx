@@ -80,6 +80,7 @@ const playerNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
   { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
+  { key: "leaderboard", label: "Leaderboard", href: "/player/leaderboard", section: "Competitions", badge: "New" },
   { key: "merch", label: "Products", href: "/player/merch", section: "Merch", badge: "New" },
   { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
   { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },
@@ -90,6 +91,7 @@ const coachNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
   { key: "schedule", label: "Schedule", href: "/coach/schedule" },
   { key: "my-groups", label: "My Groups", href: "/coach/groups" },
+  { key: "leaderboard", label: "Leaderboard", href: "/coach/leaderboard" },
   { key: "feedback", label: "Feedback", href: "/coach/feedback" },
 ];
 

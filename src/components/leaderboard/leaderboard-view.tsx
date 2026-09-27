@@ -3,23 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Crown, Trophy } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Badge, Card, EmptyState } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import { buildStandings, groupScores, type ScoreRow, type Standing } from "@/lib/king-of-court/leaderboard";
+import { openingGroup } from "@/lib/king-of-court/access";
+import { buildStandings, groupScores, type Standing } from "@/lib/king-of-court/leaderboard";
+import type { LeaderboardData } from "@/lib/king-of-court/load";
 import { shiftMonth } from "@/lib/king-of-court/month";
 import { formatMonth, joinNames } from "@/lib/king-of-court/format";
 import { PlayerBreakdownDrawer } from "./player-breakdown-drawer";
-
-export interface LeaderboardGroup {
-  id: string;
-  name: string;
-  level: string | null;
-}
-
-export interface PlayerName {
-  first_name: string;
-  last_name: string;
-}
 
 /** Gold, silver and bronze for the top three; everyone else gets a plain badge */
 const PODIUM_BADGE: Record<number, string> = {
@@ -30,19 +21,23 @@ const PODIUM_BADGE: Record<number, string> = {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-export function LeaderboardClient({
-  month,
-  currentMonth,
-  groups,
-  scores,
-  players,
+/** The King of Court leaderboard, shared by the admin, coach and player portals */
+export function LeaderboardView({
+  data,
+  linkToDailyReport = false,
+  viewerId,
+  noGroups,
 }: {
-  month: string;
-  currentMonth: string;
-  groups: LeaderboardGroup[];
-  scores: ScoreRow[];
-  players: Record<string, PlayerName>;
+  /** Already limited to the groups this viewer may see */
+  data: LeaderboardData;
+  /** Admins: the breakdown's sessions open that day's Daily Report, where scores are fixed */
+  linkToDailyReport?: boolean;
+  /** Players: their own row is marked "You" */
+  viewerId?: string;
+  /** Shown when the viewer has no group on the leaderboard */
+  noGroups: { title: string; description: string };
 }) {
+  const { month, currentMonth, groups, scores, players } = data;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -66,14 +61,17 @@ export function LeaderboardClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, rowsByGroup, players]);
 
-  // Open the group named in the URL, else the first one with scores this month
-  const [activeGroup, setActiveGroup] = useState<string | null>(() => {
-    const fromUrl = searchParams.get("group");
-    if (groups.some((g) => g.id === fromUrl)) return fromUrl;
-    return (groups.find((g) => rowsByGroup.has(g.id)) ?? groups[0])?.id ?? null;
-  });
+  const [requestedGroup, setRequestedGroup] = useState<string | null>(() => searchParams.get("group"));
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // The asked-for tab if this month shows it, else the first group with scores. Re-derived
+  // on every render so a month without that group falls back instead of showing nothing.
+  const activeGroup = openingGroup(
+    groups.map((g) => g.id),
+    new Set(rowsByGroup.keys()),
+    requestedGroup
+  );
 
   const tabBarRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -88,7 +86,7 @@ export function LeaderboardClient({
   }
 
   function openGroup(groupId: string) {
-    setActiveGroup(groupId);
+    setRequestedGroup(groupId);
     setDrawerOpen(false);
     // History API: the open tab survives a refresh without refetching the month
     const params = new URLSearchParams(window.location.search);
@@ -175,18 +173,18 @@ export function LeaderboardClient({
 
       {!group ? (
         <Card>
-          <EmptyState
-            icon={<Trophy className="w-10 h-10" />}
-            title="No groups yet"
-            description="Leaderboards appear here once groups exist and scores are logged from the Daily Report."
-          />
+          <EmptyState icon={<Trophy className="w-10 h-10" />} title={noGroups.title} description={noGroups.description} />
         </Card>
       ) : standings.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Trophy className="w-10 h-10" />}
             title="No scores logged this month"
-            description={`Scores for ${group.name} are entered on the Daily Report's Scores tab.`}
+            description={
+              linkToDailyReport
+                ? `Scores for ${group.name} are entered on the Daily Report's Scores tab.`
+                : "Points show up here once King of Court games are logged."
+            }
           />
         </Card>
       ) : (
@@ -218,37 +216,46 @@ export function LeaderboardClient({
               <span className="pr-7">Points</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {standings.map((s) => (
-                <button
-                  key={s.player_id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPlayer(s.player_id);
-                    setDrawerOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left hover:bg-slate-50 transition-colors"
-                >
-                  <span
+              {standings.map((s) => {
+                const isViewer = s.player_id === viewerId;
+                return (
+                  <button
+                    key={s.player_id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPlayer(s.player_id);
+                      setDrawerOpen(true);
+                    }}
                     className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold tabular-nums shrink-0",
-                      (s.total > 0 && PODIUM_BADGE[s.rank]) || "bg-slate-100 text-slate-500"
+                      "w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left transition-colors",
+                      isViewer ? "bg-primary-50/60 hover:bg-primary-50" : "hover:bg-slate-50"
                     )}
                   >
-                    {s.rank}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block truncate text-sm font-medium text-slate-900">{nameOf(s.player_id)}</span>
-                    <span className="block text-xs text-slate-400">
-                      {plural(s.sessions, "session")} · best {s.best}
+                    <span
+                      className={cn(
+                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold tabular-nums shrink-0",
+                        (s.total > 0 && PODIUM_BADGE[s.rank]) || "bg-slate-100 text-slate-500"
+                      )}
+                    >
+                      {s.rank}
                     </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="text-base font-semibold text-slate-900 tabular-nums">{s.total}</span>{" "}
-                    <span className="text-xs text-slate-400">pts</span>
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                </button>
-              ))}
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate text-sm font-medium text-slate-900">{nameOf(s.player_id)}</span>
+                        {isViewer && <Badge variant="info" className="shrink-0">You</Badge>}
+                      </span>
+                      <span className="block text-xs text-slate-400">
+                        {plural(s.sessions, "session")} · best {s.best}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="text-base font-semibold text-slate-900 tabular-nums">{s.total}</span>{" "}
+                      <span className="text-xs text-slate-400">pts</span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                  </button>
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -262,6 +269,7 @@ export function LeaderboardClient({
         month={month}
         standing={selectedStanding}
         scores={groupRows}
+        linkToDailyReport={linkToDailyReport}
       />
     </div>
   );

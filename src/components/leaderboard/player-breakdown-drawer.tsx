@@ -15,6 +15,7 @@ export function PlayerBreakdownDrawer({
   month,
   standing,
   scores,
+  linkToDailyReport,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +26,8 @@ export function PlayerBreakdownDrawer({
   standing: Standing | undefined;
   /** The group's rows for the month: a place in a session needs everyone's points */
   scores: ScoreRow[];
+  /** Admins: each session opens that day's Daily Report on Scores, where a wrong score is fixed */
+  linkToDailyReport: boolean;
 }) {
   const rows = standing ? playerBreakdown(scores, standing.player_id) : [];
   const stats: [string, string | number][] = standing
@@ -56,26 +59,37 @@ export function PlayerBreakdownDrawer({
           <div>
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Sessions</p>
             <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
-              {rows.map((r) => (
-                // Opens that day's Daily Report on Scores, where a wrong score is fixed
-                <Link
-                  key={`${r.schedule_session_id}|${r.session_date}`}
-                  href={`/admin/daily-report?date=${r.session_date}&tab=scores`}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
-                >
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-slate-800">{formatDay(r.session_date)}</span>
-                    <span className="block text-xs text-slate-400">{formatTime(r.start_time)}</span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-sm font-semibold text-slate-900 tabular-nums">{r.points} pts</span>
-                    <span className="block text-xs text-slate-400 tabular-nums">
-                      {ordinal(r.place)} of {r.fieldSize}
+              {rows.map((r) => {
+                const content = (
+                  <>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800">{formatDay(r.session_date)}</span>
+                      <span className="block text-xs text-slate-400">{formatTime(r.start_time)}</span>
                     </span>
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                </Link>
-              ))}
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-semibold text-slate-900 tabular-nums">{r.points} pts</span>
+                      <span className="block text-xs text-slate-400 tabular-nums">
+                        {ordinal(r.place)} of {r.fieldSize}
+                      </span>
+                    </span>
+                  </>
+                );
+                const key = `${r.schedule_session_id}|${r.session_date}`;
+                return linkToDailyReport ? (
+                  <Link
+                    key={key}
+                    href={`/admin/daily-report?date=${r.session_date}&tab=scores`}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
+                  >
+                    {content}
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                  </Link>
+                ) : (
+                  <div key={key} className="flex items-center gap-3 px-3 py-2.5">
+                    {content}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

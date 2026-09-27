@@ -17,12 +17,25 @@ group's winner of the month.
   group for the chosen month. Tapping a player opens a per-session breakdown. *(Revised
   2026-09-28 at the user's request: it was Training → King of Court, with stacked group
   cards and a pinned chip bar.)*
-- Admin-only throughout. Coaches and players see nothing new.
+- Only admins enter scores.
+- Coaches see the Leaderboard for the groups they coach, and players for the group(s) they
+  belong to, in their own portals. *(Revised 2026-09-28 at the user's request: this was
+  admin-only.)*
 
 ## Decisions (settled during brainstorming)
 
-1. **Only admins can see and enter scores.** There is no coach or player view, so RLS
-   is admin-only.
+1. **Only admins enter scores; coaches and players can view the Leaderboard.** RLS on
+   the scores table stays admin-only. The Coach and Player portals each get a Leaderboard
+   page that loads through `src/lib/king-of-court/load.ts` with the service role, limited
+   on the server to the viewer's groups.
+   - **Coaches:** active `coach_groups`.
+   - **Players:** active `group_players`.
+   - Groups with `in_leaderboard` off are hidden even from members.
+   - Everyone can open any listed player's breakdown. Only admins' breakdowns link to the
+     Daily Report.
+   - Players see their own row marked "You".
+
+   This revises the original admin-only decision, at the user's request.
 2. **The score is points per player:** a whole number from 0 to 999 for each present
    player in a session.
    - **Blank** means the player didn't take part in the game, and no row is stored.
