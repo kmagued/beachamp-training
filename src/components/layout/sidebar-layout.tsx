@@ -33,6 +33,7 @@ import {
   Tags,
   BarChart3,
   ChevronRight,
+  Trophy,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -69,6 +70,7 @@ const iconMap = {
   merch: Shirt,
   "merch-categories": Tags,
   "merch-analytics": BarChart3,
+  "king-of-court": Trophy,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -105,6 +107,7 @@ const adminNav: NavItem[] = [
   { key: "schedule", label: "Schedule", href: "/admin/schedule", section: "Training" },
   { key: "schedule-photos", label: "Schedule Photos", href: "/admin/schedule-photos", section: "Training" },
   { key: "daily-report", label: "Daily Report", href: "/admin/daily-report", section: "Training" },
+  { key: "king-of-court", label: "King of Court", href: "/admin/king-of-court", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
   { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
