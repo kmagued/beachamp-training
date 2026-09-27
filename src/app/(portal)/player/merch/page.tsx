@@ -31,11 +31,11 @@ export default async function PlayerMerchPage() {
   const availability = availabilityByItem(availabilityRows || []);
   const items = ((rows || []) as MerchItemRow[]).map((r) => toMerchCatalogItem(r, availability, publicUrl));
 
-  // Only categories that have something to show
-  const withItems = new Set(items.map((i) => i.category_id));
-  const categories = sortCategories((categoryRows || []) as MerchCategory[])
-    .filter((c) => withItems.has(c.id))
-    .map((c) => ({ id: c.id, name: c.name }));
+  const categories = sortCategories((categoryRows || []) as MerchCategory[]).map((c) => ({
+    id: c.id,
+    name: c.name,
+    created_at: c.created_at,
+  }));
 
   return <MerchCatalogClient items={items} categories={categories} />;
 }

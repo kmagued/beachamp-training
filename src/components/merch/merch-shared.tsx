@@ -29,16 +29,19 @@ export function MerchThumb({
 }
 
 /** Sizes as players see them: sold-out sizes are crossed out, counts are never shown */
-export function MerchSizes({ sizes }: { sizes: MerchCatalogSize[] }) {
+export function MerchSizes({ sizes, large = false }: { sizes: MerchCatalogSize[]; large?: boolean }) {
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className={cn("flex flex-wrap", large ? "gap-2" : "gap-1")}>
       {sizes.map((s) => (
         <span
           key={s.size}
           aria-label={s.in_stock ? s.size : `${s.size}, sold out`}
           className={cn(
-            "text-[11px] font-semibold rounded px-1.5 py-0.5",
-            s.in_stock ? "text-slate-600 bg-slate-100" : "text-slate-300 bg-slate-50 line-through",
+            "inline-flex items-center justify-center border font-bold",
+            large ? "h-9 min-w-[44px] px-3 rounded-lg text-sm" : "h-5 min-w-[22px] px-1.5 rounded-md text-[10px]",
+            s.in_stock
+              ? "border-primary-100 bg-white text-primary-700"
+              : "border-dashed border-slate-200 bg-transparent text-slate-300 line-through",
           )}
         >
           {s.size}
