@@ -98,20 +98,22 @@ export function ProductsClient({
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Products</h1>
           <p className="text-slate-500 text-sm">Your merch catalog, stock and what players can see</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="px-4" onClick={() => openSale(null)} disabled={items.length === 0}>
-            <span className="flex items-center gap-1.5">
-              <ShoppingBag className="w-4 h-4" />
-              Record sale
-            </span>
-          </Button>
-          <Button size="sm" className="px-4" onClick={() => openDrawer("create", null)}>
-            <span className="flex items-center gap-1.5">
-              <Plus className="w-4 h-4" />
-              New product
-            </span>
-          </Button>
-        </div>
+        {items.length > 0 && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="px-4" onClick={() => openSale(null)}>
+              <span className="flex items-center gap-1.5">
+                <ShoppingBag className="w-4 h-4" />
+                Record sale
+              </span>
+            </Button>
+            <Button size="sm" className="px-4" onClick={() => openDrawer("create", null)}>
+              <span className="flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                New product
+              </span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {items.length === 0 ? (

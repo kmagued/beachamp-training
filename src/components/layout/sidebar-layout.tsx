@@ -68,13 +68,14 @@ const iconMap = {
   "merch-analytics": BarChart3,
 } as const;
 
-type NavItem = { key: string; label: string; href: string; section?: string };
+/** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
+type NavItem = { key: string; label: string; href: string; section?: string; badge?: string };
 
 const playerNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
   { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
-  { key: "merch", label: "Products", href: "/player/merch", section: "Merch" },
+  { key: "merch", label: "Products", href: "/player/merch", section: "Merch", badge: "New" },
   { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
   { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },
   { key: "profile", label: "Profile", href: "/player/profile", section: "Account" },
@@ -107,6 +108,14 @@ const adminNav: NavItem[] = [
   { key: "whatsapp-templates", label: "WhatsApp Templates", href: "/admin/whatsapp-templates", section: "Messaging" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
+
+function NavBadge({ label }: { label: string }) {
+  return (
+    <span className="ml-auto shrink-0 rounded-full bg-accent px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-primary-900">
+      {label}
+    </span>
+  );
+}
 
 interface SidebarLayoutProps {
   portal: Portal;
@@ -178,9 +187,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                 {showSection && collapsed && <div className="h-3" />}
                 <Link
                   href={item.href}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? (item.badge ? `${item.label} (${item.badge.toLowerCase()})` : item.label) : undefined}
                   className={cn(
-                    "flex items-center rounded-lg text-[13px] font-medium transition-colors",
+                    "relative flex items-center rounded-lg text-[13px] font-medium transition-colors",
                     collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
                     isActive
                       ? cn(config.accentBg, config.accentText)
@@ -189,6 +198,10 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                 >
                   {Icon && <Icon className="w-4 h-4 shrink-0" />}
                   {!collapsed && <span className="truncate">{item.label}</span>}
+                  {item.badge && !collapsed && <NavBadge label={item.badge} />}
+                  {item.badge && collapsed && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-accent ring-2 ring-white" aria-hidden="true" />
+                  )}
                 </Link>
               </div>
             );
@@ -334,6 +347,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                 >
                   {Icon && <Icon className="w-[18px] h-[18px]" />}
                   {item.label}
+                  {item.badge && <NavBadge label={item.badge} />}
                 </Link>
               </div>
             );
