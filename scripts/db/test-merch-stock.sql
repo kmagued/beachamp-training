@@ -216,5 +216,49 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- ── 17. As an admin under RLS (how every real request runs) ─────────────
+-- Cases 1-15 run as the table owner, which skips RLS; this repeats the core flow as
+-- `authenticated` with admin claims, through the admin policies.
+SELECT set_config('request.jwt.claims',
+  json_build_object('sub', current_setting('mt.admin'), 'role', 'authenticated')::text, true);
+SET LOCAL ROLE authenticated;
+DO $$
+DECLARE
+  sale UUID;
+  res JSONB;
+  m INTEGER;
+BEGIN
+  SELECT quantity INTO m FROM merch_stock WHERE item_id = current_setting('mt.item')::uuid AND size = 'M';
+  ASSERT m = 7, format('17: admin should read M=7, got %s', m);
+
+  INSERT INTO income (category_id, amount, income_date, created_by, merch_item_id, merch_size, merch_quantity)
+  VALUES (current_setting('mt.income_cat')::uuid, 600, CURRENT_DATE, current_setting('mt.admin')::uuid,
+          current_setting('mt.item')::uuid, 'M', 1)
+  RETURNING id INTO sale;
+  SELECT quantity INTO m FROM merch_stock WHERE item_id = current_setting('mt.item')::uuid AND size = 'M';
+  ASSERT m = 6, format('17: an admin sale should take M to 6, got %s', m);
+
+  PERFORM merch_restock(current_setting('mt.item')::uuid, '{"M": 2}');
+  SELECT quantity INTO m FROM merch_stock WHERE item_id = current_setting('mt.item')::uuid AND size = 'M';
+  ASSERT m = 8, format('17: an admin restock should take M to 8, got %s', m);
+
+  res := merch_recount(current_setting('mt.item')::uuid, '[{"size": "M", "expected": 8, "counted": 5}]');
+  SELECT quantity INTO m FROM merch_stock WHERE item_id = current_setting('mt.item')::uuid AND size = 'M';
+  ASSERT (res->>'ok')::boolean AND m = 5, format('17: an admin recount should set M to 5, got %s (%s)', m, res);
+
+  UPDATE income SET is_active = FALSE WHERE id = sale;
+  SELECT quantity INTO m FROM merch_stock WHERE item_id = current_setting('mt.item')::uuid AND size = 'M';
+  ASSERT m = 6, format('17: deleting the admin sale should give M back (6), got %s', m);
+
+  BEGIN
+    INSERT INTO income (category_id, amount, income_date, created_by, merch_item_id, merch_size, merch_quantity)
+    VALUES (current_setting('mt.income_cat')::uuid, 600, CURRENT_DATE, current_setting('mt.admin')::uuid,
+            current_setting('mt.item')::uuid, 'M', 99);
+    RAISE EXCEPTION '17: an admin oversell should have failed';
+  EXCEPTION WHEN SQLSTATE 'MS001' THEN NULL;
+  END;
+END $$;
+RESET ROLE;
+
 ROLLBACK;
 \echo 'merch stock tests: all passed (changes rolled back)'

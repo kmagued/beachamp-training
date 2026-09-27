@@ -7,6 +7,8 @@ import {
   mergeRecountInput,
   parseCount,
   recountChanges,
+  isStockRefusal,
+  saleLimitError,
   restockTotal,
   sortSizes,
   stockStatus,
@@ -124,4 +126,28 @@ test("mergeRecountInput: after a stale recount, edited rows keep what was typed 
     { size: "L", quantity: 7 },
   ];
   assert.deepEqual(mergeRecountInput(hoodie, typed, latest), { S: "3", M: "0", L: "6" });
+});
+
+test("saleLimitError: a new sale can take up to what's in stock for its size", () => {
+  assert.equal(saleLimitError(hoodie, "L", 7, null), null);
+  assert.match(saleLimitError(hoodie, "L", 8, null)!, /7/);
+});
+
+test("saleLimitError: an edit can use the sale's own units on top of the stock", () => {
+  assert.equal(saleLimitError(hoodie, "L", 9, { size: "L", quantity: 2 }), null);
+  assert.match(saleLimitError(hoodie, "L", 10, { size: "L", quantity: 2 })!, /9/);
+});
+
+test("saleLimitError: an unchanged sale saves even after its size was removed from the product", () => {
+  // Only the amount, date or notes changed: the stock trigger leaves stock alone
+  assert.equal(saleLimitError(hoodie, "XXL", 2, { size: "XXL", quantity: 2 }), null);
+  // Changing it would take units from a size that no longer exists
+  assert.ok(saleLimitError(hoodie, "XXL", 1, { size: "XXL", quantity: 2 }));
+});
+
+test("isStockRefusal recognises the stock trigger's refusals only", () => {
+  assert.equal(isStockRefusal("MS001"), true);
+  assert.equal(isStockRefusal("MS002"), true);
+  assert.equal(isStockRefusal("23505"), false);
+  assert.equal(isStockRefusal(undefined), false);
 });

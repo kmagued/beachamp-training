@@ -5,7 +5,7 @@ import { Loader2, Minus, Plus, Search } from "lucide-react";
 import { Badge, Button, DatePicker, Drawer, Input, Label } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { merchTypeLabel, type MerchItemView } from "@/lib/config/merch";
-import { maxSellable, stockSummary } from "@/lib/merch/stock";
+import { isStockRefusal, maxSellable, stockSummary } from "@/lib/merch/stock";
 import { cairoToday } from "@/lib/utils/cairo-time";
 import { MerchThumb } from "@/components/merch/merch-shared";
 import { recordMerchSale } from "../actions";
@@ -90,9 +90,9 @@ export function SaleDrawer({
         date,
         note,
       });
-      if (!("success" in res)) {
+      if ("error" in res) {
         setError(res.error);
-        if ("code" in res && (res.code === "MS001" || res.code === "MS002")) onStale();
+        if (isStockRefusal(res.code)) onStale();
         return;
       }
       const left = res.remaining != null ? ` · ${res.remaining} ${sold.size} left` : "";

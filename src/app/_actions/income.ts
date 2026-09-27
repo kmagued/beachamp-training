@@ -78,7 +78,7 @@ export async function createIncome(formData: FormData) {
     created_by: user!.id,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
@@ -99,7 +99,7 @@ export async function updateIncome(id: string, formData: FormData) {
 
   const { error } = await supabase.from("income").update(parsed.values).eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");

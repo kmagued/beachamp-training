@@ -755,6 +755,7 @@ function AdminExpensesContent() {
         onExpenseSuccess={() => { setToast({ message: "Expense saved successfully", variant: "success" }); fetchData(); }}
         onIncomeSuccess={() => { setToast({ message: "Income saved successfully", variant: "success" }); fetchData(); }}
         onCategoriesChange={fetchData}
+        onStockChanged={fetchData}
       />
 
       {/* Category drawer */}

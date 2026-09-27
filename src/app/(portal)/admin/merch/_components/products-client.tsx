@@ -254,6 +254,7 @@ export function ProductsClient({
             setStockOpen(false);
             router.refresh();
           }}
+          onStale={() => router.refresh()}
         />
       )}
     </div>

@@ -19,6 +19,8 @@ interface EntryDrawerProps {
   onIncomeSuccess: () => void;
   /** Refetch categories after one is created inline (no toast) */
   onCategoriesChange: () => void;
+  /** Refetch after the stock trigger refused a merch sale */
+  onStockChanged?: () => void;
 }
 
 /**
@@ -38,6 +40,7 @@ export function EntryDrawer({
   onExpenseSuccess,
   onIncomeSuccess,
   onCategoriesChange,
+  onStockChanged,
 }: EntryDrawerProps) {
   const editing = kind === "expense" ? !!editingExpense : !!editingIncome;
   const noun = kind === "expense" ? "Expense" : "Income";
@@ -64,6 +67,7 @@ export function EntryDrawer({
             editingIncome={editingIncome}
             onSuccess={onIncomeSuccess}
             onCategoriesChange={onCategoriesChange}
+            onStockChanged={onStockChanged}
           />
         )}
       </div>

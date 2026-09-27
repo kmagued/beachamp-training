@@ -4,7 +4,7 @@ import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { createIncome, updateIncome, createIncomeCategory } from "@/app/_actions/income";
 import type { IncomeRow, CategoryRow, MerchOption } from "./types";
-import { maxSellable } from "@/lib/merch/stock";
+import { isStockRefusal, maxSellable, saleLimitError } from "@/lib/merch/stock";
 import { cn } from "@/lib/utils/cn";
 
 /** Sub-category select value for catalog items saved before sub-categories existed */
@@ -21,10 +21,12 @@ export interface IncomeFormProps {
   onSuccess: () => void;
   /** Refetch categories after one is created inline (no toast) */
   onCategoriesChange: () => void;
+  /** Refetch after the stock trigger refused a sale, so the counts shown are current */
+  onStockChanged?: () => void;
 }
 
 /** Income form body — rendered inside a Drawer by IncomeDrawer or EntryDrawer */
-export function IncomeForm({ open, onClose, categories, merchItems, editingIncome, onSuccess, onCategoriesChange }: IncomeFormProps) {
+export function IncomeForm({ open, onClose, categories, merchItems, editingIncome, onSuccess, onCategoriesChange, onStockChanged }: IncomeFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -75,6 +77,8 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
       ? { size: editingIncome.merch_size, quantity: editingIncome.merch_quantity ?? 0 }
       : null;
   const sizeMax = (size: string) => (selectedItem ? maxSellable(selectedItem.stock, size, ownSale) : 0);
+  // The edited sale's size was removed from the product since: it can only be saved unchanged
+  const ownSizeGone = !!ownSale && !!selectedItem && !selectedItem.stock.some((s) => s.size === ownSale.size);
 
   // Reset form when opening/editing
   useEffect(() => {
@@ -116,8 +120,9 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
     const formData = new FormData();
     formData.set("category_id", categoryId);
     const linkItem = isMerchCategory && !!merchItemId;
-    if (linkItem && merchSize && Number(quantity) > sizeMax(merchSize)) {
-      setError(`Only ${sizeMax(merchSize)} × ${merchSize} available`);
+    const overStock = linkItem && merchSize ? saleLimitError(selectedItem?.stock ?? [], merchSize, Number(quantity), ownSale) : null;
+    if (overStock) {
+      setError(overStock);
       return;
     }
     formData.set("merch_item_id", linkItem ? merchItemId : "");
@@ -135,6 +140,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
 
       if ("error" in res) {
         setError(res.error ?? "Failed to save income");
+        if ("code" in res && isStockRefusal(res.code)) onStockChanged?.();
       } else {
         onSuccess();
         onClose();
@@ -323,8 +329,28 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
                     </button>
                   );
                 })}
+                {ownSale && ownSizeGone && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMerchSize(ownSale.size);
+                      setError("");
+                    }}
+                    aria-pressed={merchSize === ownSale.size}
+                    title="This size was removed from the product. The sale can be saved unchanged."
+                    className={cn(
+                      "min-w-[58px] rounded-lg border border-dashed px-2 py-1 text-xs font-bold flex flex-col items-center leading-tight transition-colors",
+                      merchSize === ownSale.size ? "bg-primary border-primary text-white" : "bg-white border-slate-300 text-slate-700",
+                    )}
+                  >
+                    {ownSale.size}
+                    <span className={cn("text-[10px] font-semibold", merchSize === ownSale.size ? "text-primary-100" : "text-slate-400")}>
+                      no longer stocked
+                    </span>
+                  </button>
+                )}
               </div>
-              {selectedItem.stock.length === 0 && (
+              {selectedItem.stock.length === 0 && !ownSizeGone && (
                 <p className="text-xs text-slate-400 mt-1">This product has no sizes. Add them in Merch.</p>
               )}
             </div>
@@ -336,7 +362,7 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
               <Input
                 type="number"
                 min="1"
-                max={merchSize ? sizeMax(merchSize) : undefined}
+                max={merchSize ? (ownSizeGone && merchSize === ownSale?.size ? ownSale.quantity : sizeMax(merchSize)) : undefined}
                 step="1"
                 value={quantity}
                 onChange={(e) => {
@@ -346,7 +372,13 @@ export function IncomeForm({ open, onClose, categories, merchItems, editingIncom
                   if (item && amountAuto && qty > 0) setAmount(String(item.price * qty));
                 }}
               />
-              {merchSize && <p className="text-xs text-slate-400 mt-1">Up to {sizeMax(merchSize)}</p>}
+              {merchSize && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {ownSizeGone && merchSize === ownSale?.size
+                    ? `No longer stocked: keep ${ownSale.quantity}`
+                    : `Up to ${sizeMax(merchSize)}`}
+                </p>
+              )}
             </div>
           )}
         </div>

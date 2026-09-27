@@ -109,3 +109,25 @@ export function mergeRecountInput(
     }),
   );
 }
+
+/**
+ * Why a sale of `quantity` × `size` can't be saved, or null if it can. Mirrors the stock
+ * trigger: an edit gets its own units back first, and an edit that keeps product, size and
+ * quantity unchanged (only amount, date or notes) never touches stock, so it always saves,
+ * even if that size has since been removed from the product.
+ */
+export function saleLimitError(
+  stock: MerchStockLevel[],
+  size: string,
+  quantity: number,
+  editing?: { size: string; quantity: number } | null,
+): string | null {
+  if (editing && editing.size === size && editing.quantity === quantity) return null;
+  const max = maxSellable(stock, size, editing);
+  return quantity > max ? `Only ${max} × ${size} available` : null;
+}
+
+/** The stock trigger refused the sale (not enough left, or the size is gone): refresh the counts shown */
+export function isStockRefusal(code: string | undefined): boolean {
+  return code === "MS001" || code === "MS002";
+}

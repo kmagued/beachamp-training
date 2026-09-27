@@ -8,6 +8,9 @@ import { assertAdmin, revalidateMerch } from "./_lib/admin";
 
 const BUCKET = "merch-images";
 
+/** Failure result; `code` is the database's SQLSTATE when there is one (MS001/MS002 = stock refused) */
+type ActionError = { error: string; code?: string };
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkSubcategory(supabase: any, subcategoryId: string, categoryId: string) {
   const { data } = await supabase.from("merch_subcategories").select("category_id").eq("id", subcategoryId).maybeSingle();
@@ -184,14 +187,14 @@ export async function deleteMerchItem(id: string) {
 }
 
 /** Adds what arrived, e.g. { M: 10, L: 5 }, to the product's stock */
-export async function restockMerch(itemId: string, added: Record<string, number>) {
+export async function restockMerch(itemId: string, added: Record<string, number>): Promise<ActionError | { success: true }> {
   const { error: authErr, supabase } = await assertAdmin();
   if (authErr) return { error: authErr };
   if (!areValidCounts(Object.values(added))) return { error: "Arrivals must be whole numbers, 0 or more" };
   if (restockTotal(added) === 0) return { error: "Enter how many arrived" };
 
   const { error } = await supabase.rpc("merch_restock", { p_item_id: itemId, p_added: added });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidateMerch();
   return { success: true as const };
@@ -202,7 +205,10 @@ export async function restockMerch(itemId: string, added: Record<string, number>
  * from; if a sale moved any of them meanwhile nothing is written (ok: false) and the
  * current counts come back so the panel can show them.
  */
-export async function recountMerch(itemId: string, changes: RecountChange[]) {
+export async function recountMerch(
+  itemId: string,
+  changes: RecountChange[],
+): Promise<ActionError | { success: true; ok: boolean; stock: Record<string, number> }> {
   const { error: authErr, supabase } = await assertAdmin();
   if (authErr) return { error: authErr };
   if (changes.length === 0) return { error: "No counts changed" };
@@ -211,7 +217,7 @@ export async function recountMerch(itemId: string, changes: RecountChange[]) {
   }
 
   const { data, error } = await supabase.rpc("merch_recount", { p_item_id: itemId, p_counts: changes });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message as string, code: error.code as string | undefined };
 
   revalidateMerch();
   return { success: true as const, ok: data.ok as boolean, stock: data.stock as Record<string, number> };
@@ -222,7 +228,7 @@ export async function recountMerch(itemId: string, changes: RecountChange[]) {
  * with MS001 (not enough left) / MS002 (size no longer stocked); `code` lets the drawer
  * refresh the counts it's showing.
  */
-export async function recordMerchSale(input: SaleInput) {
+export async function recordMerchSale(input: SaleInput): Promise<ActionError | { success: true; remaining: number | null }> {
   const { error: authErr, supabase, userId } = await assertAdmin();
   if (authErr) return { error: authErr };
 

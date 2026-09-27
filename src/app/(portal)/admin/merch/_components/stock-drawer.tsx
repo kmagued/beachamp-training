@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import type { MerchItemView, MerchStockLevel } from "@/lib/config/merch";
 import {
   changedSizes,
+  isStockRefusal,
   mergeRecountInput,
   parseCount,
   recountChanges,
@@ -29,11 +30,14 @@ export function StockDrawer({
   open,
   onClose,
   onSaved,
+  onStale,
 }: {
   item: MerchItemView;
   open: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
+  /** A size was removed meanwhile; refresh what the page shows */
+  onStale: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("restock");
   const [baseline, setBaseline] = useState<MerchStockLevel[]>(item.stock);
@@ -66,6 +70,7 @@ export function StockDrawer({
       const res = await restockMerch(item.id, added);
       if ("error" in res) {
         setError(res.error);
+        if (isStockRefusal(res.code)) onStale();
         return;
       }
       onSaved(`Added ${addedTotal} to ${item.name}`);
@@ -78,6 +83,7 @@ export function StockDrawer({
       const res = await recountMerch(item.id, changes);
       if ("error" in res) {
         setError(res.error);
+        if (isStockRefusal(res.code)) onStale();
         return;
       }
       if (!res.ok) {
