@@ -2,23 +2,29 @@
 
 import { useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { CalendarDays, ClipboardCheck, Receipt, CreditCard, UserCheck } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Receipt, CreditCard, UserCheck, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { DatePicker } from "@/components/ui";
 import { AttendanceTab } from "./_components/attendance-tab";
+import { ScoresTab } from "./_components/scores-tab";
 import { CoachesTab } from "./_components/coaches-tab";
 import { ExpensesTab } from "./_components/expenses-tab";
 import { PaymentsTab } from "./_components/payments-tab";
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
+  { key: "scores", label: "Scores", icon: Trophy },
   { key: "coaches", label: "Coaches", icon: UserCheck },
   { key: "expenses", label: "Expenses", icon: Receipt },
   { key: "payments", label: "Payments", icon: CreditCard },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+function isTabKey(value: string | null): value is TabKey {
+  return TABS.some((t) => t.key === value);
+}
 
 export default function DailyReportPage() {
   const searchParams = useSearchParams();
@@ -27,7 +33,23 @@ export default function DailyReportPage() {
 
   const today = new Date().toISOString().split("T")[0];
   const selectedDate = searchParams.get("date") || today;
-  const [activeTab, setActiveTab] = useState<TabKey>("attendance");
+
+  // The open tab lives in ?tab= so a link can open the report on a given tab (the
+  // Leaderboard links straight to Scores). Attendance is the default and is
+  // left out of the URL.
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTabState] = useState<TabKey>(isTabKey(tabParam) ? tabParam : "attendance");
+
+  const setActiveTab = useCallback((tab: TabKey) => {
+    setActiveTabState(tab);
+    // History API rather than router.replace: a tab switch needs no server round trip,
+    // and Next keeps useSearchParams in step with replaceState
+    const params = new URLSearchParams(window.location.search);
+    if (tab === "attendance") params.delete("tab");
+    else params.set("tab", tab);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname]);
 
   const setSelectedDate = useCallback((date: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -83,6 +105,7 @@ export default function DailyReportPage() {
       </div>
 
       {activeTab === "attendance" && <AttendanceTab date={selectedDate} />}
+      {activeTab === "scores" && <ScoresTab date={selectedDate} onOpenAttendance={() => setActiveTab("attendance")} />}
       {activeTab === "coaches" && <CoachesTab date={selectedDate} />}
       {activeTab === "expenses" && <ExpensesTab date={selectedDate} />}
       {activeTab === "payments" && <PaymentsTab date={selectedDate} />}

@@ -356,6 +356,7 @@ export interface Database {
           level: GroupLevel;
           max_players: number;
           is_active: boolean;
+          in_leaderboard: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -366,6 +367,7 @@ export interface Database {
           level: GroupLevel;
           max_players: number;
           is_active?: boolean;
+          in_leaderboard?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -376,6 +378,7 @@ export interface Database {
           level?: GroupLevel;
           max_players?: number;
           is_active?: boolean;
+          in_leaderboard?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -641,6 +644,42 @@ export interface Database {
           item_id?: string;
           size?: string;
           quantity?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      king_of_court_scores: {
+        Row: {
+          id: string;
+          player_id: string;
+          schedule_session_id: string;
+          group_id: string;
+          session_date: string;
+          points: number;
+          entered_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          schedule_session_id: string;
+          group_id: string;
+          session_date: string;
+          points: number;
+          entered_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          schedule_session_id?: string;
+          group_id?: string;
+          session_date?: string;
+          points?: number;
+          entered_by?: string | null;
+          created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -1199,6 +1238,7 @@ export type PrivateSessionRequest = Database["public"]["Tables"]["private_sessio
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type CoachBlock = Database["public"]["Tables"]["coach_blocks"]["Row"];
 export type WhatsappTemplate = Database["public"]["Tables"]["whatsapp_templates"]["Row"];
+export type KingOfCourtScore = Database["public"]["Tables"]["king_of_court_scores"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {

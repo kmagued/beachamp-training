@@ -53,6 +53,8 @@ export async function createGroup(formData: FormData) {
     description: (formData.get("description") as string)?.trim() || null,
     level: formData.get("level") as string,
     max_players: Number(formData.get("max_players")) || 20,
+    // A checkbox is only sent when ticked
+    in_leaderboard: formData.get("in_leaderboard") === "on",
     is_active: true,
   });
 
@@ -77,6 +79,7 @@ export async function updateGroup(id: string, formData: FormData) {
       description: (formData.get("description") as string)?.trim() || null,
       level: formData.get("level") as string,
       max_players: Number(formData.get("max_players")) || 20,
+      in_leaderboard: formData.get("in_leaderboard") === "on",
     })
     .eq("id", id);
 

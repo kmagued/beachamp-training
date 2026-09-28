@@ -5,6 +5,7 @@ export interface GroupInfo {
   level: string;
   max_players: number;
   is_active: boolean;
+  in_leaderboard: boolean;
 }
 
 export interface GroupPlayerRow {

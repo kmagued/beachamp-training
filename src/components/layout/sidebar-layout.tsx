@@ -33,6 +33,7 @@ import {
   Tags,
   BarChart3,
   ChevronRight,
+  Trophy,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -69,6 +70,7 @@ const iconMap = {
   merch: Shirt,
   "merch-categories": Tags,
   "merch-analytics": BarChart3,
+  leaderboard: Trophy,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -78,6 +80,7 @@ const playerNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
   { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
+  { key: "leaderboard", label: "Leaderboard", href: "/player/leaderboard", section: "Competitions", badge: "New" },
   { key: "merch", label: "Products", href: "/player/merch", section: "Merch", badge: "New" },
   { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
   { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },
@@ -88,6 +91,7 @@ const coachNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/coach/dashboard" },
   { key: "schedule", label: "Schedule", href: "/coach/schedule" },
   { key: "my-groups", label: "My Groups", href: "/coach/groups" },
+  { key: "leaderboard", label: "Leaderboard", href: "/coach/leaderboard" },
   { key: "feedback", label: "Feedback", href: "/coach/feedback" },
 ];
 
@@ -108,6 +112,8 @@ const adminNav: NavItem[] = [
   { key: "private-sessions", label: "Private Sessions", href: "/admin/private-sessions", section: "Training" },
   { key: "my-groups", label: "My Groups", href: "/admin/my-groups", section: "Training" },
   { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
+  // Its own section: competitions will join the leaderboard here
+  { key: "leaderboard", label: "Leaderboard", href: "/admin/leaderboard", section: "Competitions" },
   { key: "whatsapp-templates", label: "WhatsApp Templates", href: "/admin/whatsapp-templates", section: "Messaging" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];

@@ -5,6 +5,8 @@ export interface GroupData {
   level: string;
   max_players: number;
   is_active: boolean;
+  /** Off for groups that don't play King of Court (e.g. Private Session) */
+  in_leaderboard: boolean;
   player_count: number;
   coaches: { id: string; first_name: string; last_name: string; is_primary: boolean }[];
   schedule: { day_of_week: number; start_time: string; end_time: string }[];

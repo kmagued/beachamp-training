@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Input, Select, Drawer } from "@/components/ui";
+import { Button, Input, Select, Drawer, Checkbox } from "@/components/ui";
 import { createGroup, updateGroup } from "@/app/_actions/training";
 import type { GroupData } from "./types";
 
@@ -72,6 +72,16 @@ export function GroupModal({ open, onClose, onSuccess, editingGroup }: GroupModa
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">Description</label>
           <Input name="description" placeholder="Optional description" defaultValue={editingGroup?.description || ""} />
+        </div>
+        <div>
+          <Checkbox
+            name="in_leaderboard"
+            label="Show on leaderboard"
+            defaultChecked={editingGroup?.in_leaderboard ?? true}
+          />
+          <p className="text-xs text-slate-400 mt-1 ml-7">
+            King of Court scores are logged for this group and it gets a Leaderboard tab.
+          </p>
         </div>
       </form>
     </Drawer>
