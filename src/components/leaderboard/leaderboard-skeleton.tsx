@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui";
 /** Loading state for every portal's Leaderboard page */
 export function LeaderboardSkeleton() {
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <Skeleton className="h-8 w-40 mb-2" />

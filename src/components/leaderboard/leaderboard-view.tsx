@@ -112,7 +112,7 @@ export function LeaderboardView({
   const selectedStanding = selectedPlayer ? standings.find((s) => s.player_id === selectedPlayer) : undefined;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Leaderboard</h1>
