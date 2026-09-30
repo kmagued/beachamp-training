@@ -132,8 +132,11 @@ CREATE TABLE leaderboard_awards (
   -- The player's month as it stood at closing, shown on the award card
   points          INTEGER NOT NULL,
   sessions        INTEGER NOT NULL,
-  -- The notification sent for this award, so reopening can take back the unread ones
-  notification_id UUID REFERENCES notifications(id) ON DELETE SET NULL,
+  -- The notification sent for this award, so reopening can take back the unread ones.
+  -- No foreign key: the award is written before its notification, so that a close which
+  -- fails part-way never leaves a player notified (and emailed) about an award they
+  -- don't have.
+  notification_id UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (month, group_id, player_id)
 );
@@ -209,10 +212,12 @@ Also add both tables (Row, Insert, Update) and the aliases `LeaderboardMonthClos
 Framework-free and tested with `node:test`, like the rest of `src/lib/king-of-court/`.
 
 ```ts
+export type Place = 1 | 2;
+
 export interface Award {
   group_id: string;
   player_id: string;
-  place: 1 | 2;
+  place: Place;
   points: number;
   sessions: number;
 }
@@ -224,29 +229,52 @@ export function monthAwards(scores: ScoreRow[]): Award[];
 export function canCloseMonth(month: string, currentMonth: string): boolean;
 
 /** "1st place" / "2nd place" */
-export function placeLabel(place: 1 | 2): string;
+export function placeLabel(place: Place): string;
+
+/** "142 points from 8 sessions" */
+export function awardSummary(points: number, sessions: number): string;
+
+/** One group's lines for the close confirmation: "1st: A & B (142 pts)" */
+export function groupAwardSummary(
+  awards: Award[], groupId: string, nameOf: (playerId: string) => string
+): { first: string | null; second: string | null };
 
 /** The notification an awarded player receives */
 export function awardNotification(a: {
-  place: 1 | 2; groupName: string; month: string; points: number; sessions: number;
+  place: Place; groupName: string; month: string; points: number; sessions: number;
 }): { title: string; body: string };
+
+/** The refusal shown when a change would alter a closed month's scores */
+export function closedMonthMessage(month: string): string;
+
+/** Newest month first; within a month 1st place before 2nd, then by group name */
+export function sortAwards<T extends { month: string; place: Place; group_name: string }>(awards: T[]): T[];
 ```
 
 - `monthAwards` calls `groupScores` and `buildStandings`, then keeps the standings with
   `rank <= 2` and `total > 0`. `place` is the rank. It is the only place that decides who
   is awarded: the confirmation preview and the server action both call it.
 - `awardNotification` returns:
-  - 1st: title "You won Group A's King of Court for September 2026";
-  - 2nd: title "You finished 2nd in Group A's King of Court for September 2026";
-  - body "142 points from 8 sessions." (with "1 session" in the singular).
+  - 1st: title "You won the Group A King of Court for September 2026";
+  - 2nd: title "You finished 2nd in the Group A King of Court for September 2026";
+  - body "142 points from 8 sessions." (with "1 point" and "1 session" in the singular).
+
+  The group name is never made possessive, so "Women's Team" reads "the Women's Team King
+  of Court".
+- `closedMonthMessage("2026-09")` returns "The September 2026 leaderboard is closed, and
+  this would change its scores. An admin can reopen it from the Leaderboard." The
+  database trigger raises the same sentence.
+
+`src/lib/king-of-court/month.ts` gains two small helpers: `isMonth(value)` (a real
+`YYYY-MM`) and `monthOfDate("2026-09-03")`, which returns `"2026-09"`.
 
 ### 3. Closed-month checks on the server — `src/lib/king-of-court/lock.ts`
 
 Server-only helpers that take the admin Supabase client.
 
 ```ts
-/** Whether this month ("YYYY-MM") is closed */
-export async function isMonthClosed(admin, month: string): Promise<boolean>;
+/** The message to refuse with when this month ("YYYY-MM") is closed; null when it is open */
+export async function closedMonthBlock(admin, month: string): Promise<string | null>;
 
 /**
  * The message to refuse with when the date's month is closed and any of these players
@@ -259,13 +287,14 @@ export async function closedMonthScoreBlock(
 ): Promise<string | null>;
 ```
 
-The refusal message is "The September 2026 leaderboard is closed, and this would change
-its scores. An admin can reopen it from the Leaderboard." It matches the trigger's.
+- The refusal is `closedMonthMessage(month)`.
+- Neither helper throws. If the check itself fails, it returns "Couldn't check whether
+  the leaderboard is closed: …", so the caller refuses rather than going ahead unchecked.
 
 ### 4. Server actions — `src/app/_actions/king-of-court.ts`
 
 **`saveKingOfCourtScores`** gains one check, after the future-date check: if
-`isMonthClosed` for the session date's month, return the closed message with
+`closedMonthBlock` returns a message for the session date's month, return it with
 `reload: true`, so the Scores tab reloads into its read-only state.
 
 **`closeLeaderboardMonth(month: string)`** returns
@@ -276,18 +305,18 @@ its scores. An admin can reopen it from the Leaderboard." It matches the trigger
 3. **Lock first:** insert the `leaderboard_month_closes` row with `closed_by`. A
    primary-key conflict returns "September 2026 is already closed".
 4. Load the month with `loadLeaderboard(month, null)`. The scores can no longer change.
-5. Compute `monthAwards(scores)`.
-6. Insert one notification per award, each with an id generated in the action
-   (`crypto.randomUUID()`), type `'system'` and link `/player/achievements`. They are
-   inserted directly rather than through `createNotification`, which would also send an
-   email from the app.
-7. Insert the `leaderboard_awards` rows, each carrying its `notification_id`.
+5. Compute `monthAwards(scores)`, and give each award a notification id generated in the
+   action (`crypto.randomUUID()`).
+6. Insert the `leaderboard_awards` rows, each carrying its `notification_id`.
+7. Insert one notification per award under those ids, with type `'system'` and link
+   `/player/achievements`. They are inserted directly rather than through
+   `createNotification`, which would also send an email from the app. This is the last
+   write, and one insert, so nobody is notified unless the whole close succeeded.
 8. Revalidate `/admin/leaderboard`, `/coach/leaderboard`, `/player/leaderboard`,
    `/player/achievements`, `/player/dashboard` and `/admin/daily-report`.
 
-If step 4, 5, 6 or 7 fails, the action deletes the notifications it inserted and the
-close row (the awards cascade), and returns the error. The month is then open again, as
-if nothing had happened.
+If step 4, 5, 6 or 7 fails, the action deletes the close row (the awards cascade) and
+returns the error. The month is then open again, as if nothing had happened.
 
 **`reopenLeaderboardMonth(month: string)`** returns
 `{ success: true } | { error: string }`:
@@ -385,11 +414,17 @@ export interface PlayerAward {
 }
 
 /** A player's awards, newest month first; 1st place before 2nd within a month */
-export async function loadPlayerAwards(supabase, playerId: string, limit?: number): Promise<PlayerAward[]>;
+export async function loadPlayerAwards(supabase, playerId: string): Promise<PlayerAward[]>;
+
+/** The newest few, for the dashboard. Never throws: a failure gives no awards. */
+export async function loadLatestAwards(supabase, playerId: string, limit: number): Promise<PlayerAward[]>;
 ```
 
-It reads `leaderboard_awards` joined to `groups(name)` with the player's own client, so
-RLS limits it to their rows.
+- Both read `leaderboard_awards` joined to `groups(name)` with the player's own client, so
+  RLS limits them to the player's rows.
+- `loadPlayerAwards` throws when the read fails, as `loadLeaderboard` does.
+- `loadLatestAwards` returns an empty list instead, so a problem with achievements can
+  never take the dashboard down with it.
 
 **Achievements page — `src/app/(portal)/player/achievements/page.tsx`** (server), with a
 `loading.tsx` skeleton.
@@ -416,7 +451,7 @@ The mockup's stat tiles, Badges section and "Share this award" button are not bu
 
 **Dashboard card — `player/dashboard/page.tsx`**
 
-- The page loads `loadPlayerAwards(supabase, currentUser.id, 3)`.
+- The page loads `loadLatestAwards(supabase, currentUser.id, 3)`.
 - When there is at least one award, a full-width **Achievements** card sits below the
   two-column grid:
   - a heading with the `Award` icon, in the style of the other dashboard cards;
@@ -437,7 +472,8 @@ The mockup's stat tiles, Badges section and "Share this award" button are not bu
 |---|---|
 | Two admins close the same month at once | The second insert hits the primary key and returns "already closed". |
 | A score is being saved at the instant of closing | The trigger's table lock makes one wait for the other: the save either lands before the awards are ranked or is refused. |
-| Closing fails after the month is locked | The action removes what it wrote and the close row, so the month is open again. |
+| Closing fails after the month is locked | The action removes the close row and the awards with it, so the month is open again. Nobody was notified. |
+| The code is deployed before the migration is applied | Attendance and score saves would be refused, because the closed-month check can't run. The migration must be applied to production first; it is safe to apply early, because nothing is closed until the button is used. |
 | Close is pressed for a future month (e.g. by a stale tab) | The action refuses it. |
 | A month with no scores is closed | It locks with no awards. The confirmation says nobody is awarded. |
 | The scores change between loading the page and confirming | The awards follow the scores at the moment of closing. The page refreshes to show them. |
