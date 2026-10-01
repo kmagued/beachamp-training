@@ -15,6 +15,8 @@ const PAGE = 1000;
 export interface LeaderboardData {
   month: string;
   currentMonth: string;
+  /** When the month was closed; null while it is open */
+  closedAt: string | null;
   groups: LeaderboardGroup[];
   scores: ScoreRow[];
   players: Record<string, PlayerName>;
@@ -96,6 +98,14 @@ export async function loadLeaderboard(
     if (rows.length < PAGE) break;
   }
 
+  const { data: closeRow, error: closeErr } = await admin
+    .from("leaderboard_month_closes")
+    .select("closed_at")
+    .eq("month", month)
+    .maybeSingle();
+  // An open month offers Close and a closed one Reopen: don't guess which
+  if (closeErr) throw new Error(`Could not load whether ${month} is closed: ${closeErr.message}`);
+
   const groups = groupsToShow(visible, new Set(scores.map((s) => s.group_id)));
-  return { month, currentMonth, groups, scores, players };
+  return { month, currentMonth, closedAt: closeRow?.closed_at ?? null, groups, scores, players };
 }
