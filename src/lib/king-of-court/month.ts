@@ -1,6 +1,6 @@
 // Calendar months for the King of Court leaderboard, written "YYYY-MM".
 
-const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 /** The ?month= value when it is a real YYYY-MM, otherwise the fallback (the current month) */
 export function parseMonthParam(param: string | undefined, fallback: string): string {
@@ -19,4 +19,14 @@ export function shiftMonth(month: string, by: number): string {
 /** Dates in the month are `from <= session_date < to`; comparing YYYY-MM-DD strings needs no timezone */
 export function monthRange(month: string): { from: string; to: string } {
   return { from: `${month}-01`, to: `${shiftMonth(month, 1)}-01` };
+}
+
+/** Whether this is a real YYYY-MM */
+export function isMonth(value: string): boolean {
+  return MONTH_PATTERN.test(value);
+}
+
+/** "2026-09-03" → "2026-09": session dates are plain calendar days, so no timezone is involved */
+export function monthOfDate(date: string): string {
+  return date.slice(0, 7);
 }

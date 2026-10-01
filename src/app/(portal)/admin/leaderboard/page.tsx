@@ -21,6 +21,7 @@ export default async function AdminLeaderboardPage({
     <LeaderboardView
       data={data}
       linkToDailyReport
+      canClose
       noGroups={{
         title: "No groups yet",
         description: "Leaderboards appear here once groups exist and scores are logged from the Daily Report.",

@@ -34,6 +34,7 @@ import {
   BarChart3,
   ChevronRight,
   Trophy,
+  Award,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -71,6 +72,7 @@ const iconMap = {
   "merch-categories": Tags,
   "merch-analytics": BarChart3,
   leaderboard: Trophy,
+  achievements: Award,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -80,7 +82,8 @@ const playerNav: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/player/dashboard" },
   { key: "sessions", label: "Sessions", href: "/player/sessions", section: "Training" },
   { key: "private-sessions", label: "Private Sessions", href: "/player/private-sessions", section: "Training" },
-  { key: "leaderboard", label: "Leaderboard", href: "/player/leaderboard", section: "Competitions", badge: "New" },
+  { key: "leaderboard", label: "Leaderboard", href: "/player/leaderboard", section: "Competitions" },
+  { key: "achievements", label: "Achievements", href: "/player/achievements", section: "Competitions" },
   { key: "merch", label: "Products", href: "/player/merch", section: "Merch", badge: "New" },
   { key: "subscriptions", label: "Subscriptions", href: "/player/subscriptions", section: "Account" },
   { key: "feedback", label: "Feedback", href: "/player/feedback", section: "Account" },

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Crown, Trophy } from "lucide-react";
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { ChevronLeft, ChevronRight, Crown, Lock, LockOpen, Trophy } from "lucide-react";
+import { Badge, Button, Card, ConfirmDialog, EmptyState, Toast } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { closeLeaderboardMonth, reopenLeaderboardMonth } from "@/app/_actions/king-of-court";
 import { openingGroup } from "@/lib/king-of-court/access";
+import { canCloseMonth, groupAwardSummary, monthAwards } from "@/lib/king-of-court/awards";
 import { buildStandings, groupScores, type Standing } from "@/lib/king-of-court/leaderboard";
 import type { LeaderboardData } from "@/lib/king-of-court/load";
 import { shiftMonth } from "@/lib/king-of-court/month";
@@ -25,6 +27,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export function LeaderboardView({
   data,
   linkToDailyReport = false,
+  canClose = false,
   viewerId,
   noGroups,
 }: {
@@ -32,16 +35,22 @@ export function LeaderboardView({
   data: LeaderboardData;
   /** Admins: the breakdown's sessions open that day's Daily Report, where scores are fixed */
   linkToDailyReport?: boolean;
+  /** Admins: the month can be closed and reopened from here */
+  canClose?: boolean;
   /** Players: their own row is marked "You" */
   viewerId?: string;
   /** Shown when the viewer has no group on the leaderboard */
   noGroups: { title: string; description: string };
 }) {
-  const { month, currentMonth, groups, scores, players } = data;
+  const { month, currentMonth, closedAt, groups, scores, players } = data;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isCurrentMonth = month === currentMonth;
+  const isClosed = closedAt !== null;
+  const monthLabel = formatMonth(month, "long");
+  /** "September": for buttons and sentences where the year is already on screen */
+  const monthName = monthLabel.split(" ")[0];
 
   const nameOf = (playerId: string) => {
     const p = players[playerId];
@@ -60,10 +69,15 @@ export function LeaderboardView({
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, rowsByGroup, players]);
+  // The same function the server awards with, so the confirmation lists who it will award
+  const awards = useMemo(() => monthAwards(scores), [scores]);
 
   const [requestedGroup, setRequestedGroup] = useState<string | null>(() => searchParams.get("group"));
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dialog, setDialog] = useState<"close" | "reopen" | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   // The asked-for tab if this month shows it, else the first group with scores. Re-derived
   // on every render so a month without that group falls back instead of showing nothing.
@@ -94,6 +108,47 @@ export function LeaderboardView({
     window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
   }
 
+  /** After a close or reopen came back: say what happened and show the month as it is now */
+  function finish(res: { error: string } | { success: true }, done: string) {
+    setDialog(null);
+    if ("error" in res) {
+      setToast({ message: res.error, variant: "error" });
+      // "Already closed" and "isn't closed" mean this page is out of date
+      router.refresh();
+      return;
+    }
+    setToast({ message: done, variant: "success" });
+    router.refresh();
+  }
+
+  function unreachable() {
+    setDialog(null);
+    setToast({ message: "Couldn't reach the server. Check your connection and try again.", variant: "error" });
+    // The request may have landed before the connection dropped
+    router.refresh();
+  }
+
+  function handleClose() {
+    startTransition(async () => {
+      try {
+        const res = await closeLeaderboardMonth(month);
+        finish(res, "awards" in res ? `${monthLabel} closed · ${plural(res.awards, "achievement")} awarded` : "");
+      } catch {
+        unreachable();
+      }
+    });
+  }
+
+  function handleReopen() {
+    startTransition(async () => {
+      try {
+        finish(await reopenLeaderboardMonth(month), `${monthLabel} reopened`);
+      } catch {
+        unreachable();
+      }
+    });
+  }
+
   // On phones the tab row scrolls sideways: keep the open tab in view
   useEffect(() => {
     const bar = tabBarRef.current;
@@ -108,38 +163,79 @@ export function LeaderboardView({
   const standings = (activeGroup && standingsByGroup.get(activeGroup)) || [];
   const groupRows = (activeGroup && rowsByGroup.get(activeGroup)) || [];
   const winners = standings.filter((s) => s.isWinner);
+  // Only a closed month has a runner-up: until then second place can still change hands
+  const runnersUp = isClosed ? standings.filter((s) => s.rank === 2 && s.total > 0) : [];
   const sessionCount = new Set(groupRows.map((r) => `${r.schedule_session_id}|${r.session_date}`)).size;
   const selectedStanding = selectedPlayer ? standings.find((s) => s.player_id === selectedPlayer) : undefined;
+  const showClose = canClose && !isClosed && canCloseMonth(month, currentMonth);
+  const showReopen = canClose && isClosed;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
+
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Leaderboard</h1>
-          <div className="flex items-center shrink-0 rounded-xl border border-slate-200 bg-white p-0.5">
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => goToMonth(shiftMonth(month, -1))}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="min-w-[5.25rem] text-center text-sm font-semibold text-slate-800 tabular-nums">
-              {formatMonth(month)}
-            </span>
-            <button
-              type="button"
-              aria-label="Next month"
-              disabled={month >= currentMonth}
-              onClick={() => goToMonth(shiftMonth(month, 1))}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          {/* Close and Reopen sit beside the month they act on. On phones they shrink to their
+              icon so the row still fits; the confirmation names the month in full. */}
+          <div className="flex items-center gap-2 shrink-0">
+            {showClose && (
+              <Button
+                aria-label="Close month"
+                className="h-[34px] gap-1.5 rounded-xl px-2.5 py-0 sm:px-3.5"
+                onClick={() => setDialog("close")}
+              >
+                <Lock className="w-4 h-4" />
+                <span className="hidden sm:inline">Close month</span>
+              </Button>
+            )}
+            {showReopen && (
+              <Button
+                variant="outline"
+                aria-label="Reopen month"
+                className="h-[34px] gap-1.5 rounded-xl px-2.5 py-0 sm:px-3.5"
+                onClick={() => setDialog("reopen")}
+              >
+                <LockOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Reopen</span>
+              </Button>
+            )}
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
+              <button
+                type="button"
+                aria-label="Previous month"
+                onClick={() => goToMonth(shiftMonth(month, -1))}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="min-w-[5.25rem] text-center text-sm font-semibold text-slate-800 tabular-nums">
+                {formatMonth(month)}
+              </span>
+              <button
+                type="button"
+                aria-label="Next month"
+                disabled={month >= currentMonth}
+                onClick={() => goToMonth(shiftMonth(month, 1))}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-        <p className="mt-0.5 text-slate-500 text-sm">King of Court points by group</p>
+        {/* The month's state reads with the page description, for every viewer */}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-slate-500 text-sm">King of Court points by group</p>
+          {isClosed && (
+            <Badge variant="neutral">
+              <span className="flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Closed
+              </span>
+            </Badge>
+          )}
+        </div>
       </div>
 
       {groups.length > 0 && (
@@ -195,8 +291,9 @@ export function LeaderboardView({
                 <Crown className="w-6 h-6 text-amber-500" />
               </div>
               <div className="min-w-0">
+                {/* "Winner" is official: it only shows once the month is closed */}
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
-                  {isCurrentMonth ? "Leading" : "Winner"} · {formatMonth(month, "long")}
+                  {isClosed ? "Winner" : "Leading"} · {monthLabel}
                 </p>
                 <p className="text-lg font-semibold leading-snug text-slate-900">
                   {joinNames(winners.map((w) => nameOf(w.player_id)))}
@@ -204,6 +301,15 @@ export function LeaderboardView({
                 <p className="text-sm text-slate-500">
                   {winners[0].total} pts · {plural(winners[0].sessions, "session")}
                 </p>
+                {runnersUp.length > 0 && (
+                  <p className="mt-1 text-sm text-slate-500">
+                    Runner-up:{" "}
+                    <span className="font-medium text-slate-700">
+                      {joinNames(runnersUp.map((r) => nameOf(r.player_id)))}
+                    </span>{" "}
+                    · {runnersUp[0].total} pts
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -270,6 +376,66 @@ export function LeaderboardView({
         standing={selectedStanding}
         scores={groupRows}
         linkToDailyReport={linkToDailyReport}
+      />
+
+      <ConfirmDialog
+        open={dialog === "close"}
+        onClose={() => setDialog(null)}
+        onConfirm={handleClose}
+        title={`Close ${monthLabel}?`}
+        confirmLabel={`Close ${monthName}`}
+        confirmVariant="primary"
+        loading={isPending}
+        loadingLabel="Closing..."
+        description={
+          <div className="space-y-3">
+            {awards.length === 0 ? (
+              <p>No scores were logged, so nobody is awarded.</p>
+            ) : (
+              // Every group at once: scrolls rather than pushing the buttons off a phone
+              <ul className="max-h-56 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {groups.map((g) => {
+                  const summary = groupAwardSummary(awards, g.id, nameOf);
+                  return (
+                    <li key={g.id} className="px-3 py-2">
+                      <p className="text-xs font-semibold text-slate-700">{g.name}</p>
+                      {summary.first ? (
+                        <>
+                          <p className="text-xs text-slate-500">{summary.first}</p>
+                          {summary.second && <p className="text-xs text-slate-500">{summary.second}</p>}
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-400">No awards</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p>
+              Scores for {monthName} can&apos;t be changed until you reopen it
+              {awards.length > 0 && ", and these players are notified"}.
+            </p>
+            {isCurrentMonth && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {monthName} isn&apos;t over. Sessions still to come this month can&apos;t be scored while
+                it&apos;s closed.
+              </p>
+            )}
+          </div>
+        }
+      />
+
+      <ConfirmDialog
+        open={dialog === "reopen"}
+        onClose={() => setDialog(null)}
+        onConfirm={handleReopen}
+        title={`Reopen ${monthLabel}?`}
+        confirmLabel="Reopen"
+        confirmVariant="danger"
+        loading={isPending}
+        loadingLabel="Reopening..."
+        description={`This removes the month's ${plural(awards.length, "achievement")} and lets its scores be edited again. Notifications that players haven't read are removed. Close the month again to re-award.`}
       />
     </div>
   );

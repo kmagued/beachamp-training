@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -600,6 +601,16 @@ export async function submitAttendance(data: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
+  // Moving a scored player away from present deletes their King of Court score. In a
+  // closed leaderboard month the database refuses that; refuse here, before the loop
+  // below has saved some players and not others.
+  const closed = await closedMonthScoreBlock(
+    admin,
+    data,
+    data.records.filter((r) => r.status !== "present").map((r) => r.player_id)
+  );
+  if (closed) return { error: closed };
+
   // Get the schedule session to find the time
   const { data: scheduleSession } = await admin
     .from("schedule_sessions")
@@ -667,6 +678,12 @@ export async function removeAttendanceRecords(data: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
+
+  // Removing a scored player's attendance deletes their King of Court score. In a closed
+  // leaderboard month the database refuses that delete, but only after the credits below
+  // had been restored, leaving the player with both the attendance and the credit.
+  const closed = await closedMonthScoreBlock(admin, data, data.player_ids);
+  if (closed) return { error: closed };
 
   // Find existing attendance records for these players (match via schedule_session_id)
   let existingQuery = admin

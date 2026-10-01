@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { monthRange, parseMonthParam, shiftMonth } from "./month";
+import { isMonth, monthOfDate, monthRange, parseMonthParam, shiftMonth } from "./month";
 
 test("parseMonthParam keeps a valid YYYY-MM and falls back otherwise", () => {
   assert.equal(parseMonthParam("2026-09", "2026-10"), "2026-09");
@@ -31,4 +31,18 @@ test("monthRange: the last day is inside the month, the next month's 1st is not"
   assert.equal(inside("2026-09", "2026-08-31"), false);
   assert.equal(inside("2028-02", "2028-02-29"), true);
   assert.equal(inside("2026-12", "2026-12-31"), true);
+});
+
+test("isMonth: a real YYYY-MM and nothing else", () => {
+  assert.equal(isMonth("2026-09"), true);
+  assert.equal(isMonth("2026-12"), true);
+  for (const bad of ["2026-13", "2026-00", "2026-9", "abc", "", "2026-09-01"]) {
+    assert.equal(isMonth(bad), false, bad);
+  }
+});
+
+test("monthOfDate: the month a YYYY-MM-DD falls in", () => {
+  assert.equal(monthOfDate("2026-09-03"), "2026-09");
+  assert.equal(monthOfDate("2026-12-31"), "2026-12");
+  assert.equal(monthOfDate("2027-01-01"), "2027-01");
 });

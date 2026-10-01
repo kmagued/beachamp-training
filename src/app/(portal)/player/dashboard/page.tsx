@@ -12,8 +12,14 @@ import {
   MessageSquare,
   Star,
   AlertTriangle,
+  Award,
+  Trophy,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
+import { cn } from "@/lib/utils/cn";
+import { placeLabel } from "@/lib/king-of-court/awards";
+import { loadLatestAwards } from "@/lib/king-of-court/awards-load";
+import { formatMonth } from "@/lib/king-of-court/format";
 import type { Subscription } from "@/types/database";
 import { PendingPaymentCard } from "./_components/pending-payment-card";
 
@@ -71,6 +77,9 @@ export default async function PlayerDashboard() {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Never throws: the dashboard renders without the card if awards can't be read
+  const latestAwards = await loadLatestAwards(supabase, currentUser.id, 3);
 
   let daysRemaining: number | null = null;
   let isExpired = false;
@@ -275,6 +284,46 @@ export default async function PlayerDashboard() {
           )}
         </Card>
       </div>
+
+      {/* Achievements: only for players who have one */}
+      {latestAwards.length > 0 && (
+        <Card className="mb-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="font-display text-xl tracking-wide text-primary-900 flex items-center gap-2">
+              <Award className="w-4 h-4 text-primary-700/50" />
+              Achievements
+            </h2>
+            <Link
+              href="/player/achievements"
+              className="text-sm font-semibold text-primary-800 hover:text-primary-900 whitespace-nowrap"
+            >
+              View all →
+            </Link>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {latestAwards.map((award) => (
+              <div key={award.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                <div
+                  className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                    award.place === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
+                  )}
+                >
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-primary-900">
+                    {placeLabel(award.place)} · {formatMonth(award.month, "long")}
+                  </p>
+                  <p className="text-xs text-primary-700/60 truncate">
+                    {award.group_name} · {award.points} pts
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Renewal / Warning Banners */}
       {isExpired && (

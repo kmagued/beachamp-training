@@ -684,6 +684,60 @@ export interface Database {
         };
         Relationships: [];
       };
+      leaderboard_month_closes: {
+        Row: {
+          month: string;
+          closed_by: string | null;
+          closed_at: string;
+        };
+        Insert: {
+          month: string;
+          closed_by?: string | null;
+          closed_at?: string;
+        };
+        Update: {
+          month?: string;
+          closed_by?: string | null;
+          closed_at?: string;
+        };
+        Relationships: [];
+      };
+      leaderboard_awards: {
+        Row: {
+          id: string;
+          month: string;
+          group_id: string;
+          player_id: string;
+          place: number;
+          points: number;
+          sessions: number;
+          notification_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          month: string;
+          group_id: string;
+          player_id: string;
+          place: number;
+          points: number;
+          sessions: number;
+          notification_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          month?: string;
+          group_id?: string;
+          player_id?: string;
+          place?: number;
+          points?: number;
+          sessions?: number;
+          notification_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       coach_groups: {
         Row: {
           id: string;
@@ -1239,6 +1293,8 @@ export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type CoachBlock = Database["public"]["Tables"]["coach_blocks"]["Row"];
 export type WhatsappTemplate = Database["public"]["Tables"]["whatsapp_templates"]["Row"];
 export type KingOfCourtScore = Database["public"]["Tables"]["king_of_court_scores"]["Row"];
+export type LeaderboardMonthClose = Database["public"]["Tables"]["leaderboard_month_closes"]["Row"];
+export type LeaderboardAward = Database["public"]["Tables"]["leaderboard_awards"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {

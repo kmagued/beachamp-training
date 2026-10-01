@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Toast } from "@/components/ui";
-import { Loader2, Check, Clock, Trash2 } from "lucide-react";
+import { Loader2, Check, Clock, Lock, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { saveKingOfCourtScores } from "@/app/_actions/king-of-court";
 import { parsePoints } from "@/lib/king-of-court/points";
 import { applySavedScores, buildSavePayload, hasUnsavedChanges } from "@/lib/king-of-court/save";
-import { formatTime } from "@/lib/king-of-court/format";
+import { formatMonth, formatTime } from "@/lib/king-of-court/format";
+import { monthOfDate } from "@/lib/king-of-court/month";
 
 interface GroupSession {
   id: string;
@@ -46,6 +48,9 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [bySession, setBySession] = useState<Record<string, SessionScores>>({});
   const [loading, setLoading] = useState(true);
+  /** The date's leaderboard month is closed: its scores are shown but can't be changed */
+  const [closed, setClosed] = useState(false);
+  const month = monthOfDate(date);
   /** Bumped to reload after the server refused a save because attendance moved on */
   const [reloadKey, setReloadKey] = useState(0);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -91,7 +96,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
       });
       const sessionIds = sessionRows.map((s) => s.id);
 
-      const [{ data: attendance }, { data: scores }] = await Promise.all([
+      const [{ data: attendance }, { data: scores }, { data: closeRow }] = await Promise.all([
         sessionIds.length > 0
           ? supabase
               .from("attendance")
@@ -106,6 +111,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
               .eq("session_date", date)
               .in("schedule_session_id", sessionIds)
           : Promise.resolve({ data: [] as unknown[] }),
+        supabase.from("leaderboard_month_closes").select("month").eq("month", month).maybeSingle(),
       ]);
 
       if (cancelled) return;
@@ -135,6 +141,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
 
       setSessions(sessionRows);
       setBySession(next);
+      setClosed(!!closeRow);
       setLoading(false);
     }
 
@@ -243,6 +250,17 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
         variant={toast?.variant}
         onClose={() => setToast(null)}
       />
+      {closed && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <Lock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-slate-600">
+            The {formatMonth(month, "long")} leaderboard is closed, so these scores are read-only.{" "}
+            <Link href={`/admin/leaderboard?month=${month}`} className="font-semibold text-primary hover:underline">
+              Open the Leaderboard
+            </Link>
+          </p>
+        </div>
+      )}
       {sessions.map((session) => {
         const s = bySession[session.id];
         const invalid = new Set(buildSavePayload(s.inputs, s.saved).invalid_player_ids);
@@ -269,7 +287,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
                   <span className="text-xs text-slate-400 tabular-nums">
                     {scoredCount}/{s.players.length} scored
                   </span>
-                  {changed ? (
+                  {changed && !closed ? (
                     <Button
                       size="sm"
                       onClick={() => handleSave(session.id)}
@@ -309,7 +327,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     Present ({s.players.length})
                   </span>
-                  {Object.values(s.inputs).some((t) => t.trim() !== "") && (
+                  {!closed && Object.values(s.inputs).some((t) => t.trim() !== "") && (
                     <button
                       type="button"
                       onClick={() => clearBoxes(session.id)}
@@ -337,6 +355,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
                         autoComplete="off"
                         aria-label={`Points for ${p.first_name} ${p.last_name}`}
                         aria-invalid={invalid.has(p.id) || undefined}
+                        disabled={closed}
                         value={s.inputs[p.id] ?? ""}
                         onChange={(e) => setBox(session.id, p.id, e.target.value)}
                         onKeyDown={(e) => {
@@ -346,7 +365,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
                           }
                         }}
                         className={cn(
-                          "w-16 h-9 px-2 text-right text-sm tabular-nums bg-white border rounded-lg focus:outline-none focus:ring-2",
+                          "w-16 h-9 px-2 text-right text-sm tabular-nums bg-white border rounded-lg focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500",
                           invalid.has(p.id)
                             ? "border-red-400 focus:ring-red-200"
                             : "border-slate-200 focus:ring-primary/20 focus:border-primary"
