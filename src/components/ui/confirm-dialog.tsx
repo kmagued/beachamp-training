@@ -14,6 +14,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   confirmVariant?: "primary" | "outline" | "danger";
   loading?: boolean;
+  /** Shown on the confirm button while `loading` */
+  loadingLabel?: string;
 }
 
 export function ConfirmDialog({
@@ -25,6 +27,7 @@ export function ConfirmDialog({
   confirmLabel = "Delete",
   confirmVariant = "danger",
   loading,
+  loadingLabel = "Deleting...",
 }: ConfirmDialogProps) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -68,15 +71,16 @@ export function ConfirmDialog({
         )}
       >
         <h3 className="font-semibold text-slate-900 text-lg mb-1">{title}</h3>
+        {/* A div, not a p: the description may hold a list */}
         {description && (
-          <p className="text-sm text-slate-500 mb-5">{description}</p>
+          <div className="text-sm text-slate-500 mb-5">{description}</div>
         )}
         <div className="flex gap-3 justify-end">
           <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button variant={confirmVariant} size="sm" onClick={onConfirm} disabled={loading}>
-            {loading ? "Deleting..." : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </Button>
         </div>
       </div>
