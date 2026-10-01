@@ -356,12 +356,14 @@ reopened.
 
 **`LeaderboardView`** gains a `canClose?: boolean` prop, passed only by the admin page.
 
-- **Header, second row:** the subtitle stays on the left. On the right:
-  - a **Closed** badge with a lock icon when `closedAt` is set, for every viewer;
-  - for admins, **Reopen** (outline) when closed, or **Close month** when open and
-    `canCloseMonth(month, currentMonth)`.
-
-  On phones the right side wraps under the subtitle.
+- **Header:** *(Revised 2026-10-01 at the user's request: the badge and button first sat
+  together on the right of the subtitle row.)*
+  - For admins, **Close month** (primary, when the month is open and
+    `canCloseMonth(month, currentMonth)`) or **Reopen** (outline, when it is closed) sits in
+    the title row, just left of the month picker it acts on, at the picker's height. On
+    phones the button shows only its lock icon so the row still fits.
+  - A **Closed** badge with a lock icon follows the subtitle when `closedAt` is set, for
+    every viewer.
 - **Close confirmation** (`ConfirmDialog`, primary, labelled "Close September"):
   - Title: "Close September 2026?"
   - One line per group with awards: the group name, then "1st: A & B (142 pts)" and
@@ -463,7 +465,8 @@ The mockup's stat tiles, Badges section and "Share this award" button are not bu
 **Nav — `sidebar-layout.tsx`**
 
 - Add `{ key: "achievements", label: "Achievements", href: "/player/achievements",
-  section: "Competitions", badge: "New" }` to `playerNav`, after Leaderboard.
+  section: "Competitions" }` to `playerNav`, after Leaderboard. No "New" tag: at the user's
+  request (2026-10-01), only Products carries one, so Leaderboard loses its tag too.
 - Map the `Award` icon to `achievements` in the icon map.
 
 ## Edge cases

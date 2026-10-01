@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Crown, Lock, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Lock, LockOpen, Trophy } from "lucide-react";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Toast } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { closeLeaderboardMonth, reopenLeaderboardMonth } from "@/app/_actions/king-of-court";
@@ -177,52 +177,63 @@ export function LeaderboardView({
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Leaderboard</h1>
-          <div className="flex items-center shrink-0 rounded-xl border border-slate-200 bg-white p-0.5">
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => goToMonth(shiftMonth(month, -1))}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="min-w-[5.25rem] text-center text-sm font-semibold text-slate-800 tabular-nums">
-              {formatMonth(month)}
-            </span>
-            <button
-              type="button"
-              aria-label="Next month"
-              disabled={month >= currentMonth}
-              onClick={() => goToMonth(shiftMonth(month, 1))}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          {/* Close and Reopen sit beside the month they act on. On phones they shrink to their
+              icon so the row still fits; the confirmation names the month in full. */}
+          <div className="flex items-center gap-2 shrink-0">
+            {showClose && (
+              <Button
+                aria-label="Close month"
+                className="h-[34px] gap-1.5 rounded-xl px-2.5 py-0 sm:px-3.5"
+                onClick={() => setDialog("close")}
+              >
+                <Lock className="w-4 h-4" />
+                <span className="hidden sm:inline">Close month</span>
+              </Button>
+            )}
+            {showReopen && (
+              <Button
+                variant="outline"
+                aria-label="Reopen month"
+                className="h-[34px] gap-1.5 rounded-xl px-2.5 py-0 sm:px-3.5"
+                onClick={() => setDialog("reopen")}
+              >
+                <LockOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Reopen</span>
+              </Button>
+            )}
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
+              <button
+                type="button"
+                aria-label="Previous month"
+                onClick={() => goToMonth(shiftMonth(month, -1))}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="min-w-[5.25rem] text-center text-sm font-semibold text-slate-800 tabular-nums">
+                {formatMonth(month)}
+              </span>
+              <button
+                type="button"
+                aria-label="Next month"
+                disabled={month >= currentMonth}
+                onClick={() => goToMonth(shiftMonth(month, 1))}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-        {/* The subtitle, with the month's state beside it; on phones the state wraps under */}
-        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        {/* The month's state reads with the page description, for every viewer */}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className="text-slate-500 text-sm">King of Court points by group</p>
-          {(isClosed || showClose) && (
-            <div className="flex items-center gap-2">
-              {isClosed && (
-                <Badge variant="neutral">
-                  <span className="flex items-center gap-1">
-                    <Lock className="w-3 h-3" /> Closed
-                  </span>
-                </Badge>
-              )}
-              {showReopen && (
-                <Button variant="outline" className="px-3.5 py-1.5" onClick={() => setDialog("reopen")}>
-                  Reopen
-                </Button>
-              )}
-              {showClose && (
-                <Button className="px-3.5 py-1.5" onClick={() => setDialog("close")}>
-                  Close month
-                </Button>
-              )}
-            </div>
+          {isClosed && (
+            <Badge variant="neutral">
+              <span className="flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Closed
+              </span>
+            </Badge>
           )}
         </div>
       </div>
