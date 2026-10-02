@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   badgeDescription,
   creditsEarned,
+  deleteBadgeWarning,
   formatBadgeDate,
   formatCredits,
+  holdersLabel,
   progressFraction,
   progressLabel,
 } from "./words";
@@ -55,4 +57,26 @@ test("formatBadgeDate: short, medium and long, never shifted by the viewer's tim
   assert.equal(formatBadgeDate("2026-10-02", "medium"), "2 Oct 2026");
   assert.equal(formatBadgeDate("2026-09-25", "long"), "25 September 2026");
   assert.equal(formatBadgeDate("2026-01-01", "short"), "1 Jan");
+});
+
+test("holdersLabel: how many players hold a badge, on the admin page", () => {
+  assert.equal(holdersLabel(0), "Nobody holds it yet");
+  assert.equal(holdersLabel(1), "1 player holds it");
+  assert.equal(holdersLabel(12), "12 players hold it");
+});
+
+test("deleteBadgeWarning: who loses it, and the credits that go with it", () => {
+  assert.equal(
+    deleteBadgeWarning("Court Regular", 12, 50),
+    "12 players hold Court Regular. Deleting it takes it away from them, with the 50 credits it gave each."
+  );
+  assert.equal(
+    deleteBadgeWarning("Court Regular", 1, 1),
+    "1 player holds Court Regular. Deleting it takes it away from them, with the 1 credit it gave each."
+  );
+  assert.equal(
+    deleteBadgeWarning("Iron Streak", 3, 0),
+    "3 players hold Iron Streak. Deleting it takes it away from them."
+  );
+  assert.equal(deleteBadgeWarning("Court Regular", 0, 50), "Nobody holds Court Regular yet.");
 });

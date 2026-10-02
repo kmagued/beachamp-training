@@ -73,3 +73,17 @@ export function formatBadgeDate(date: string, style: "short" | "medium" | "long"
   const short = `${day} ${MONTHS_SHORT[d.getUTCMonth()]}`;
   return style === "medium" ? `${short} ${d.getUTCFullYear()}` : short;
 }
+
+/** "Nobody holds it yet", "1 player holds it", "12 players hold it" */
+export function holdersLabel(holders: number): string {
+  if (holders === 0) return "Nobody holds it yet";
+  return holders === 1 ? "1 player holds it" : `${holders} players hold it`;
+}
+
+/** The delete confirmation: who loses the badge, and the credits that go with it */
+export function deleteBadgeWarning(name: string, holders: number, credits: number): string {
+  if (holders === 0) return `Nobody holds ${name} yet.`;
+  const who = holders === 1 ? "1 player holds" : `${holders} players hold`;
+  const withCredits = credits > 0 ? `, with the ${formatCredits(credits)} it gave each` : "";
+  return `${who} ${name}. Deleting it takes it away from them${withCredits}.`;
+}

@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Trophy,
   Award,
+  Medal,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
@@ -73,6 +74,7 @@ const iconMap = {
   "merch-analytics": BarChart3,
   leaderboard: Trophy,
   achievements: Award,
+  badges: Medal,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -117,6 +119,7 @@ const adminNav: NavItem[] = [
   { key: "feedback", label: "Feedback", href: "/admin/feedback", section: "Training" },
   // Its own section: competitions will join the leaderboard here
   { key: "leaderboard", label: "Leaderboard", href: "/admin/leaderboard", section: "Competitions" },
+  { key: "badges", label: "Badges", href: "/admin/badges", section: "Competitions" },
   { key: "whatsapp-templates", label: "WhatsApp Templates", href: "/admin/whatsapp-templates", section: "Messaging" },
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
