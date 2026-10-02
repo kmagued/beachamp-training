@@ -6,12 +6,13 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Pagination, SelectionBar, Button, Input, Drawer } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { createCoach, bulkDeleteCoaches } from "@/app/_actions/training";
-import { Plus, Eye, EyeOff, Copy, CheckCircle2, Trash2, Loader2 } from "lucide-react";
+import { Plus, Eye, EyeOff, Copy, CheckCircle2, Trash2, Loader2, Download } from "lucide-react";
 import type { CoachRow, SortField, SortDir } from "./_components/types";
 import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
 import { CoachesFilters } from "./_components/filters";
 import { CoachesTableView } from "./_components/table";
 import { CoachDrawer } from "./_components/coach-drawer";
+import { ExportPayDrawer } from "./_components/export-pay-drawer";
 
 export default function AdminCoachesPage() {
   return (
@@ -34,6 +35,7 @@ function AdminCoachesContent() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, startBulkDeleteTransition] = useTransition();
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  const [showExport, setShowExport] = useState(false);
 
   // Add Coach state
   const [showAddCoach, setShowAddCoach] = useState(false);
@@ -157,6 +159,16 @@ function AdminCoachesContent() {
       return next;
     });
   }, []);
+
+  // Selected coaches for the pay export, across every page, in name order
+  const exportCoaches = useMemo(
+    () =>
+      coaches
+        .filter((c) => selectedIds.has(c.id))
+        .map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [coaches, selectedIds]
+  );
 
   // Keep an open coach drawer in sync with refreshed list data; close it if the
   // coach is gone (e.g. after a delete), matching the players pattern.
@@ -290,6 +302,13 @@ function AdminCoachesContent() {
 
       <SelectionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
         <button
+          onClick={() => setShowExport(true)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2 sm:px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export
+        </button>
+        <button
           onClick={() => setConfirmBulkDelete(true)}
           className="inline-flex items-center gap-1.5 text-xs font-medium px-2 sm:px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
         >
@@ -339,6 +358,8 @@ function AdminCoachesContent() {
         onClose={() => setDrawerCoach(null)}
         onDataChange={fetchCoaches}
       />
+
+      <ExportPayDrawer open={showExport} onClose={() => setShowExport(false)} coaches={exportCoaches} />
 
       {/* Bulk delete confirmation — portaled to body so the backdrop covers the whole viewport */}
       {confirmBulkDelete && createPortal(
