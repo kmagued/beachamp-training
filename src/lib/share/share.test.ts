@@ -15,6 +15,7 @@ const award: ShareSubject = {
 const badge: ShareSubject = {
   kind: "badge",
   name: "Court Regular",
+  tier: 2,
   icon: "shield-check",
   description: "Attended 25 sessions",
   earnedOn: "2026-09-25",
@@ -29,15 +30,19 @@ test("shareText: an award names the place, group and month; never a possessive g
   );
 });
 
-test("shareText: a badge names the badge and what it took", () => {
-  assert.equal(shareText(badge), "I earned the Court Regular badge at Beachamp Academy · Attended 25 sessions");
+test("shareText: a badge tier names the tier, the badge and what it took", () => {
+  assert.equal(shareText(badge), "I earned the Silver Court Regular badge at Beachamp Academy · Attended 25 sessions");
+  assert.equal(
+    shareText({ ...badge, tier: 5 }),
+    "I earned the Diamond Court Regular badge at Beachamp Academy · Attended 25 sessions"
+  );
 });
 
 test("shareFileName: lowercase ASCII, safe on every phone", () => {
   assert.equal(shareFileName(award), "beachamp-1st-place-september-2026.jpg");
   assert.equal(shareFileName({ ...award, place: 2, month: "2026-08" }), "beachamp-2nd-place-august-2026.jpg");
-  assert.equal(shareFileName(badge), "beachamp-court-regular-badge.jpg");
-  assert.equal(shareFileName({ ...badge, name: "Iron Streak! (8×)" }), "beachamp-iron-streak-8-badge.jpg");
+  assert.equal(shareFileName(badge), "beachamp-court-regular-silver-badge.jpg");
+  assert.equal(shareFileName({ ...badge, tier: 1, name: "Iron Streak! (8×)" }), "beachamp-iron-streak-8-bronze-badge.jpg");
 });
 
 test("slugify: accents dropped, punctuation collapsed, never empty", () => {

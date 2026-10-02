@@ -5,21 +5,33 @@ import { useRouter } from "next/navigation";
 import { Medal, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, ConfirmDialog, EmptyState, Toast } from "@/components/ui";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
-import type { BadgeIconKey, Measure } from "@/lib/badges/config";
-import { badgeDescription, creditsEarned, deleteBadgeWarning, formatBadgeDate, holdersLabel } from "@/lib/badges/words";
+import { MEASURES, TIERS, type BadgeIconKey, type Measure, type TierNumber } from "@/lib/badges/config";
+import { creditsEarned, deleteBadgeWarning, formatBadgeDate, playersCount, tierRequirement } from "@/lib/badges/words";
 import { deleteBadge } from "@/app/_actions/badges";
 import { BadgeDrawer } from "./badge-drawer";
+
+export interface AdminBadgeTier {
+  id: string;
+  tier: TierNumber;
+  threshold: number;
+  credits: number;
+  /** Players holding this tier */
+  holders: number;
+}
 
 export interface AdminBadge {
   id: string;
   name: string;
   icon: BadgeIconKey;
   measure: Measure;
-  threshold: number;
-  credits: number;
   /** YYYY-MM-DD: only activity from this day counts */
   counts_from: string;
+  /** Bronze first */
+  tiers: AdminBadgeTier[];
+  /** Players holding any tier */
   holders: number;
+  /** Credits actually paid for its tiers, which can differ from what they pay now */
+  credits_paid: number;
 }
 
 export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
@@ -94,29 +106,41 @@ export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {badges.map((badge) => {
-            const credits = creditsEarned(badge.credits);
+            const top = badge.tiers.at(-1)?.tier ?? 1;
             return (
-              <div
-                key={badge.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 flex flex-col items-center text-center"
-              >
-                <BadgeMedallion icon={badge.icon} size="lg" />
-                <h3 className="mt-4 text-lg font-semibold text-primary-900">{badge.name}</h3>
-                <p className="text-sm text-slate-500">{badgeDescription(badge.measure, badge.threshold)}</p>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {credits && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-xs font-semibold text-amber-800">
-                      {credits}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
-                    {holdersLabel(badge.holders)}
-                  </span>
+              <div key={badge.id} className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 flex flex-col">
+                <div className="flex items-center gap-3">
+                  <BadgeMedallion icon={badge.icon} tier={top} size="md" />
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-primary-900 truncate">{badge.name}</h3>
+                    <p className="text-sm text-slate-500">{MEASURES[badge.measure].label}</p>
+                  </div>
                 </div>
-                <p className="mt-2 text-xs text-slate-400">
+
+                <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                  {badge.tiers.map((tier) => {
+                    const credits = creditsEarned(tier.credits);
+                    return (
+                      <li key={tier.id} className="flex items-center gap-2.5 px-3 py-2">
+                        <BadgeMedallion icon={badge.icon} tier={tier.tier} size="xs" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-primary-900">
+                            {TIERS[tier.tier].label} · {tierRequirement(badge.measure, tier.threshold)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {credits ? `${credits} · ` : ""}
+                            {playersCount(tier.holders)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <p className="mt-3 text-xs text-slate-400">
                   Counting since {formatBadgeDate(badge.counts_from, "medium")}
                 </p>
-                <div className="mt-5 flex w-full gap-2">
+                <div className="mt-auto pt-4 flex w-full gap-2">
                   <Button variant="outline" className="flex-1 px-3" onClick={() => openDrawer(badge)}>
                     <span className="flex items-center justify-center gap-1.5">
                       <Pencil className="w-4 h-4" />
@@ -155,7 +179,7 @@ export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
         onClose={() => setDeleting(null)}
         onConfirm={handleDelete}
         title={deleting ? `Delete ${deleting.name}?` : "Delete badge?"}
-        description={deleting ? deleteBadgeWarning(deleting.name, deleting.holders, deleting.credits) : undefined}
+        description={deleting ? deleteBadgeWarning(deleting.name, deleting.holders, deleting.credits_paid) : undefined}
         confirmLabel="Delete badge"
         loading={isPending}
       />

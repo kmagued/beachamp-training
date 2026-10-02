@@ -29,21 +29,26 @@ export function badgeDescription(measure: Measure, threshold: number): string {
   }
 }
 
-/**
- * How far a player is toward a locked badge. value is the player's figure for the measure;
- * currentRun is the streak as it stands now, which is what a player can still build on.
- */
-export function progressLabel(measure: Measure, value: number, currentRun: number | null, threshold: number): string {
+/** The short form on a tier tile, under the badge's measure: "25 sessions", "8 in a row" */
+export function tierRequirement(measure: Measure, threshold: number): string {
   switch (measure) {
     case "sessions_attended":
-      return `${value} of ${plural(threshold, "session")}`;
+      return plural(threshold, "session");
     case "attendance_streak":
-      return `Current run: ${currentRun ?? 0} of ${threshold}`;
+      return `${threshold} in a row`;
     case "month_points":
-      return `Best month: ${value} of ${threshold} points`;
+      return `${threshold}+ points`;
     case "monthly_wins":
-      return `${value} of ${plural(threshold, "win")}`;
+      return plural(threshold, "win");
   }
+}
+
+/**
+ * How far a player is toward the next tier: "34 / 50". value is the player's figure for
+ * the measure; for a streak it's the run as it stands now, which is what they can build on.
+ */
+export function tierProgress(measure: Measure, value: number, currentRun: number | null, threshold: number): string {
+  return measure === "attendance_streak" ? `Run ${currentRun ?? 0} / ${threshold}` : `${value} / ${threshold}`;
 }
 
 /** The progress bar's fill, from 0 to 1 */
@@ -57,7 +62,7 @@ export function formatCredits(n: number): string {
   return plural(n, "credit");
 }
 
-/** "+50 credits" for a badge that pays some, or null for one that pays none */
+/** "+50 credits" for a tier that pays some, or null for one that pays none */
 export function creditsEarned(credits: number): string | null {
   return credits > 0 ? `+${formatCredits(credits)}` : null;
 }
@@ -74,27 +79,30 @@ export function formatBadgeDate(date: string, style: "short" | "medium" | "long"
   return style === "medium" ? `${short} ${d.getUTCFullYear()}` : short;
 }
 
-/** "Nobody holds it yet", "1 player holds it", "12 players hold it" */
-export function holdersLabel(holders: number): string {
-  if (holders === 0) return "Nobody holds it yet";
-  return holders === 1 ? "1 player holds it" : `${holders} players hold it`;
+/** How many players hold a tier, on the admin page: "Nobody yet", "1 player", "12 players" */
+export function playersCount(holders: number): string {
+  return holders === 0 ? "Nobody yet" : plural(holders, "player");
 }
 
-/** The delete confirmation: who loses the badge, and the credits that go with it */
-export function deleteBadgeWarning(name: string, holders: number, credits: number): string {
+/**
+ * The delete confirmation: who loses the badge, and the credits actually paid for it,
+ * which can differ from what its tiers pay now
+ */
+export function deleteBadgeWarning(name: string, holders: number, creditsPaid: number): string {
   if (holders === 0) return `Nobody holds ${name} yet.`;
   const who = holders === 1 ? "1 player holds" : `${holders} players hold`;
-  const withCredits = credits > 0 ? `, with the ${formatCredits(credits)} it gave each` : "";
+  const withCredits = creditsPaid > 0 ? `, with the ${formatCredits(creditsPaid)} it gave them` : "";
   return `${who} ${name}. Deleting it takes it away from them${withCredits}.`;
 }
 
-/** The Badges earned tile: "2 still to unlock", or "All unlocked" */
-export function badgesDetail(earned: number, total: number): string {
-  const left = total - earned;
+/** The Badges earned tile, counting tiers: "11 still to unlock", "All unlocked" */
+export function badgesDetail(earnedTiers: number, totalTiers: number): string {
+  if (totalTiers === 0) return "None yet";
+  const left = totalTiers - earnedTiers;
   return left <= 0 ? "All unlocked" : `${left} still to unlock`;
 }
 
-/** The Beachamp Credits tile: where the balance came from */
-export function creditsDetail(earnedBadges: number): string {
-  return earnedBadges === 0 ? "Earn badges to collect them" : `From ${plural(earnedBadges, "badge")}`;
+/** The Beachamp Credits tile: where the balance came from, counting tiers that paid */
+export function creditsDetail(paidTiers: number): string {
+  return paidTiers === 0 ? "Earn badges to collect them" : `From ${plural(paidTiers, "badge")}`;
 }

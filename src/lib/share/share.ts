@@ -2,7 +2,7 @@
 // drawing agree, and tests cover them without a browser.
 
 import { branding } from "@/lib/config/branding";
-import type { BadgeIconKey } from "@/lib/badges/config";
+import { TIERS, type BadgeIconKey, type TierNumber } from "@/lib/badges/config";
 import { placeLabel, type Place } from "@/lib/king-of-court/awards";
 import { formatMonth, ordinal } from "@/lib/king-of-court/format";
 
@@ -20,6 +20,7 @@ export type ShareSubject =
   | {
       kind: "badge";
       name: string;
+      tier: TierNumber;
       icon: BadgeIconKey;
       description: string;
       /** YYYY-MM-DD */
@@ -35,26 +36,26 @@ export function shareText(subject: ShareSubject): string {
   if (subject.kind === "award") {
     return `${placeLabel(subject.place)} in the ${subject.groupName} King of Court for ${formatMonth(subject.month, "long")} · ${branding.name}`;
   }
-  return `I earned the ${subject.name} badge at ${branding.name} · ${subject.description}`;
+  return `I earned the ${TIERS[subject.tier].label} ${subject.name} badge at ${branding.name} · ${subject.description}`;
 }
 
 /** "Café  Champion" → "cafe-champion"; anything with no letters or digits → "achievement" */
 export function slugify(text: string): string {
   const slug = text
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "achievement";
 }
 
-/** "beachamp-1st-place-september-2026.jpg", "beachamp-court-regular-badge.jpg" */
+/** "beachamp-1st-place-september-2026.jpg", "beachamp-court-regular-silver-badge.jpg" */
 export function shareFileName(subject: ShareSubject): string {
   const what =
     subject.kind === "award"
       ? `${ordinal(subject.place)}-place-${slugify(formatMonth(subject.month, "long"))}`
-      : `${slugify(subject.name)}-badge`;
+      : `${slugify(subject.name)}-${TIERS[subject.tier].key}-badge`;
   return `beachamp-${what}.jpg`;
 }
 

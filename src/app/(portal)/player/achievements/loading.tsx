@@ -19,10 +19,9 @@ export default function PlayerAchievementsLoading() {
         <Skeleton className="h-56 w-full rounded-2xl" />
       </div>
       <Skeleton className="h-3 w-20 mb-3" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-52 w-full rounded-2xl" />
-        ))}
+      <div className="space-y-4">
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     </div>
   );

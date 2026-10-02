@@ -3,19 +3,32 @@
 // to their rows, and my_badge_progress() only ever answers for the signed-in player.
 
 import { loadPlayerAwards, type PlayerAward } from "@/lib/king-of-court/awards-load";
-import type { BadgeIconKey, Measure } from "./config";
+import type { BadgeIconKey, Measure, TierNumber } from "./config";
 import { sortBadges } from "./sort";
 
-/** A badge as one player sees it: earned_on is set when they hold it */
+/** One tier of a badge, as one player sees it */
+export interface PlayerTierView {
+  id: string;
+  tier: TierNumber;
+  threshold: number;
+  /** What the tier pays now, for a tier still to earn */
+  credits: number;
+  /** YYYY-MM-DD, or null while locked */
+  earned_on: string | null;
+  /** What the player was actually paid for it (credits are fixed when earned), or null while locked */
+  credits_paid: number | null;
+}
+
+/** A badge as one player sees it */
 export interface PlayerBadgeView {
   id: string;
   name: string;
   icon: BadgeIconKey;
   measure: Measure;
-  threshold: number;
-  credits: number;
   created_at: string;
-  /** YYYY-MM-DD, or null while locked */
+  /** Bronze first */
+  tiers: PlayerTierView[];
+  /** The latest day any of its tiers was earned, or null if none is: for ordering */
   earned_on: string | null;
   /** The player's figure for the measure (sessions, best run, best month, wins) */
   value: number;
@@ -25,7 +38,7 @@ export interface PlayerBadgeView {
 
 export interface PlayerAchievements {
   awards: PlayerAward[];
-  /** Earned first, newest first; then locked */
+  /** Badges with an earned tier first, newest first; then locked */
   badges: PlayerBadgeView[];
   creditBalance: number;
   sessionsAttended: number;
@@ -33,29 +46,65 @@ export interface PlayerAchievements {
 
 export type LatestAchievement =
   | { kind: "award"; id: string; date: string; award: PlayerAward }
-  | { kind: "badge"; id: string; date: string; badge: PlayerBadgeView };
+  | { kind: "badge"; id: string; date: string; badge: PlayerBadgeView; tier: PlayerTierView };
+
+type Progress = Map<string, { value: number; current_run: number | null }>;
 
 const fail = (message: string) => new Error(`Could not load your achievements: ${message}`);
 
-/** Every badge, with whether and when the player earned it */
+/** Every badge and its tiers, with whether and when the player earned each, and what it paid */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadBadges(supabase: any, playerId: string, progress: Map<string, { value: number; current_run: number | null }>) {
-  const [{ data: badges, error: badgeErr }, { data: held, error: heldErr }] = await Promise.all([
-    supabase.from("badges").select("id, name, icon, measure, threshold, credits, created_at"),
-    supabase.from("player_badges").select("badge_id, earned_on").eq("player_id", playerId),
+async function loadBadges(supabase: any, playerId: string, progress: Promise<Progress>): Promise<PlayerBadgeView[]> {
+  const [{ data: badges, error: badgeErr }, { data: held, error: heldErr }, progressByBadge] = await Promise.all([
+    supabase.from("badges").select("id, name, icon, measure, created_at, badge_tiers(id, tier, threshold, credits)"),
+    supabase
+      .from("player_badges")
+      .select("badge_tier_id, earned_on, credit_transactions(amount)")
+      .eq("player_id", playerId),
+    progress,
   ]);
   if (badgeErr) throw fail(badgeErr.message);
   if (heldErr) throw fail(heldErr.message);
 
-  const earnedOn = new Map(((held || []) as { badge_id: string; earned_on: string }[]).map((h) => [h.badge_id, h.earned_on]));
-  const rows = (badges || []) as Omit<PlayerBadgeView, "earned_on" | "value" | "current_run">[];
+  const heldTiers = new Map(
+    ((held || []) as { badge_tier_id: string; earned_on: string; credit_transactions: { amount: number }[] | null }[]).map(
+      (h) => [h.badge_tier_id, { earned_on: h.earned_on, paid: (h.credit_transactions ?? []).reduce((sum, c) => sum + c.amount, 0) }]
+    )
+  );
+  const rows = (badges || []) as (Omit<PlayerBadgeView, "tiers" | "earned_on" | "value" | "current_run"> & {
+    badge_tiers: { id: string; tier: TierNumber; threshold: number; credits: number }[] | null;
+  })[];
+
   return sortBadges(
-    rows.map((b) => ({
-      ...b,
-      earned_on: earnedOn.get(b.id) ?? null,
-      value: progress.get(b.id)?.value ?? 0,
-      current_run: progress.get(b.id)?.current_run ?? null,
-    }))
+    rows.map(({ badge_tiers, ...badge }) => {
+      const tiers = [...(badge_tiers ?? [])]
+        .sort((a, b) => a.tier - b.tier)
+        .map((t) => ({
+          ...t,
+          earned_on: heldTiers.get(t.id)?.earned_on ?? null,
+          credits_paid: heldTiers.get(t.id)?.paid ?? null,
+        }));
+      const earnedDays = tiers.map((t) => t.earned_on).filter((d): d is string => d !== null).sort();
+      return {
+        ...badge,
+        tiers,
+        earned_on: earnedDays.at(-1) ?? null,
+        value: progressByBadge.get(badge.id)?.value ?? 0,
+        current_run: progressByBadge.get(badge.id)?.current_run ?? null,
+      };
+    })
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadProgress(supabase: any): Promise<Progress> {
+  const { data, error } = await supabase.rpc("my_badge_progress");
+  if (error) throw fail(error.message);
+  return new Map(
+    ((data || []) as { badge_id: string; value: number; current_run: number | null }[]).map((p) => [
+      p.badge_id,
+      { value: p.value, current_run: p.current_run },
+    ])
   );
 }
 
@@ -66,44 +115,45 @@ async function loadCreditBalance(supabase: any, playerId: string): Promise<numbe
   return ((data || []) as { amount: number }[]).reduce((sum, row) => sum + row.amount, 0);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadSessionsAttended(supabase: any, playerId: string): Promise<number> {
+  // Every present session, all time: not limited by any badge's start day
+  const { count, error } = await supabase
+    .from("attendance")
+    .select("id", { count: "exact", head: true })
+    .eq("player_id", playerId)
+    .eq("status", "present");
+  if (error) throw fail(error.message);
+  return count ?? 0;
+}
+
 /** Everything the Achievements page shows. Throws, so a failed read isn't shown as "nothing yet". */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadPlayerAchievements(supabase: any, playerId: string): Promise<PlayerAchievements> {
-  const [awards, progressRes, creditBalance, attendanceRes] = await Promise.all([
+  const progress = loadProgress(supabase);
+  // Handled by loadBadges; this stops an early failure being reported as unhandled
+  progress.catch(() => {});
+  const [awards, badges, creditBalance, sessionsAttended] = await Promise.all([
     loadPlayerAwards(supabase, playerId),
-    supabase.rpc("my_badge_progress"),
+    loadBadges(supabase, playerId, progress),
     loadCreditBalance(supabase, playerId),
-    // Every present session, all time: not limited by any badge's start day
-    supabase
-      .from("attendance")
-      .select("id", { count: "exact", head: true })
-      .eq("player_id", playerId)
-      .eq("status", "present"),
+    loadSessionsAttended(supabase, playerId),
   ]);
-  if (progressRes.error) throw fail(progressRes.error.message);
-  if (attendanceRes.error) throw fail(attendanceRes.error.message);
-
-  const progress = new Map(
-    ((progressRes.data || []) as { badge_id: string; value: number; current_run: number | null }[]).map((p) => [
-      p.badge_id,
-      { value: p.value, current_run: p.current_run },
-    ])
-  );
-  const badges = await loadBadges(supabase, playerId, progress);
-
-  return { awards, badges, creditBalance, sessionsAttended: attendanceRes.count ?? 0 };
+  return { awards, badges, creditBalance, sessionsAttended };
 }
 
 /**
- * Awards and earned badges together, newest first. An award is dated by when its month
- * was closed (a timestamp), a badge by the day it was earned; the two compare as strings.
+ * Awards and earned tiers together, newest first. An award is dated by when its month
+ * was closed (a timestamp), a tier by the day it was earned; the two compare as strings.
  */
 export function latestAchievements(awards: PlayerAward[], badges: PlayerBadgeView[], limit: number): LatestAchievement[] {
   const items: LatestAchievement[] = [
     ...awards.map((award) => ({ kind: "award" as const, id: award.id, date: award.awarded_at, award })),
-    ...badges
-      .filter((badge) => badge.earned_on)
-      .map((badge) => ({ kind: "badge" as const, id: badge.id, date: badge.earned_on!, badge })),
+    ...badges.flatMap((badge) =>
+      badge.tiers
+        .filter((tier) => tier.earned_on !== null)
+        .map((tier) => ({ kind: "badge" as const, id: tier.id, date: tier.earned_on!, badge, tier }))
+    ),
   ];
   return items.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
 }
@@ -114,18 +164,17 @@ export function latestAchievements(awards: PlayerAward[], badges: PlayerBadgeVie
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadLatestAchievements(supabase: any, playerId: string, limit: number) {
-  let awards: PlayerAward[] = [];
-  let badges: PlayerBadgeView[] = [];
-  let creditBalance = 0;
-  try {
-    awards = await loadPlayerAwards(supabase, playerId);
-  } catch (err) {
-    console.error("[achievements]", err);
-  }
-  try {
-    [badges, creditBalance] = await Promise.all([loadBadges(supabase, playerId, new Map()), loadCreditBalance(supabase, playerId)]);
-  } catch (err) {
-    console.error("[achievements]", err);
-  }
+  const noProgress: Promise<Progress> = Promise.resolve(new Map());
+  const [awards, badgesAndCredits] = await Promise.all([
+    loadPlayerAwards(supabase, playerId).catch((err) => {
+      console.error("[achievements]", err);
+      return [] as PlayerAward[];
+    }),
+    Promise.all([loadBadges(supabase, playerId, noProgress), loadCreditBalance(supabase, playerId)]).catch((err) => {
+      console.error("[achievements]", err);
+      return [[], 0] as [PlayerBadgeView[], number];
+    }),
+  ]);
+  const [badges, creditBalance] = badgesAndCredits;
   return { items: latestAchievements(awards, badges, limit), creditBalance };
 }

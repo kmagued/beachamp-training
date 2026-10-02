@@ -52,6 +52,10 @@ export function ShareDrawer({
   const [file, setFile] = useState<File | null>(null);
   const [drawing, setDrawing] = useState(true);
   const [readingPhoto, setReadingPhoto] = useState(false);
+  // A share sheet is open: a second tap would make share() fail and save a stray file.
+  // The ref blocks a second tap at once; the state disables the button.
+  const sharingNow = useRef(false);
+  const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "error" | "info" } | null>(null);
 
   const subjectKey = JSON.stringify(subject);
@@ -115,19 +119,25 @@ export function ShareDrawer({
   const canShareFiles = file !== null && typeof navigator !== "undefined" && !!navigator.canShare?.({ files: [file] });
 
   async function handleShare() {
-    if (!file) return;
+    if (!file || sharingNow.current) return;
     if (!canShareFiles) {
       download(file);
       return;
     }
+    sharingNow.current = true;
+    setSharing(true);
     try {
+      // Called straight from the tap, before any other await: iOS requires it
       await navigator.share({ files: [file], text: shareText(subject) });
     } catch (err) {
-      // Closing the share sheet isn't a failure
-      if (err instanceof DOMException && err.name === "AbortError") return;
+      // Closing the share sheet isn't a failure, and neither is a share already open
+      if (err instanceof DOMException && (err.name === "AbortError" || err.name === "InvalidStateError")) return;
       console.error("[share]", err);
       download(file);
       setToast({ message: "Couldn't open sharing, so the image was saved instead.", variant: "info" });
+    } finally {
+      sharingNow.current = false;
+      setSharing(false);
     }
   }
 
@@ -141,7 +151,7 @@ export function ShareDrawer({
         onClose={onClose}
         title={subject.kind === "award" ? "Share your award" : "Share your badge"}
         footer={
-          <Button className="w-full" onClick={handleShare} disabled={!file}>
+          <Button className="w-full" onClick={handleShare} disabled={!file || sharing}>
             <span className="flex items-center justify-center gap-2">
               {drawing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -150,7 +160,7 @@ export function ShareDrawer({
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {canShareFiles || drawing ? "Share" : "Save image"}
+              {canShareFiles ? "Share" : drawing ? "Preparing…" : "Save image"}
             </span>
           </Button>
         }
@@ -194,6 +204,17 @@ export function ShareDrawer({
           <p className="text-xs text-slate-400">
             Your photo stays on this phone. It&apos;s only used to draw the card.
           </p>
+          {/* Where the button opens a share sheet (e.g. a Mac), the image can still just be saved */}
+          {canShareFiles && file && (
+            <button
+              type="button"
+              onClick={() => download(file)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-800 hover:text-primary-900"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Save the image instead
+            </button>
+          )}
         </div>
 
         {/* The badge's icon, drawn into the card from this hidden copy */}

@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { validateBadge, type BadgeField, type BadgeInput } from "@/lib/badges/validate";
+import { validateBadge, type BadgeField, type BadgeFields, type BadgeInput } from "@/lib/badges/validate";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -29,7 +29,7 @@ function requireAdmin(user: { role: string } | null) {
   return null;
 }
 
-type BadgeResult = { success: true } | { error: string; field?: BadgeField };
+type BadgeResult = { success: true } | { error: string; field?: BadgeField; tier?: number };
 
 function revalidateBadges() {
   for (const path of ["/admin/badges", "/player/achievements", "/player/dashboard"]) {
@@ -37,37 +37,49 @@ function revalidateBadges() {
   }
 }
 
-// 23505 is badges_name_unique: names are unique ignoring case and surrounding spaces
+// 23505 is badges_name_unique: names are unique ignoring case and surrounding spaces.
+// save_badge's own refusals (23514) are written to be shown to the admin as they are.
 function saveError(error: { code?: string; message: string }, name: string): BadgeResult {
   if (error.code === "23505") return { error: `There's already a badge called ${name}`, field: "name" };
   return { error: error.message };
+}
+
+// save_badge writes the badge and all its tiers in one transaction, then re-checks every
+// player the badge could affect, so the admin sees an error if that fails
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function saveBadge(admin: any, id: string | null, fields: BadgeFields, createdBy: string): Promise<BadgeResult> {
+  const { error } = await admin.rpc("save_badge", {
+    p_id: id,
+    p_name: fields.name,
+    p_icon: fields.icon,
+    p_measure: fields.measure,
+    p_tiers: fields.tiers,
+    p_created_by: createdBy,
+  });
+  if (error) return saveError(error, fields.name);
+  revalidateBadges();
+  return { success: true };
 }
 
 // ═══════════════════════════════════════
 // BADGES (Admin only)
 // ═══════════════════════════════════════
 
-// The database awards a new badge to everyone who already meets it since today (its
-// counts_from day), inside this insert, so the admin sees an error if that fails.
+// A new badge counts from today (its counts_from day), so players start from zero
 export async function createBadge(input: BadgeInput): Promise<BadgeResult> {
   const user = await getCurrentUserRole();
   const authErr = requireAdmin(user);
   if (authErr) return authErr;
 
   const checked = validateBadge(input);
-  if (!checked.ok) return { error: checked.error, field: checked.field };
+  if (!checked.ok) return { error: checked.error, field: checked.field, tier: checked.tier };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
-  const { error } = await admin.from("badges").insert({ ...checked.value, created_by: user!.id });
-  if (error) return saveError(error, checked.value.name);
-
-  revalidateBadges();
-  return { success: true };
+  return saveBadge(createAdminClient() as any, null, checked.value, user!.id);
 }
 
-// The measure and start day never change. A new number re-checks every holder and
-// candidate in the database; new credits apply only to players who earn it from now on.
+// The measure and start day never change. Raising a number or removing a tier takes it
+// back from players who no longer qualify; new credits apply only to future earners.
 export async function updateBadge(id: string, input: BadgeInput): Promise<BadgeResult> {
   const user = await getCurrentUserRole();
   const authErr = requireAdmin(user);
@@ -81,18 +93,13 @@ export async function updateBadge(id: string, input: BadgeInput): Promise<BadgeR
   if (!existing) return { error: "That badge no longer exists" };
 
   const checked = validateBadge(input, { currentMeasure: existing.measure });
-  if (!checked.ok) return { error: checked.error, field: checked.field };
+  if (!checked.ok) return { error: checked.error, field: checked.field, tier: checked.tier };
 
-  const { name, icon, threshold, credits } = checked.value;
-  const { error } = await admin.from("badges").update({ name, icon, threshold, credits }).eq("id", id);
-  if (error) return saveError(error, name);
-
-  revalidateBadges();
-  return { success: true };
+  return saveBadge(admin, id, checked.value, user!.id);
 }
 
-// Holders lose the badge and its credits (ON DELETE CASCADE); unread notifications for
-// it are removed by the player_badges_drop_notification trigger.
+// Holders lose its tiers and their credits (ON DELETE CASCADE); unread notifications
+// for them are removed by the player_badges_drop_notification trigger.
 export async function deleteBadge(id: string): Promise<BadgeResult> {
   const user = await getCurrentUserRole();
   const authErr = requireAdmin(user);

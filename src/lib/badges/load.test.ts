@@ -29,9 +29,35 @@ function stubClient(tables: Record<string, Result>, progress: Result = { data: [
 }
 
 const badgeRows = [
-  { id: "regular", name: "Court Regular", icon: "shield-check", measure: "sessions_attended", threshold: 25, credits: 50, created_at: "2026-10-02T09:00:00Z" },
-  { id: "streak", name: "Iron Streak", icon: "zap", measure: "attendance_streak", threshold: 8, credits: 0, created_at: "2026-10-02T10:00:00Z" },
-  { id: "century", name: "Century Club", icon: "sparkles", measure: "month_points", threshold: 100, credits: 30, created_at: "2026-10-02T11:00:00Z" },
+  {
+    id: "regular",
+    name: "Court Regular",
+    icon: "shield-check",
+    measure: "sessions_attended",
+    created_at: "2026-10-02T09:00:00Z",
+    // Out of order on purpose: the loader puts Bronze first
+    badge_tiers: [
+      { id: "regular-2", tier: 2, threshold: 25, credits: 100 },
+      { id: "regular-1", tier: 1, threshold: 10, credits: 20 },
+      { id: "regular-3", tier: 3, threshold: 50, credits: 200 },
+    ],
+  },
+  {
+    id: "streak",
+    name: "Iron Streak",
+    icon: "zap",
+    measure: "attendance_streak",
+    created_at: "2026-10-02T10:00:00Z",
+    badge_tiers: [{ id: "streak-1", tier: 1, threshold: 8, credits: 0 }],
+  },
+  {
+    id: "century",
+    name: "Century Club",
+    icon: "sparkles",
+    measure: "month_points",
+    created_at: "2026-10-02T11:00:00Z",
+    badge_tiers: [{ id: "century-1", tier: 1, threshold: 100, credits: 30 }],
+  },
 ];
 
 const awardRows = [
@@ -40,34 +66,58 @@ const awardRows = [
 
 const tables: Record<string, Result> = {
   badges: { data: badgeRows },
-  player_badges: { data: [{ badge_id: "century", earned_on: "2026-10-20" }, { badge_id: "regular", earned_on: "2026-11-03" }] },
-  credit_transactions: { data: [{ amount: 50 }, { amount: 30 }] },
+  player_badges: {
+    data: [
+      // Silver was earned when it paid 50; the tier pays 100 now
+      { badge_tier_id: "regular-2", earned_on: "2026-11-03", credit_transactions: [{ amount: 50 }] },
+      { badge_tier_id: "regular-1", earned_on: "2026-10-12", credit_transactions: [{ amount: 20 }] },
+      { badge_tier_id: "century-1", earned_on: "2026-10-20", credit_transactions: [{ amount: 30 }] },
+    ],
+  },
+  credit_transactions: { data: [{ amount: 20 }, { amount: 50 }, { amount: 30 }] },
   attendance: { count: 64 },
   leaderboard_awards: { data: awardRows },
 };
 
 const progress: Result = {
   data: [
-    { badge_id: "regular", value: 27, current_run: null },
+    { badge_id: "regular", value: 34, current_run: null },
     { badge_id: "streak", value: 5, current_run: 3 },
   ],
 };
 
-test("loadPlayerAchievements: awards, badges with what's held and progress, the balance and sessions", async () => {
+test("loadPlayerAchievements: awards, badges with their tiers, what was paid, progress, balance and sessions", async () => {
   const a = await loadPlayerAchievements(stubClient(tables, progress), "p1");
 
   assert.deepEqual(a.awards.map((w) => w.id), ["a1"]);
-  assert.equal(a.creditBalance, 80);
+  assert.equal(a.creditBalance, 100);
   assert.equal(a.sessionsAttended, 64);
   assert.deepEqual(
     a.badges.map((b) => [b.id, b.earned_on, b.value, b.current_run]),
     [
-      ["regular", "2026-11-03", 27, null],
+      ["regular", "2026-11-03", 34, null],
       ["century", "2026-10-20", 0, null],
       ["streak", null, 5, 3],
     ],
-    "earned newest first, then locked; a badge with no progress row reads 0"
+    "badges with an earned tier first, newest first, then locked; a badge with no progress row reads 0"
   );
+  assert.deepEqual(a.badges[0].tiers, [
+    { id: "regular-1", tier: 1, threshold: 10, credits: 20, earned_on: "2026-10-12", credits_paid: 20 },
+    { id: "regular-2", tier: 2, threshold: 25, credits: 100, earned_on: "2026-11-03", credits_paid: 50 },
+    { id: "regular-3", tier: 3, threshold: 50, credits: 200, earned_on: null, credits_paid: null },
+  ]);
+});
+
+test("loadPlayerAchievements: a tier earned with 0 credits shows 0 paid", async () => {
+  const a = await loadPlayerAchievements(
+    stubClient(
+      { ...tables, player_badges: { data: [{ badge_tier_id: "streak-1", earned_on: "2026-10-05", credit_transactions: [] }] } },
+      progress
+    ),
+    "p1"
+  );
+  const streak = a.badges.find((b) => b.id === "streak")!;
+  assert.equal(streak.tiers[0].credits_paid, 0);
 });
 
 test("loadPlayerAchievements: a failed read is thrown, so the page doesn't show an empty state for it", async () => {
@@ -84,24 +134,38 @@ test("loadPlayerAchievements: a failed read is thrown, so the page doesn't show 
 const award = (id: string, awarded_at: string): PlayerAward => ({
   id, month: "2026-09", place: 1, points: 10, sessions: 2, awarded_at, group_name: "Mixed",
 });
-const badge = (id: string, earned_on: string | null): PlayerBadgeView => ({
-  id, name: id, icon: "star", measure: "sessions_attended", threshold: 5, credits: 0,
-  created_at: "2026-10-01T00:00:00Z", earned_on, value: 0, current_run: null,
+const badge = (id: string, tiers: (string | null)[]): PlayerBadgeView => ({
+  id,
+  name: id,
+  icon: "star",
+  measure: "sessions_attended",
+  created_at: "2026-10-01T00:00:00Z",
+  tiers: tiers.map((earned_on, i) => ({
+    id: `${id}-${i + 1}`,
+    tier: (i + 1) as 1 | 2 | 3 | 4 | 5,
+    threshold: (i + 1) * 10,
+    credits: 0,
+    earned_on,
+    credits_paid: earned_on ? 0 : null,
+  })),
+  earned_on: tiers.filter((t): t is string => t !== null).sort().at(-1) ?? null,
+  value: 0,
+  current_run: null,
 });
 
-test("latestAchievements: awards and earned badges together, newest first, up to the limit", () => {
+test("latestAchievements: awards and earned tiers together, newest first, up to the limit", () => {
   const items = latestAchievements(
     [award("sep", "2026-10-01T10:00:00Z"), award("aug", "2026-09-01T10:00:00Z")],
-    [badge("new", "2026-10-15"), badge("locked", null), badge("old", "2026-09-10")],
+    [badge("regular", ["2026-09-10", "2026-10-15", null]), badge("locked", [null])],
     3
   );
-  assert.deepEqual(items.map((i) => `${i.kind}:${i.id}`), ["badge:new", "award:sep", "badge:old"]);
+  assert.deepEqual(items.map((i) => `${i.kind}:${i.id}`), ["badge:regular-2", "award:sep", "badge:regular-1"]);
 });
 
 test("loadLatestAchievements: the dashboard's newest three and the balance", async () => {
   const latest = await loadLatestAchievements(stubClient(tables), "p1", 3);
-  assert.deepEqual(latest.items.map((i) => `${i.kind}:${i.id}`), ["badge:regular", "badge:century", "award:a1"]);
-  assert.equal(latest.creditBalance, 80);
+  assert.deepEqual(latest.items.map((i) => `${i.kind}:${i.id}`), ["badge:regular-2", "badge:century-1", "badge:regular-1"]);
+  assert.equal(latest.creditBalance, 100);
 });
 
 test("loadLatestAchievements: if badges can't be read, awards still show and nothing is thrown", async () => {

@@ -3,6 +3,7 @@
 // never leave the phone until the player shares them.
 
 import { branding } from "@/lib/config/branding";
+import { TIERS, type TierNumber } from "@/lib/badges/config";
 import { formatBadgeDate } from "@/lib/badges/words";
 import { formatMonth } from "@/lib/king-of-court/format";
 import { fitFontSize, type ShareSubject } from "@/lib/share/share";
@@ -17,7 +18,6 @@ const NAVY_DEEP = "#0C313A";
 const NAVY = branding.colors.primary[800];
 const TEAL = branding.colors.primary[500];
 const GOLD = branding.colors.accent[500];
-const GOLD_DEEP = branding.colors.accent[600];
 const CREAM = branding.colors.sand;
 
 // Canvas-only family names: next/font hashes the app's own, so a canvas can't name them
@@ -57,12 +57,13 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 
 const font = (weight: number, size: number, family: string) => `${weight} ${size}px ${family}`;
 
-/** Cuts text that still doesn't fit at the smallest size, with an ellipsis */
+/** Cuts text that still doesn't fit at the smallest size, with an ellipsis, never mid-character */
 function clip(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
-  let cut = text;
-  while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) cut = cut.slice(0, -1);
-  return `${cut.trimEnd()}…`;
+  // Code points, not UTF-16 units, so an emoji is never cut in half
+  let chars = Array.from(text);
+  while (chars.length > 1 && ctx.measureText(`${chars.join("")}…`).width > maxWidth) chars = chars.slice(0, -1);
+  return `${chars.join("").trimEnd()}…`;
 }
 
 /** Sets the largest font from start down to min that fits the width, and returns the size */
@@ -191,10 +192,18 @@ function drawAward(ctx: CanvasRenderingContext2D, subject: Extract<ShareSubject,
   drawPlace(ctx, subject.place, y);
 }
 
-function drawMedallion(ctx: CanvasRenderingContext2D, icon: HTMLImageElement | null, cx: number, cy: number, r: number) {
+/** The tier's metal, as on the Achievements page */
+function drawMedallion(
+  ctx: CanvasRenderingContext2D,
+  icon: HTMLImageElement | null,
+  tier: TierNumber,
+  cx: number,
+  cy: number,
+  r: number
+) {
   const fill = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-  fill.addColorStop(0, branding.colors.accent[400]);
-  fill.addColorStop(1, GOLD_DEEP);
+  fill.addColorStop(0, TIERS[tier].from);
+  fill.addColorStop(1, TIERS[tier].to);
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
   ctx.shadowBlur = 30;
@@ -249,13 +258,13 @@ function drawBadge(ctx: CanvasRenderingContext2D, subject: Extract<ShareSubject,
   // The medallion
   const r = 92;
   y -= badgeSize * 0.88 + 40;
-  drawMedallion(ctx, icon, MARGIN + r, y - r, r);
+  drawMedallion(ctx, icon, subject.tier, MARGIN + r, y - r, r);
 
-  // BADGE EARNED
+  // SILVER · BADGE EARNED, in the tier's colour
   y -= r * 2 + 44;
-  ctx.fillStyle = GOLD;
+  ctx.fillStyle = TIERS[subject.tier].light;
   ctx.font = font(600, 30, BODY);
-  drawSpaced(ctx, "BADGE EARNED", MARGIN, y, 9);
+  drawSpaced(ctx, `${TIERS[subject.tier].label.toUpperCase()} · BADGE EARNED`, MARGIN, y, 9);
 }
 
 /**

@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/user";
 import { Card, EmptyState } from "@/components/ui";
 import { AchievementStat } from "@/components/achievements/achievement-stat";
 import { AwardCard } from "@/components/achievements/award-card";
-import { BadgeTile } from "@/components/achievements/badge-tile";
+import { BadgeCard } from "@/components/achievements/badge-card";
 import { ShareButton } from "@/components/achievements/share-button";
 import { loadPlayerAchievements } from "@/lib/badges/load";
 import { badgeDescription, badgesDetail, creditsDetail } from "@/lib/badges/words";
@@ -21,8 +21,10 @@ export default async function PlayerAchievementsPage() {
 
   const supabase = await createClient();
   const { awards, badges, creditBalance, sessionsAttended } = await loadPlayerAchievements(supabase, currentUser.id);
-  const earned = badges.filter((b) => b.earned_on !== null);
-  const nothingYet = awards.length === 0 && earned.length === 0;
+  const tiers = badges.flatMap((b) => b.tiers);
+  const earnedTiers = tiers.filter((t) => t.earned_on !== null);
+  const paidTiers = earnedTiers.filter((t) => (t.credits_paid ?? 0) > 0);
+  const nothingYet = awards.length === 0 && earnedTiers.length === 0;
   // The name on the share card
   const { first_name, last_name } = currentUser.profile;
   const playerName = `${first_name ?? ""} ${last_name ?? ""}`.trim() || "Beachamp player";
@@ -36,16 +38,12 @@ export default async function PlayerAchievementsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <AchievementStat highlight label="Awards" value={awards.length} detail="Monthly leaderboard finishes" />
-        {badges.length > 0 && (
-          <>
-            <AchievementStat
-              label="Badges earned"
-              value={`${earned.length} of ${badges.length}`}
-              detail={badgesDetail(earned.length, badges.length)}
-            />
-            <AchievementStat label="Beachamp Credits" value={creditBalance} detail={creditsDetail(earned.length)} />
-          </>
-        )}
+        <AchievementStat
+          label="Badges earned"
+          value={`${earnedTiers.length} of ${tiers.length}`}
+          detail={badgesDetail(earnedTiers.length, tiers.length)}
+        />
+        <AchievementStat label="Beachamp Credits" value={creditBalance} detail={creditsDetail(paidTiers.length)} />
         <AchievementStat label="Sessions attended" value={sessionsAttended} detail="All time" />
       </div>
 
@@ -103,27 +101,26 @@ export default async function PlayerAchievementsPage() {
       {badges.length > 0 && (
         <section>
           <SectionHeading>Badges</SectionHeading>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="space-y-4">
             {badges.map((badge) => (
-              <BadgeTile
+              <BadgeCard
                 key={badge.id}
                 badge={badge}
-                share={
-                  badge.earned_on && (
-                    <ShareButton
-                      look="compact"
-                      playerId={currentUser.id}
-                      subject={{
-                        kind: "badge",
-                        name: badge.name,
-                        icon: badge.icon,
-                        description: badgeDescription(badge.measure, badge.threshold),
-                        earnedOn: badge.earned_on,
-                        playerName,
-                      }}
-                    />
-                  )
-                }
+                share={(tier) => (
+                  <ShareButton
+                    look="compact"
+                    playerId={currentUser.id}
+                    subject={{
+                      kind: "badge",
+                      name: badge.name,
+                      tier: tier.tier,
+                      icon: badge.icon,
+                      description: badgeDescription(badge.measure, tier.threshold),
+                      earnedOn: tier.earned_on!,
+                      playerName,
+                    }}
+                  />
+                )}
               />
             ))}
           </div>

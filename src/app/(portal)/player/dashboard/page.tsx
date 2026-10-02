@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils/cn";
 import { placeLabel } from "@/lib/king-of-court/awards";
 import { formatMonth } from "@/lib/king-of-court/format";
 import { loadLatestAchievements } from "@/lib/badges/load";
+import { TIERS } from "@/lib/badges/config";
 import { badgeDescription, formatCredits } from "@/lib/badges/words";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import type { Subscription } from "@/types/database";
@@ -330,11 +331,13 @@ export default async function PlayerDashboard() {
                 </div>
               ) : (
                 <div key={`badge-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <BadgeMedallion icon={item.badge.icon} size="sm" />
+                  <BadgeMedallion icon={item.badge.icon} tier={item.tier.tier} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-primary-900">{item.badge.name} badge</p>
+                    <p className="text-sm font-semibold text-primary-900">
+                      {item.badge.name} · {TIERS[item.tier.tier].label}
+                    </p>
                     <p className="text-xs text-primary-700/60 truncate">
-                      {badgeDescription(item.badge.measure, item.badge.threshold)}
+                      {badgeDescription(item.badge.measure, item.tier.threshold)}
                     </p>
                   </div>
                 </div>
