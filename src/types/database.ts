@@ -744,8 +744,6 @@ export interface Database {
           name: string;
           icon: string;
           measure: string;
-          threshold: number;
-          credits: number;
           counts_from: string;
           created_by: string | null;
           created_at: string;
@@ -756,8 +754,6 @@ export interface Database {
           name: string;
           icon: string;
           measure: string;
-          threshold: number;
-          credits?: number;
           counts_from?: string;
           created_by?: string | null;
           created_at?: string;
@@ -768,8 +764,6 @@ export interface Database {
           name?: string;
           icon?: string;
           measure?: string;
-          threshold?: number;
-          credits?: number;
           counts_from?: string;
           created_by?: string | null;
           created_at?: string;
@@ -777,10 +771,37 @@ export interface Database {
         };
         Relationships: [];
       };
-      player_badges: {
+      badge_tiers: {
         Row: {
           id: string;
           badge_id: string;
+          tier: number;
+          threshold: number;
+          credits: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          badge_id: string;
+          tier: number;
+          threshold: number;
+          credits?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          badge_id?: string;
+          tier?: number;
+          threshold?: number;
+          credits?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      player_badges: {
+        Row: {
+          id: string;
+          badge_tier_id: string;
           player_id: string;
           earned_on: string;
           notification_id: string | null;
@@ -788,7 +809,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          badge_id: string;
+          badge_tier_id: string;
           player_id: string;
           earned_on: string;
           notification_id?: string | null;
@@ -796,7 +817,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          badge_id?: string;
+          badge_tier_id?: string;
           player_id?: string;
           earned_on?: string;
           notification_id?: string | null;
@@ -1348,6 +1369,25 @@ export interface Database {
         };
         Returns: unknown;
       };
+      save_badge: {
+        Args: {
+          p_id: string | null;
+          p_name: string;
+          p_icon: string;
+          p_measure: string;
+          p_tiers: { threshold: number; credits: number }[];
+          p_created_by: string | null;
+        };
+        Returns: string;
+      };
+      badge_summaries: {
+        Args: Record<string, never>;
+        Returns: { badge_id: string; holders: number; credits_paid: number }[];
+      };
+      my_badge_progress: {
+        Args: Record<string, never>;
+        Returns: { badge_id: string; value: number; current_run: number | null }[];
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -1389,6 +1429,7 @@ export type KingOfCourtScore = Database["public"]["Tables"]["king_of_court_score
 export type LeaderboardMonthClose = Database["public"]["Tables"]["leaderboard_month_closes"]["Row"];
 export type LeaderboardAward = Database["public"]["Tables"]["leaderboard_awards"]["Row"];
 export type Badge = Database["public"]["Tables"]["badges"]["Row"];
+export type BadgeTier = Database["public"]["Tables"]["badge_tiers"]["Row"];
 export type PlayerBadge = Database["public"]["Tables"]["player_badges"]["Row"];
 export type CreditTransaction = Database["public"]["Tables"]["credit_transactions"]["Row"];
 
