@@ -39,6 +39,14 @@ export function cairoToday(): string {
   return dayKeyFmt.format(new Date());
 }
 
+/** Whether a YYYY-MM-DD date is after today in Cairo, e.g. a session that hasn't
+ *  happened yet. Compares calendar days as strings: parsing the date gives UTC
+ *  midnight while server-local midnight depends on the machine, and the two
+ *  disagree for the first hours of every Cairo day. */
+export function isFutureCairoDate(date: string, now: Date = new Date()): boolean {
+  return date > dayKeyFmt.format(now);
+}
+
 /** Whole days from `from` to `to`, both YYYY-MM-DD. Negative when `to` is
  *  earlier. Parsed as UTC midnight on both sides so the offset cancels out and
  *  DST never shifts the count. */
