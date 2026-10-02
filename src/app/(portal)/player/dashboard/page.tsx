@@ -128,6 +128,88 @@ export default async function PlayerDashboard() {
         </p>
       </div>
 
+      {/* Renewal / Warning Banners */}
+      {isExpired && (
+        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-danger">
+              Your subscription has expired
+            </p>
+            <p className="text-xs text-danger/80 mt-0.5">
+              Renew your subscription to continue attending training sessions.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
+          >
+            Renew Now →
+          </Link>
+        </div>
+      )}
+      {!isExpired && sessionsOut && (
+        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-danger">
+              You have no sessions remaining
+            </p>
+            <p className="text-xs text-danger/80 mt-0.5">
+              Renew your subscription to continue training.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
+          >
+            Renew Now →
+          </Link>
+        </div>
+      )}
+      {!isExpired && !sessionsOut && (isExpiringSoon || sessionsLow) && (
+        <div className={`${isExpiringSoon ? "bg-danger/5 border-danger/30" : "bg-accent/10 border-accent/40"} border rounded-xl p-4 mb-6 flex items-center gap-3`}>
+          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-danger" : "text-accent-600"} flex-shrink-0`} />
+          <div className="flex-1">
+            <p className={`text-sm font-semibold ${isExpiringSoon ? "text-danger" : "text-accent-700"}`}>
+              {isExpiringSoon && sessionsLow
+                ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
+                : isExpiringSoon
+                ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
+                : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`}
+            </p>
+            <p className={`text-xs ${isExpiringSoon ? "text-danger/80" : "text-accent-700/80"} mt-0.5`}>
+              Renew now to avoid interruption to your training.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className={`text-sm font-semibold ${isExpiringSoon ? "text-danger hover:text-danger/80" : "text-accent-700 hover:text-accent-600"} whitespace-nowrap`}
+          >
+            Renew Now →
+          </Link>
+        </div>
+      )}
+      {!isExpired && !sessionsOut && !isExpiringSoon && !sessionsLow && expiringBySessions && (
+        <div className="bg-accent/10 border border-accent/40 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-accent-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-accent-700">
+              Your sessions are running low ({subscription?.sessions_remaining} remaining)
+            </p>
+            <p className="text-xs text-accent-700/80 mt-0.5">
+              Renew now to avoid interruption to your training.
+            </p>
+          </div>
+          <Link
+            href="/player/subscribe"
+            className="text-sm font-semibold text-accent-700 hover:text-accent-600 whitespace-nowrap"
+          >
+            Renew Now →
+          </Link>
+        </div>
+      )}
+
       {/* Stat cards */}
       {subscription ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -354,88 +436,6 @@ export default async function PlayerDashboard() {
             )}
           </div>
         </Card>
-      )}
-
-      {/* Renewal / Warning Banners */}
-      {isExpired && (
-        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-danger">
-              Your subscription has expired
-            </p>
-            <p className="text-xs text-danger/80 mt-0.5">
-              Renew your subscription to continue attending training sessions.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && sessionsOut && (
-        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-danger">
-              You have no sessions remaining
-            </p>
-            <p className="text-xs text-danger/80 mt-0.5">
-              Renew your subscription to continue training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && !sessionsOut && (isExpiringSoon || sessionsLow) && (
-        <div className={`${isExpiringSoon ? "bg-danger/5 border-danger/30" : "bg-accent/10 border-accent/40"} border rounded-xl p-4 flex items-center gap-3`}>
-          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-danger" : "text-accent-600"} flex-shrink-0`} />
-          <div className="flex-1">
-            <p className={`text-sm font-semibold ${isExpiringSoon ? "text-danger" : "text-accent-700"}`}>
-              {isExpiringSoon && sessionsLow
-                ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
-                : isExpiringSoon
-                ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
-                : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`}
-            </p>
-            <p className={`text-xs ${isExpiringSoon ? "text-danger/80" : "text-accent-700/80"} mt-0.5`}>
-              Renew now to avoid interruption to your training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className={`text-sm font-semibold ${isExpiringSoon ? "text-danger hover:text-danger/80" : "text-accent-700 hover:text-accent-600"} whitespace-nowrap`}
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && !sessionsOut && !isExpiringSoon && !sessionsLow && expiringBySessions && (
-        <div className="bg-accent/10 border border-accent/40 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-accent-600 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-accent-700">
-              Your sessions are running low ({subscription?.sessions_remaining} remaining)
-            </p>
-            <p className="text-xs text-accent-700/80 mt-0.5">
-              Renew now to avoid interruption to your training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-accent-700 hover:text-accent-600 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
       )}
     </div>
   );
