@@ -7,8 +7,9 @@ import { Card, EmptyState } from "@/components/ui";
 import { AchievementStat } from "@/components/achievements/achievement-stat";
 import { AwardCard } from "@/components/achievements/award-card";
 import { BadgeTile } from "@/components/achievements/badge-tile";
+import { ShareButton } from "@/components/achievements/share-button";
 import { loadPlayerAchievements } from "@/lib/badges/load";
-import { badgesDetail, creditsDetail } from "@/lib/badges/words";
+import { badgeDescription, badgesDetail, creditsDetail } from "@/lib/badges/words";
 
 function SectionHeading({ children }: { children: string }) {
   return <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{children}</h2>;
@@ -22,6 +23,9 @@ export default async function PlayerAchievementsPage() {
   const { awards, badges, creditBalance, sessionsAttended } = await loadPlayerAchievements(supabase, currentUser.id);
   const earned = badges.filter((b) => b.earned_on !== null);
   const nothingYet = awards.length === 0 && earned.length === 0;
+  // The name on the share card
+  const { first_name, last_name } = currentUser.profile;
+  const playerName = `${first_name ?? ""} ${last_name ?? ""}`.trim() || "Beachamp player";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -72,7 +76,25 @@ export default async function PlayerAchievementsPage() {
           <SectionHeading>Monthly awards</SectionHeading>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {awards.map((award) => (
-              <AwardCard key={award.id} award={award} />
+              <AwardCard
+                key={award.id}
+                award={award}
+                share={
+                  <ShareButton
+                    look={award.place === 1 ? "gold" : "outline"}
+                    playerId={currentUser.id}
+                    subject={{
+                      kind: "award",
+                      place: award.place,
+                      groupName: award.group_name,
+                      month: award.month,
+                      points: award.points,
+                      sessions: award.sessions,
+                      playerName,
+                    }}
+                  />
+                }
+              />
             ))}
           </div>
         </section>
@@ -83,7 +105,26 @@ export default async function PlayerAchievementsPage() {
           <SectionHeading>Badges</SectionHeading>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {badges.map((badge) => (
-              <BadgeTile key={badge.id} badge={badge} />
+              <BadgeTile
+                key={badge.id}
+                badge={badge}
+                share={
+                  badge.earned_on && (
+                    <ShareButton
+                      look="compact"
+                      playerId={currentUser.id}
+                      subject={{
+                        kind: "badge",
+                        name: badge.name,
+                        icon: badge.icon,
+                        description: badgeDescription(badge.measure, badge.threshold),
+                        earnedOn: badge.earned_on,
+                        playerName,
+                      }}
+                    />
+                  )
+                }
+              />
             ))}
           </div>
         </section>
