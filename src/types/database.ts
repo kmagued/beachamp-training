@@ -738,6 +738,99 @@ export interface Database {
         };
         Relationships: [];
       };
+      badges: {
+        Row: {
+          id: string;
+          name: string;
+          icon: string;
+          measure: string;
+          threshold: number;
+          credits: number;
+          counts_from: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          icon: string;
+          measure: string;
+          threshold: number;
+          credits?: number;
+          counts_from?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          icon?: string;
+          measure?: string;
+          threshold?: number;
+          credits?: number;
+          counts_from?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      player_badges: {
+        Row: {
+          id: string;
+          badge_id: string;
+          player_id: string;
+          earned_on: string;
+          notification_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          badge_id: string;
+          player_id: string;
+          earned_on: string;
+          notification_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          badge_id?: string;
+          player_id?: string;
+          earned_on?: string;
+          notification_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      credit_transactions: {
+        Row: {
+          id: string;
+          player_id: string;
+          amount: number;
+          description: string;
+          player_badge_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          amount: number;
+          description: string;
+          player_badge_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          player_id?: string;
+          amount?: number;
+          description?: string;
+          player_badge_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       coach_groups: {
         Row: {
           id: string;
@@ -1295,6 +1388,9 @@ export type WhatsappTemplate = Database["public"]["Tables"]["whatsapp_templates"
 export type KingOfCourtScore = Database["public"]["Tables"]["king_of_court_scores"]["Row"];
 export type LeaderboardMonthClose = Database["public"]["Tables"]["leaderboard_month_closes"]["Row"];
 export type LeaderboardAward = Database["public"]["Tables"]["leaderboard_awards"]["Row"];
+export type Badge = Database["public"]["Tables"]["badges"]["Row"];
+export type PlayerBadge = Database["public"]["Tables"]["player_badges"]["Row"];
+export type CreditTransaction = Database["public"]["Tables"]["credit_transactions"]["Row"];
 
 // ── Joined types for UI queries ──
 export interface ScheduleSessionWithDetails extends ScheduleSession {
