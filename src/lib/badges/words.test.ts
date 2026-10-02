@@ -40,6 +40,11 @@ test("tierProgress: how far a player is toward the next tier; a streak shows the
   assert.equal(tierProgress("monthly_wins", 1, null, 3), "1 / 3");
 });
 
+test("tierProgress: a figure past a locked tier (badges not yet re-checked) is capped at its number", () => {
+  assert.equal(tierProgress("sessions_attended", 27, null, 25), "25 / 25");
+  assert.equal(tierProgress("attendance_streak", 9, 9, 8), "Run 8 / 8");
+});
+
 test("progressFraction: the bar's fill, capped at full; a streak follows the current run", () => {
   assert.equal(progressFraction("sessions_attended", 12, null, 24), 0.5);
   assert.equal(progressFraction("sessions_attended", 30, null, 25), 1);

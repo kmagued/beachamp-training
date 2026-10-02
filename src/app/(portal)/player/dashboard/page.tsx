@@ -19,10 +19,13 @@ import { formatDate } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { placeLabel } from "@/lib/king-of-court/awards";
 import { formatMonth } from "@/lib/king-of-court/format";
-import { loadLatestAchievements } from "@/lib/badges/load";
+import { loadLatestAchievements, loadStreak } from "@/lib/badges/load";
 import { TIERS } from "@/lib/badges/config";
-import { badgeDescription, formatCredits } from "@/lib/badges/words";
+import { badgeDescription } from "@/lib/badges/words";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
+import { BadgeProgressCard } from "@/components/achievements/badge-progress-card";
+import { CreditsCard } from "@/components/achievements/credits-card";
+import { StreakCard } from "@/components/achievements/streak-card";
 import type { Subscription } from "@/types/database";
 import { PendingPaymentCard } from "./_components/pending-payment-card";
 
@@ -81,8 +84,12 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle();
 
-  // Never throws: the dashboard renders without the card if achievements can't be read
-  const { items: latestAchievements, creditBalance } = await loadLatestAchievements(supabase, currentUser.id, 3);
+  // Neither throws: the dashboard renders without these if they can't be read
+  const [{ items: latestAchievements, badges, creditBalance }, streak] = await Promise.all([
+    loadLatestAchievements(supabase, currentUser.id, 3),
+    loadStreak(supabase, currentUser.id),
+  ]);
+  const paidTiers = badges.flatMap((b) => b.tiers).filter((t) => (t.credits_paid ?? 0) > 0).length;
 
   let daysRemaining: number | null = null;
   let isExpired = false;
@@ -169,6 +176,13 @@ export default async function PlayerDashboard() {
           />
         </div>
       )}
+
+      {/* Encouragement: the streak, the credit balance, and how close each badge is */}
+      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        <StreakCard streak={streak} />
+        <CreditsCard balance={creditBalance} paidTiers={paidTiers} />
+      </div>
+      {badges.length > 0 && <BadgeProgressCard badges={badges} />}
 
       {/* Two column grid */}
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -295,11 +309,6 @@ export default async function PlayerDashboard() {
             <h2 className="font-display text-xl tracking-wide text-primary-900 flex items-center gap-2">
               <Award className="w-4 h-4 text-primary-700/50" />
               Achievements
-              {creditBalance !== 0 && (
-                <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full border border-amber-200 bg-amber-50 font-sans text-xs font-semibold tracking-normal text-amber-800">
-                  {formatCredits(creditBalance)}
-                </span>
-              )}
             </h2>
             <Link
               href="/player/achievements"

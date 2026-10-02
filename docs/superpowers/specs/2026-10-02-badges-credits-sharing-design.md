@@ -317,6 +317,12 @@ One migration: `supabase/migrations/20261002000000_badges_and_credits.sql`.
     - awards and earned tiers, newest first, plus the balance;
     - it never throws;
     - awards still show if badges can't be read.
+- **`streak.ts`:** `attendanceStreak(marks)` (current run, best run, the last 8 marks)
+  and `streakMessage(current, best)`.
+- **`progress.ts`:**
+  - `badgeProgress(badges)`: each badge's next tier and how close it is, closest first;
+  - `remainingLabel`: "16 more sessions", "2 more in a row", "36 more points in a
+    month", "1 more win".
 - **`src/lib/share/share.ts`:**
   - `ShareSubject` (an award, or a badge tier);
   - `shareText`, e.g. "I earned the Silver Court Regular badge at Beachamp Academy ·
@@ -392,13 +398,28 @@ One migration: `supabase/migrations/20261002000000_badges_and_credits.sql`.
 - **Empty state:** with no awards and no earned tiers, the empty card shows "No
   achievements yet". Its description depends on whether badges exist. Locked badges
   still render beneath it.
-- **Dashboard card:**
-  - The 3 newest achievements: awards (dated by `leaderboard_awards.created_at`) and
-    earned tiers (by `earned_on`).
-  - A tier row shows the small medallion in its metal, "Court Regular · Silver" and its
-    description.
-  - A credits chip shows when the balance isn't 0.
-  - The card hides when there is nothing to show.
+- **Dashboard** (added 2026-10-02 at the user's request), below the stat cards:
+  - **Attendance streak card:**
+    - The current run, e.g. "6 sessions in a row", by the badge rules. It covers all
+      time, not a badge's start day, and is read from the player's newest 1000 marks.
+    - The last 8 marked sessions as dots: filled for present, red outline for absent,
+      grey for excused.
+    - A line of encouragement (`streakMessage`):
+      - "Attend your next session to start a streak.";
+      - "Your best is 9 in a row. Start a new streak at your next session.";
+      - "3 more to beat your best of 9.";
+      - "Your best ever. Keep it going!".
+  - **Beachamp Credits card:** the balance, "From 4 badges" (tiers that paid), and "See
+    your badges →". It is always shown, even at 0.
+  - **Badge progress card:** every badge's next tier, closest first, e.g. "Silver Iron
+    Streak · Run 6 / 8", with a bar and "2 more in a row". Badges with every tier earned
+    come last, reading "All tiers earned". The card hides when no badges exist.
+  - **Achievements card:**
+    - The 3 newest achievements: awards (dated by `leaderboard_awards.created_at`) and
+      earned tiers (by `earned_on`; same-day tiers show the higher first).
+    - A tier row shows the small medallion in its metal, "Court Regular · Silver" and its
+      description.
+    - It hides when there is nothing to show.
 
 ## Sharing
 

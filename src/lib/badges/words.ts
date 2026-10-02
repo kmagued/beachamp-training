@@ -46,9 +46,11 @@ export function tierRequirement(measure: Measure, threshold: number): string {
 /**
  * How far a player is toward the next tier: "34 / 50". value is the player's figure for
  * the measure; for a streak it's the run as it stands now, which is what they can build on.
+ * Capped at the tier's number: a figure past it only means badges haven't been re-checked.
  */
 export function tierProgress(measure: Measure, value: number, currentRun: number | null, threshold: number): string {
-  return measure === "attendance_streak" ? `Run ${currentRun ?? 0} / ${threshold}` : `${value} / ${threshold}`;
+  const figure = Math.min(measure === "attendance_streak" ? currentRun ?? 0 : value, threshold);
+  return measure === "attendance_streak" ? `Run ${figure} / ${threshold}` : `${figure} / ${threshold}`;
 }
 
 /** The progress bar's fill, from 0 to 1 */

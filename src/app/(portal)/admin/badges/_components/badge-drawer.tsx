@@ -177,7 +177,7 @@ export function BadgeDrawer({
         <div>
           <Label required>Tiers</Label>
           <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
-            <div className="grid grid-cols-[1fr_6rem_6rem_2rem] gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_2rem] sm:grid-cols-[minmax(0,1fr)_6rem_6rem_2rem] gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               <span>Tier</span>
               <span>{measureInfo.numberLabel}</span>
               <span>Credits</span>
@@ -188,10 +188,10 @@ export function BadgeDrawer({
               const removable = i === tiers.length - 1 && tiers.length > 1;
               return (
                 <div key={number} className="px-3 py-2">
-                  <div className="grid grid-cols-[1fr_6rem_6rem_2rem] items-center gap-2">
-                    <span className="flex items-center gap-2 text-sm font-medium text-primary-900">
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_2rem] sm:grid-cols-[minmax(0,1fr)_6rem_6rem_2rem] items-center gap-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-primary-900">
                       <BadgeMedallion icon={icon} tier={number} size="xs" />
-                      {TIERS[number].label}
+                      <span className="truncate">{TIERS[number].label}</span>
                     </span>
                     <Input
                       aria-label={`${TIERS[number].label} ${measureInfo.numberLabel.toLowerCase()}`}

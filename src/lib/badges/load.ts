@@ -5,6 +5,7 @@
 import { loadPlayerAwards, type PlayerAward } from "@/lib/king-of-court/awards-load";
 import type { BadgeIconKey, Measure, TierNumber } from "./config";
 import { sortBadges } from "./sort";
+import { attendanceStreak, type AttendanceMark, type StreakSummary } from "./streak";
 
 /** One tier of a badge, as one player sees it */
 export interface PlayerTierView {
@@ -143,8 +144,9 @@ export async function loadPlayerAchievements(supabase: any, playerId: string): P
 }
 
 /**
- * Awards and earned tiers together, newest first. An award is dated by when its month
- * was closed (a timestamp), a tier by the day it was earned; the two compare as strings.
+ * Awards and earned tiers together, newest first; two tiers earned the same day show the
+ * higher first. An award is dated by when its month was closed (a timestamp), a tier by
+ * the day it was earned; the two compare as strings.
  */
 export function latestAchievements(awards: PlayerAward[], badges: PlayerBadgeView[], limit: number): LatestAchievement[] {
   const items: LatestAchievement[] = [
@@ -155,26 +157,49 @@ export function latestAchievements(awards: PlayerAward[], badges: PlayerBadgeVie
         .map((tier) => ({ kind: "badge" as const, id: tier.id, date: tier.earned_on!, badge, tier }))
     ),
   ];
-  return items.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+  const tierOf = (item: LatestAchievement) => (item.kind === "badge" ? item.tier.tier : 0);
+  return items.sort((a, b) => b.date.localeCompare(a.date) || tierOf(b) - tierOf(a)).slice(0, limit);
 }
 
 /**
- * The dashboard card's newest few, and the credit balance. Never throws: the card is an
- * extra, and a problem reading badges must not take the dashboard (or the awards) with it.
+ * For the dashboard: the newest few achievements, every badge with the player's progress,
+ * and the credit balance. Never throws: these cards are extras, and a problem reading
+ * badges must not take the dashboard (or the awards) with it.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadLatestAchievements(supabase: any, playerId: string, limit: number) {
-  const noProgress: Promise<Progress> = Promise.resolve(new Map());
   const [awards, badgesAndCredits] = await Promise.all([
     loadPlayerAwards(supabase, playerId).catch((err) => {
       console.error("[achievements]", err);
       return [] as PlayerAward[];
     }),
-    Promise.all([loadBadges(supabase, playerId, noProgress), loadCreditBalance(supabase, playerId)]).catch((err) => {
-      console.error("[achievements]", err);
-      return [[], 0] as [PlayerBadgeView[], number];
-    }),
+    Promise.all([loadBadges(supabase, playerId, loadProgress(supabase)), loadCreditBalance(supabase, playerId)]).catch(
+      (err) => {
+        console.error("[achievements]", err);
+        return [[], 0] as [PlayerBadgeView[], number];
+      }
+    ),
   ]);
   const [badges, creditBalance] = badgesAndCredits;
-  return { items: latestAchievements(awards, badges, limit), creditBalance };
+  return { items: latestAchievements(awards, badges, limit), badges, creditBalance };
+}
+
+/**
+ * The player's attendance streak for the dashboard. Reads their newest 1000 marks, which
+ * covers the current run and the dots; a best run older than that (years of sessions) may
+ * be missed. Never throws: a problem here gives an empty streak, not a broken dashboard.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadStreak(supabase: any, playerId: string): Promise<StreakSummary> {
+  const { data, error } = await supabase
+    .from("attendance")
+    .select("session_date, session_time, created_at, status")
+    .eq("player_id", playerId)
+    .order("session_date", { ascending: false })
+    .limit(1000);
+  if (error) {
+    console.error("[achievements] streak:", error.message);
+    return { current: 0, best: 0, recent: [] };
+  }
+  return attendanceStreak((data || []) as AttendanceMark[]);
 }

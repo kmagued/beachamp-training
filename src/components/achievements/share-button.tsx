@@ -12,7 +12,7 @@ const LOOKS = {
   /** 2nd place: outlined navy */
   outline: "rounded-xl px-5 py-2.5 text-sm border border-primary-200 bg-white hover:bg-primary-50 text-primary-800",
   /** On a badge tile */
-  compact: "rounded-lg px-3 py-1.5 text-xs border border-slate-200 bg-white hover:bg-slate-50 text-primary-800",
+  compact: "rounded-lg px-2.5 py-1.5 gap-1.5 text-xs border border-slate-200 bg-white hover:bg-slate-50 text-primary-800",
 };
 
 export function ShareButton({

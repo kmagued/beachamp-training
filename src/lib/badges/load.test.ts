@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { latestAchievements, loadLatestAchievements, loadPlayerAchievements, type PlayerBadgeView } from "./load";
+import {
+  latestAchievements,
+  loadLatestAchievements,
+  loadPlayerAchievements,
+  loadStreak,
+  type PlayerBadgeView,
+} from "./load";
 import type { PlayerAward } from "@/lib/king-of-court/awards-load";
 
 type Result = { data?: unknown; error?: { message: string } | null; count?: number | null };
@@ -17,6 +23,7 @@ function stubClient(tables: Record<string, Result>, progress: Result = { data: [
       select: () => q,
       eq: () => q,
       order: () => q,
+      limit: () => q,
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
         Promise.resolve(settled).then(resolve, reject),
     };
@@ -162,10 +169,44 @@ test("latestAchievements: awards and earned tiers together, newest first, up to 
   assert.deepEqual(items.map((i) => `${i.kind}:${i.id}`), ["badge:regular-2", "award:sep", "badge:regular-1"]);
 });
 
-test("loadLatestAchievements: the dashboard's newest three and the balance", async () => {
-  const latest = await loadLatestAchievements(stubClient(tables), "p1", 3);
+test("latestAchievements: two tiers earned the same day show the higher first", () => {
+  const items = latestAchievements([], [badge("regular", ["2026-10-15", "2026-10-15", null])], 3);
+  assert.deepEqual(items.map((i) => i.id), ["regular-2", "regular-1"]);
+});
+
+test("loadLatestAchievements: the dashboard's newest three, every badge with progress, and the balance", async () => {
+  const latest = await loadLatestAchievements(stubClient(tables, progress), "p1", 3);
   assert.deepEqual(latest.items.map((i) => `${i.kind}:${i.id}`), ["badge:regular-2", "badge:century-1", "badge:regular-1"]);
   assert.equal(latest.creditBalance, 100);
+  assert.deepEqual(
+    latest.badges.map((b) => [b.id, b.value, b.current_run]),
+    [
+      ["regular", 34, null],
+      ["century", 0, null],
+      ["streak", 5, 3],
+    ]
+  );
+});
+
+test("loadStreak: the player's run, best and recent marks", async () => {
+  const streak = await loadStreak(
+    stubClient({
+      attendance: {
+        data: [
+          { session_date: "2026-10-08", session_time: null, created_at: "2026-10-08T10:00:00Z", status: "present" },
+          { session_date: "2026-10-05", session_time: null, created_at: "2026-10-05T10:00:00Z", status: "absent" },
+          { session_date: "2026-10-01", session_time: null, created_at: "2026-10-01T10:00:00Z", status: "present" },
+        ],
+      },
+    }),
+    "p1"
+  );
+  assert.deepEqual(streak, { current: 1, best: 1, recent: ["present", "absent", "present"] });
+});
+
+test("loadStreak: a failed read is an empty streak, not a broken dashboard", async () => {
+  const streak = await loadStreak(stubClient({ attendance: { error: { message: "boom" } } }), "p1");
+  assert.deepEqual(streak, { current: 0, best: 0, recent: [] });
 });
 
 test("loadLatestAchievements: if badges can't be read, awards still show and nothing is thrown", async () => {
@@ -184,5 +225,5 @@ test("loadLatestAchievements: if nothing can be read, the dashboard gets no card
     "p1",
     3
   );
-  assert.deepEqual(latest, { items: [], creditBalance: 0 });
+  assert.deepEqual(latest, { items: [], badges: [], creditBalance: 0 });
 });
