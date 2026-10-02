@@ -44,7 +44,22 @@ export function SessionsTable({ records }: { records: SessionRecord[] }) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="overflow-x-auto">
+      {/* Phones: one row per session, no sideways scrolling */}
+      <ul className="sm:hidden divide-y divide-slate-100">
+        {pageRecords.map((record) => (
+          <li key={record.id} className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{formatDate(record.session_date)}</p>
+              <p className="text-xs text-slate-500 truncate">
+                {[record.session_time && formatTime(record.session_time), record.group_name].filter(Boolean).join(" · ") || "—"}
+              </p>
+            </div>
+            {statusBadge(record.status)}
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-200">

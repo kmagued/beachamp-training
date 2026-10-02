@@ -2,19 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
-import { StatCard, Card, Badge, EmptyState } from "@/components/ui";
+import { Card, Badge, EmptyState } from "@/components/ui";
 import { getLevelLabel } from "@/lib/config/branding";
-import {
-  CalendarDays,
-  Clock,
-  Package,
-  TrendingUp,
-  MessageSquare,
-  Star,
-  AlertTriangle,
-  Award,
-  Trophy,
-} from "lucide-react";
+import { TrendingUp, MessageSquare, Award, Trophy } from "lucide-react";
 import { formatDate } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { placeLabel } from "@/lib/king-of-court/awards";
@@ -27,7 +17,8 @@ import { BadgeProgressCard } from "@/components/achievements/badge-progress-card
 import { CreditsCard } from "@/components/achievements/credits-card";
 import { StreakCard } from "@/components/achievements/streak-card";
 import type { Subscription } from "@/types/database";
-import { PendingPaymentCard } from "./_components/pending-payment-card";
+import { PlanCard } from "./_components/plan-card";
+import { RenewalBanner } from "./_components/renewal-banner";
 
 export default async function PlayerDashboard() {
   const currentUser = await getCurrentUser();
@@ -94,7 +85,6 @@ export default async function PlayerDashboard() {
   let daysRemaining: number | null = null;
   let isExpired = false;
   let isExpiringSoon = false;
-  let expiringBySessions = false;
   if (subscription?.end_date) {
     const end = new Date(subscription.end_date);
     const now = new Date();
@@ -112,9 +102,35 @@ export default async function PlayerDashboard() {
   }
   const sessionsRatio = subscription && subscription.sessions_total > 0
     ? subscription.sessions_remaining / subscription.sessions_total : 1;
-  const sessionsLow = subscription && sessionsRatio <= 0.3;
-  const sessionsOut = subscription && subscription.sessions_remaining <= 0;
-  if (sessionsLow && !isExpired) expiringBySessions = true;
+  const sessionsLow = !!subscription && sessionsRatio <= 0.3;
+  const sessionsOut = !!subscription && subscription.sessions_remaining <= 0;
+
+  // At most one renew prompt, the most urgent
+  const renewal: { tone: "danger" | "warning"; title: string; body: string } | null = isExpired
+    ? {
+        tone: "danger",
+        title: "Your subscription has expired",
+        body: "Renew your subscription to continue attending training sessions.",
+      }
+    : sessionsOut
+    ? {
+        tone: "danger",
+        title: "You have no sessions remaining",
+        body: "Renew your subscription to continue training.",
+      }
+    : isExpiringSoon || sessionsLow
+    ? {
+        tone: isExpiringSoon ? "danger" : "warning",
+        title: isExpiringSoon && sessionsLow
+          ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
+          : isExpiringSoon
+          ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
+          : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`,
+        body: "Renew now to avoid interruption to your training.",
+      }
+    : null;
+
+  const level = getLevelLabel(currentUser.profile.playing_level);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -123,223 +139,36 @@ export default async function PlayerDashboard() {
         <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-primary-900">
           Welcome back, {currentUser.profile.first_name}!
         </h1>
-        <p className="text-primary-700/60 text-sm mt-1">
-          Here&apos;s an overview of your training progress.
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-primary-700/60 text-sm">
+            Here&apos;s an overview of your training progress.
+          </p>
+          {level && (
+            <Badge variant="info" className="gap-1">
+              <TrendingUp className="w-3 h-3" />
+              {level}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {/* Renewal / Warning Banners */}
-      {isExpired && (
-        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-danger">
-              Your subscription has expired
-            </p>
-            <p className="text-xs text-danger/80 mt-0.5">
-              Renew your subscription to continue attending training sessions.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && sessionsOut && (
-        <div className="bg-danger/5 border border-danger/30 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-danger">
-              You have no sessions remaining
-            </p>
-            <p className="text-xs text-danger/80 mt-0.5">
-              Renew your subscription to continue training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-danger hover:text-danger/80 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && !sessionsOut && (isExpiringSoon || sessionsLow) && (
-        <div className={`${isExpiringSoon ? "bg-danger/5 border-danger/30" : "bg-accent/10 border-accent/40"} border rounded-xl p-4 mb-6 flex items-center gap-3`}>
-          <AlertTriangle className={`w-5 h-5 ${isExpiringSoon ? "text-danger" : "text-accent-600"} flex-shrink-0`} />
-          <div className="flex-1">
-            <p className={`text-sm font-semibold ${isExpiringSoon ? "text-danger" : "text-accent-700"}`}>
-              {isExpiringSoon && sessionsLow
-                ? `Your subscription expires in ${daysRemaining} days and you have ${subscription?.sessions_remaining} sessions left`
-                : isExpiringSoon
-                ? `Your subscription expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
-                : `You have only ${subscription?.sessions_remaining} session${subscription?.sessions_remaining === 1 ? "" : "s"} remaining`}
-            </p>
-            <p className={`text-xs ${isExpiringSoon ? "text-danger/80" : "text-accent-700/80"} mt-0.5`}>
-              Renew now to avoid interruption to your training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className={`text-sm font-semibold ${isExpiringSoon ? "text-danger hover:text-danger/80" : "text-accent-700 hover:text-accent-600"} whitespace-nowrap`}
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
-      {!isExpired && !sessionsOut && !isExpiringSoon && !sessionsLow && expiringBySessions && (
-        <div className="bg-accent/10 border border-accent/40 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-accent-600 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-accent-700">
-              Your sessions are running low ({subscription?.sessions_remaining} remaining)
-            </p>
-            <p className="text-xs text-accent-700/80 mt-0.5">
-              Renew now to avoid interruption to your training.
-            </p>
-          </div>
-          <Link
-            href="/player/subscribe"
-            className="text-sm font-semibold text-accent-700 hover:text-accent-600 whitespace-nowrap"
-          >
-            Renew Now →
-          </Link>
-        </div>
-      )}
+      {renewal && <RenewalBanner {...renewal} />}
 
-      {/* Stat cards */}
-      {subscription ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <StatCard
-            label="Sessions Remaining"
-            value={subscription.sessions_remaining}
-            subtitle={`of ${subscription.sessions_total} total`}
-            accentColor={sessionsOut ? "bg-danger" : sessionsLow ? "bg-accent" : "bg-primary-800"}
-            icon={<CalendarDays className="w-5 h-5" />}
-          />
-          <StatCard
-            label="Valid Until"
-            value={
-              isExpired ? "Expired" :
-              subscription.end_date
-                ? formatDate(subscription.end_date)
-                : "—"
-            }
-            subtitle={daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days remaining` : undefined}
-            accentColor={isExpired ? "bg-danger" : isExpiringSoon ? "bg-accent" : "bg-secondary"}
-            icon={<Clock className="w-5 h-5" />}
-          />
-          <StatCard
-            label="Package"
-            value={subscription.packages?.name || "—"}
-            accentColor="bg-primary-800"
-            icon={<Package className="w-5 h-5" />}
-          />
-          <StatCard
-            label="Level"
-            value={getLevelLabel(currentUser.profile.playing_level) || "—"}
-            accentColor="bg-secondary-dark"
-            icon={<TrendingUp className="w-5 h-5" />}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <StatCard label="Sessions Remaining" value="—" accentColor="bg-primary-200" icon={<CalendarDays className="w-5 h-5" />} />
-          <StatCard label="Valid Until" value="—" accentColor="bg-primary-200" icon={<Clock className="w-5 h-5" />} />
-          <StatCard label="Package" value="None" accentColor="bg-primary-200" icon={<Package className="w-5 h-5" />} />
-          <StatCard
-            label="Level"
-            value={getLevelLabel(currentUser.profile.playing_level) || "—"}
-            accentColor="bg-secondary-dark"
-            icon={<TrendingUp className="w-5 h-5" />}
-          />
-        </div>
-      )}
-
-      {/* Encouragement: the streak, the credit balance, and how close each badge is */}
-      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+      {/* Sessions left first, then the streak and credits that keep players coming back */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+        <PlanCard
+          className="sm:col-span-2 lg:col-span-1"
+          subscription={subscription}
+          pendingSubscription={pendingSubscription}
+          pendingPayment={showPaymentCard ? pendingPayment : null}
+          state={{ daysRemaining, isExpired, isExpiringSoon, sessionsLow, sessionsOut }}
+        />
         <StreakCard streak={streak} />
         <CreditsCard balance={creditBalance} paidTiers={paidTiers} />
       </div>
       {badges.length > 0 && <BadgeProgressCard badges={badges} />}
 
-      {/* Two column grid */}
-      <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
-        {/* Subscription Status */}
-        <Card>
-          <h2 className="font-display text-xl tracking-wide text-primary-900 mb-4 flex items-center gap-2">
-            <Package className="w-4 h-4 text-primary-700/50" />
-            Subscription Status
-          </h2>
-          {showPaymentCard ? (
-            <PendingPaymentCard
-              paymentId={pendingPayment!.id}
-              packageName={pendingSubscription?.packages?.name ?? "your package"}
-              amount={pendingPayment!.amount}
-              hasScreenshot={!!pendingPayment!.screenshot_url}
-            />
-          ) : subscription ? (
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-primary-700/60">Status</span>
-                <Badge variant="success">Active</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-primary-700/60">Package</span>
-                <span className="text-sm font-semibold text-primary-900">{subscription.packages?.name}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-primary-700/60">Sessions</span>
-                <span className="text-sm font-semibold text-primary-900">
-                  {subscription.sessions_total === 1 ? subscription.sessions_remaining : `${subscription.sessions_remaining} / ${subscription.sessions_total}`}
-                </span>
-              </div>
-              {subscription.start_date && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-primary-700/60">Started</span>
-                  <span className="text-sm text-primary-800">
-                    {formatDate(subscription.start_date)}
-                  </span>
-                </div>
-              )}
-              <Link
-                href="/player/subscriptions"
-                className="block text-center text-sm font-semibold text-primary-800 hover:text-primary-900 pt-2"
-              >
-                View Details →
-              </Link>
-            </div>
-          ) : pendingSubscription ? (
-            <div className="text-center py-4">
-              <Badge variant="warning" className="mb-2">
-                {pendingSubscription.status === "pending_payment" ? "Payment Required" : "Pending Confirmation"}
-              </Badge>
-              <p className="text-sm text-primary-700/70 mt-2">
-                {pendingSubscription.status === "pending_payment"
-                  ? `You have an unpaid session for ${pendingSubscription.packages?.name}.`
-                  : `Your payment for ${pendingSubscription.packages?.name} is being reviewed.`}
-              </p>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Package className="w-10 h-10" />}
-              title="No Active Subscription"
-              description="Subscribe to a training package to start attending sessions."
-              action={
-                <Link
-                  href="/player/packages"
-                  className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
-                >
-                  Browse Packages
-                </Link>
-              }
-            />
-          )}
-        </Card>
-
+      <div className={cn("grid gap-4 sm:gap-6", latestAchievements.length > 0 && "lg:grid-cols-2")}>
         {/* Latest Feedback */}
         <Card>
           <h2 className="font-display text-xl tracking-wide text-primary-900 mb-4 flex items-center gap-2">
@@ -382,61 +211,60 @@ export default async function PlayerDashboard() {
             />
           )}
         </Card>
+        {/* Achievements: only for players who have an award or a badge */}
+        {latestAchievements.length > 0 && (
+          <Card>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="font-display text-xl tracking-wide text-primary-900 flex items-center gap-2">
+                <Award className="w-4 h-4 text-primary-700/50" />
+                Achievements
+              </h2>
+              <Link
+                href="/player/achievements"
+                className="text-sm font-semibold text-primary-800 hover:text-primary-900 whitespace-nowrap"
+              >
+                View all →
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {latestAchievements.map((item) =>
+                item.kind === "award" ? (
+                  <div key={`award-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <div
+                      className={cn(
+                        "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                        item.award.place === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
+                      )}
+                    >
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-primary-900">
+                        {placeLabel(item.award.place)} · {formatMonth(item.award.month, "long")}
+                      </p>
+                      <p className="text-xs text-primary-700/60 truncate">
+                        {item.award.group_name} · {item.award.points} pts
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={`badge-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <BadgeMedallion icon={item.badge.icon} tier={item.tier.tier} size="sm" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-primary-900">
+                        {item.badge.name} · {TIERS[item.tier.tier].label}
+                      </p>
+                      <p className="text-xs text-primary-700/60 truncate">
+                        {badgeDescription(item.badge.measure, item.tier.threshold)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </Card>
+        )}
       </div>
-
-      {/* Achievements: only for players who have an award or a badge */}
-      {latestAchievements.length > 0 && (
-        <Card className="mb-6">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="font-display text-xl tracking-wide text-primary-900 flex items-center gap-2">
-              <Award className="w-4 h-4 text-primary-700/50" />
-              Achievements
-            </h2>
-            <Link
-              href="/player/achievements"
-              className="text-sm font-semibold text-primary-800 hover:text-primary-900 whitespace-nowrap"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {latestAchievements.map((item) =>
-              item.kind === "award" ? (
-                <div key={`award-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <div
-                    className={cn(
-                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-                      item.award.place === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
-                    )}
-                  >
-                    <Trophy className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-primary-900">
-                      {placeLabel(item.award.place)} · {formatMonth(item.award.month, "long")}
-                    </p>
-                    <p className="text-xs text-primary-700/60 truncate">
-                      {item.award.group_name} · {item.award.points} pts
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div key={`badge-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <BadgeMedallion icon={item.badge.icon} tier={item.tier.tier} size="sm" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-primary-900">
-                      {item.badge.name} · {TIERS[item.tier.tier].label}
-                    </p>
-                    <p className="text-xs text-primary-700/60 truncate">
-                      {badgeDescription(item.badge.measure, item.tier.threshold)}
-                    </p>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

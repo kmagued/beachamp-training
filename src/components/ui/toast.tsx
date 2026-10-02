@@ -53,7 +53,7 @@ export function Toast({ message, variant = "error", duration = 5000, onClose }: 
   return createPortal(
     <div
       className={cn(
-        "fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-full mx-4 px-4 py-3 rounded-xl shadow-lg",
+        "fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] px-4 py-3 rounded-xl shadow-lg",
         "flex items-center gap-3 transition-all duration-300",
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2",
         variantClasses[variant]

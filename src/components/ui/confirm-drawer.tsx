@@ -13,6 +13,8 @@ interface ConfirmDrawerProps {
   /** Rendered below the description — e.g. a summary of the record being deleted */
   details?: ReactNode;
   confirmLabel?: string;
+  /** The button that backs out — rename it when the action itself is a "Cancel …" */
+  cancelLabel?: string;
   loadingLabel?: string;
   confirmVariant?: "primary" | "outline" | "danger";
   loading?: boolean;
@@ -30,6 +32,7 @@ export function ConfirmDrawer({
   description,
   details,
   confirmLabel = "Delete",
+  cancelLabel = "Cancel",
   loadingLabel = "Deleting...",
   confirmVariant = "danger",
   loading,
@@ -39,13 +42,14 @@ export function ConfirmDrawer({
       open={open}
       onClose={onClose}
       title={title}
-      width="max-w-sm"
+      // sm: only, so the phone bottom sheet spans the full width
+      width="sm:max-w-sm"
       footer={
-        <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
+        <div className="flex gap-3 sm:justify-end">
+          <Button variant="outline" onClick={onClose} disabled={loading} className="flex-1 sm:flex-none">
+            {cancelLabel}
           </Button>
-          <Button variant={confirmVariant} onClick={onConfirm} disabled={loading}>
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={loading} className="flex-1 sm:flex-none">
             {loading ? loadingLabel : confirmLabel}
           </Button>
         </div>

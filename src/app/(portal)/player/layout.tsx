@@ -1,6 +1,14 @@
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
+import type { Viewport } from "next";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
+
+// Edge to edge on notched phones (the tab bar pads itself clear of the home indicator),
+// with the browser bar matching the header
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: "#FDFCF9",
+};
 
 export default async function PlayerLayout({ children }: { children: React.ReactNode }) {
   const currentUser = await getCurrentUser();

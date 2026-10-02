@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Card, Button, Input, Select, Alert, DatePicker, Textarea, MultiSelect } from "@/components/ui";
+import { Card, Button, Input, Select, Toast, DatePicker, Textarea, MultiSelect } from "@/components/ui";
 import { branding } from "@/lib/config/branding";
 import { updateProfile } from "./actions";
 import type { Profile } from "@/types/database";
@@ -13,6 +13,7 @@ export default function PlayerProfilePage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const clearResult = useCallback(() => setResult(null), []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,16 +84,12 @@ export default function PlayerProfilePage() {
         <p className="text-slate-500 text-sm">Update your personal information</p>
       </div>
 
-      {result?.success && (
-        <Alert variant="success" className="mb-4">
-          Profile updated successfully.
-        </Alert>
-      )}
-      {result?.error && (
-        <Alert variant="error" className="mb-4">
-          {result.error}
-        </Alert>
-      )}
+      {/* A toast, not a banner: Save sits at the bottom of a long form on phones */}
+      <Toast
+        message={result?.success ? "Profile updated successfully." : result?.error ?? null}
+        variant={result?.success ? "success" : "error"}
+        onClose={clearResult}
+      />
 
       <Card>
         <form action={handleSubmit} className="space-y-4">
@@ -107,11 +104,11 @@ export default function PlayerProfilePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-500 mb-1 block">First Name</label>
-                  <Input name="first_name" defaultValue={profile.first_name} required />
+                  <Input name="first_name" defaultValue={profile.first_name} autoComplete="given-name" required />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 mb-1 block">Last Name</label>
-                  <Input name="last_name" defaultValue={profile.last_name} required />
+                  <Input name="last_name" defaultValue={profile.last_name} autoComplete="family-name" required />
                 </div>
               </div>
 
@@ -125,7 +122,7 @@ export default function PlayerProfilePage() {
 
               <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Phone</label>
-                <Input name="phone" defaultValue={profile.phone || ""} />
+                <Input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="01XXXXXXXXX" defaultValue={profile.phone || ""} />
               </div>
 
               <div>
@@ -167,7 +164,7 @@ export default function PlayerProfilePage() {
             </div>
           </div>
 
-          <Button type="submit" disabled={isPending} className="sm:w-auto sm:px-12">
+          <Button type="submit" disabled={isPending} className="w-full sm:w-auto sm:px-12">
             {isPending ? "Saving..." : "Save Changes"}
           </Button>
         </form>

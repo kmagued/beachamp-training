@@ -74,14 +74,14 @@ export default async function PlayerSubscriptionsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Subscriptions</h1>
           <p className="text-slate-500 text-sm">Manage your training packages</p>
         </div>
         <Link
           href="/player/subscribe"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           {hasActive ? "Renew" : "Subscribe"}
           <ArrowRight className="w-4 h-4" />
@@ -94,7 +94,10 @@ export default async function PlayerSubscriptionsPage() {
           title="No Subscriptions Yet"
           description="Subscribe to a training package to start attending sessions."
           action={
-            <Link href="/player/packages" className="text-sm font-medium text-primary hover:underline">
+            <Link
+              href="/player/packages"
+              className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
+            >
               Browse Packages
             </Link>
           }
@@ -180,47 +183,47 @@ export default async function PlayerSubscriptionsPage() {
           <div className="sm:hidden space-y-3">
             {subs.map((sub) => {
               const display = getDisplayStatus(sub);
+              const message = display.reason
+                ? { text: display.reason, className: "bg-red-50 text-red-700" }
+                : display.label === "Pending Payment"
+                ? { text: "Payment required", className: "bg-amber-50 text-amber-700" }
+                : display.label === "Pending Confirmation"
+                ? { text: "Awaiting confirmation", className: "bg-amber-50 text-amber-700" }
+                : null;
               return (
                 <Card key={sub.id} className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm font-semibold text-slate-900">{sub.packages?.name || "—"}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900 min-w-0">{sub.packages?.name || "—"}</p>
                     <Badge variant={display.variant}>{display.label}</Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
                     <div>
-                      <span className="text-slate-400">Sessions</span>
-                      <p className="text-slate-700 font-medium">
+                      <dt className="text-slate-400">Sessions</dt>
+                      <dd className="text-sm text-slate-800 font-medium">
                         {sub.sessions_total === 1
                           ? sub.sessions_total
-                          : `${sub.sessions_remaining}/${sub.sessions_total}`}
-                      </p>
+                          : `${sub.sessions_remaining} / ${sub.sessions_total}`}
+                      </dd>
                     </div>
                     <div>
-                      <span className="text-slate-400">Price</span>
-                      <p className="text-slate-700 font-medium">
-                        {formatPaidPrice(sub)}
-                      </p>
+                      <dt className="text-slate-400">Price</dt>
+                      <dd className="text-sm text-slate-800 font-medium">{formatPaidPrice(sub)}</dd>
                     </div>
                     <div>
-                      <span className="text-slate-400">Date</span>
-                      <p className="text-slate-700 font-medium">
-                        {sub.start_date
-                          ? formatDate(sub.start_date)
-                          : formatDate(sub.created_at)}
-                      </p>
+                      <dt className="text-slate-400">{sub.start_date ? "Start date" : "Requested"}</dt>
+                      <dd className="text-sm text-slate-800 font-medium">
+                        {formatDate(sub.start_date ?? sub.created_at)}
+                      </dd>
                     </div>
-                  </div>
-                  {(display.reason || display.label === "Pending Confirmation" || display.label === "Pending Payment") && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 text-xs">
-                      <span className="text-slate-400">Message: </span>
-                      {display.reason ? (
-                        <span className="text-red-500">{display.reason}</span>
-                      ) : display.label === "Pending Payment" ? (
-                        <span className="text-amber-500">Payment required</span>
-                      ) : (
-                        <span className="text-amber-500">Awaiting confirmation</span>
-                      )}
+                    <div>
+                      <dt className="text-slate-400">End date</dt>
+                      <dd className="text-sm text-slate-800 font-medium">
+                        {sub.end_date ? formatDate(sub.end_date) : "—"}
+                      </dd>
                     </div>
+                  </dl>
+                  {message && (
+                    <p className={`mt-3 rounded-lg px-3 py-2 text-xs font-medium ${message.className}`}>{message.text}</p>
                   )}
                 </Card>
               );

@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
+import { PlayerTabBar } from "./player-tab-bar";
 import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
 
 type Portal = "player" | "coach" | "admin";
@@ -156,6 +157,22 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const activeKey = matched || (pathname.startsWith(`/${portal}/subscribe`) ? "subscriptions" : "dashboard");
 
   const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
+  // Players get a tab bar on phones; coaches and admins keep the slide-out menu
+  const hasTabs = portal === "player";
+
+  // While the phone menu is open the page behind it stays put, and Escape closes it
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
 
   // Fold-away sections: the current page's section opens on arrival; whatever the admin
   // opens or closes is remembered in this browser
@@ -372,16 +389,20 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
       </aside>
 
       {/* Top navbar */}
-      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-20 transition-[left] duration-200">
-        <div className="relative flex items-center justify-between h-full px-4">
-          {/* Left: hamburger on mobile */}
+      <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-16 md:h-20 transition-[left] duration-200">
+        <div className="relative flex items-center justify-between h-full px-2 md:px-4">
+          {/* Left: menu button on mobile (players open the menu from the tab bar instead) */}
           <div className="flex items-center">
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden text-primary-800 p-1 -ml-1"
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            {!hasTabs && (
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileOpen}
+                className="md:hidden text-primary-800 p-2.5 rounded-lg hover:bg-sand/50 transition-colors"
+              >
+                {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            )}
           </div>
 
           {/* Center: logo */}
@@ -396,7 +417,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
               width={240}
               height={80}
               priority
-              className="h-16 w-auto object-contain"
+              className="h-12 md:h-16 w-auto object-contain"
             />
           </Link>
 
@@ -418,7 +439,8 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             </div>
             <button
               onClick={() => logout()}
-              className="p-2 rounded-lg text-primary-700/50 hover:text-primary-900 hover:bg-sand/50 transition-colors"
+              aria-label="Sign out"
+              className="p-2.5 md:p-2 rounded-lg text-primary-700/50 hover:text-primary-900 hover:bg-sand/50 transition-colors"
               title="Sign out"
             >
               <LogOut className="w-4 h-4" />
@@ -427,89 +449,110 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         </div>
       </header>
 
-      {/* Mobile slide-out menu */}
-      <div
-        className={cn(
-          "md:hidden fixed inset-0 bg-black/30 z-40 transition-opacity duration-300",
-          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none",
-        )}
-        onClick={() => setMobileOpen(false)}
-      />
-      <div
-        className={cn(
-          "md:hidden fixed inset-y-0 left-0 w-64 bg-white border-r border-primary-200/60 z-50 flex flex-col transition-transform duration-300 ease-in-out",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        {/* Header */}
-        <div className="h-14 flex items-center px-5 shrink-0">
-          <p className={cn("text-[11px] font-semibold uppercase tracking-[0.15em]", config.labelColor)}>
-            {config.label}
-          </p>
-        </div>
-        <nav className="flex-1 px-3 pt-2 overflow-y-auto">
-          {config.foldSections
-            ? foldedNav("mobile")
-            : navItems.map((item, index) => {
-                const prevItem = index > 0 ? navItems[index - 1] : null;
-                const showSection = item.section && item.section !== prevItem?.section;
-                return (
-                  <div key={item.key}>
-                    {showSection && (
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
-                        {item.section}
-                      </p>
-                    )}
-                    {mobileLink(item)}
-                  </div>
-                );
-              })}
-        </nav>
-
-        {process.env.NODE_ENV === "development" && (
-          <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
-            <div className="flex gap-1">
-              {(["admin", "coach", "player"] as const).map((p) => (
-                <a
-                  key={p}
-                  href={`/${p}/dashboard`}
-                  className={cn(
-                    "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
-                    portal === p
-                      ? "bg-primary-50 text-primary-700"
-                      : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
-                  )}
-                >
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Brand mark at bottom */}
-        <div className="shrink-0 flex items-center justify-center px-3 pb-8 pt-2">
-          <Link
-            href={navItems[0].href}
+      {/* Mobile slide-out menu (coach and admin) */}
+      {!hasTabs && (
+        <>
+          <div
+            className={cn(
+              "md:hidden fixed inset-0 bg-black/30 z-40 transition-opacity duration-300",
+              mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+            )}
             onClick={() => setMobileOpen(false)}
-            className="opacity-60 hover:opacity-100 transition-opacity"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            inert={!mobileOpen}
+            className={cn(
+              "md:hidden fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white border-r border-primary-200/60 z-50 flex flex-col transition-transform duration-300 ease-in-out pb-[env(safe-area-inset-bottom)]",
+              mobileOpen ? "translate-x-0" : "-translate-x-full",
+            )}
           >
-            <Image
-              src="/images/logo.png"
-              alt={branding.name}
-              width={160}
-              height={56}
-              priority
-              className="h-14 w-auto object-contain"
-            />
-          </Link>
-        </div>
-      </div>
+            {/* Header: who's signed in */}
+            <div className="flex items-center gap-3 px-5 pt-5 pb-4 shrink-0 border-b border-primary-100">
+              <div
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0",
+                  config.avatar,
+                )}
+              >
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-primary-900 truncate">
+                  {user.first_name} {user.last_name}
+                </p>
+                <p className="text-xs text-primary-700/60 truncate">{user.email}</p>
+              </div>
+              <button
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close menu"
+                className="p-2 -mr-2 rounded-lg text-primary-700/60 hover:text-primary-900 hover:bg-sand/50 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="flex-1 px-3 pt-2 overflow-y-auto">
+              {config.foldSections
+                ? foldedNav("mobile")
+                : navItems.map((item, index) => {
+                    const prevItem = index > 0 ? navItems[index - 1] : null;
+                    const showSection = item.section && item.section !== prevItem?.section;
+                    return (
+                      <div key={item.key}>
+                        {showSection && (
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 mt-4 mb-1 px-3">
+                            {item.section}
+                          </p>
+                        )}
+                        {mobileLink(item)}
+                      </div>
+                    );
+                  })}
+            </nav>
+
+            {process.env.NODE_ENV === "development" && (
+              <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
+                <div className="flex gap-1">
+                  {(["admin", "coach", "player"] as const).map((p) => (
+                    <a
+                      key={p}
+                      href={`/${p}/dashboard`}
+                      className={cn(
+                        "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
+                        portal === p
+                          ? "bg-primary-50 text-primary-700"
+                          : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
+                      )}
+                    >
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {hasTabs && (
+        <PlayerTabBar
+          items={navItems.map((item) => ({ ...item, icon: iconMap[item.key as keyof typeof iconMap] }))}
+          activeKey={activeKey}
+        />
+      )}
 
       {/* Main content — desktop gets sidebar margin via CSS variable */}
       <style>{`:root { --sidebar-w: ${sidebarW}px; }`}</style>
-      <main className="relative flex-1 min-w-0 overflow-x-hidden pt-20 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10">
+      <main
+        className={cn(
+          "relative flex-1 min-w-0 overflow-x-hidden pt-16 md:pt-20 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10",
+          // Room for the tab bar so the end of every page can scroll clear of it
+          hasTabs && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+        )}
+      >
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 opacity-[0.035] z-0"

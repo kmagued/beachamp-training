@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
-import { Card, Badge, EmptyState, Button } from "@/components/ui";
+import { Card, Badge, EmptyState, buttonVariants, buttonSizes } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import { UserCheck, Plus } from "lucide-react";
 import { CancelButton } from "./_components/cancel-button";
 
@@ -64,19 +65,21 @@ export default async function PlayerPrivateSessionsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">Private Sessions</h1>
           <p className="text-slate-500 text-sm">Request and manage private training sessions</p>
         </div>
-        <Link href="/player/private-sessions/request">
-          <Button size="sm">
-            <span className="flex items-center gap-1.5">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Request Session</span>
-            </span>
-          </Button>
-        </Link>
+        {/* With no requests yet, the empty state's button is the only one needed */}
+        {items.length > 0 && (
+          <Link
+            href="/player/private-sessions/request"
+            className={cn(buttonVariants.primary, buttonSizes.sm, "shrink-0 inline-flex items-center gap-1.5 px-4")}
+          >
+            <Plus className="w-4 h-4" />
+            Request<span className="hidden sm:inline">&nbsp;Session</span>
+          </Link>
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -84,6 +87,14 @@ export default async function PlayerPrivateSessionsPage() {
           icon={<UserCheck className="w-12 h-12" />}
           title="No Private Session Requests"
           description="Request a private session with a coach to get personalized training."
+          action={
+            <Link
+              href="/player/private-sessions/request"
+              className="inline-flex items-center justify-center bg-accent hover:bg-accent-600 text-primary-900 font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
+            >
+              Request a Session
+            </Link>
+          }
         />
       ) : (
         <>

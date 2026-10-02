@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
-import { Card, Badge, EmptyState } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
 import { CalendarDays } from "lucide-react";
 import { SessionsTable, type SessionRecord } from "./_components/sessions-table";
 import type { Attendance } from "@/types/database";
@@ -40,11 +40,18 @@ export default async function PlayerSessionsPage() {
         <p className="text-slate-500 text-sm">Your attendance history</p>
       </div>
 
-      {/* Summary badges */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Badge variant="success">{presentCount} Present</Badge>
-        <Badge variant="danger">{absentCount} Absent</Badge>
-        <Badge variant="warning">{excusedCount} Excused</Badge>
+      {/* Totals */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+        {[
+          { label: "Present", value: presentCount, className: "text-emerald-600" },
+          { label: "Absent", value: absentCount, className: "text-red-500" },
+          { label: "Excused", value: excusedCount, className: "text-amber-500" },
+        ].map((t) => (
+          <div key={t.label} className="bg-white rounded-xl border border-slate-200 px-4 py-3 sm:px-5 sm:py-4">
+            <p className={`font-display text-3xl sm:text-4xl leading-none ${t.className}`}>{t.value}</p>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">{t.label}</p>
+          </div>
+        ))}
       </div>
 
       {records.length > 0 ? (

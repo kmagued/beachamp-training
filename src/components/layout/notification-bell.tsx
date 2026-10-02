@@ -53,7 +53,8 @@ export function NotificationBell({ userId, href }: NotificationBellProps) {
   return (
     <Link
       href={href}
-      className="relative p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+      aria-label={count > 0 ? `Notifications, ${count} unread` : "Notifications"}
+      className="relative p-2.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
     >
       <Bell className="w-5 h-5" />
       {count > 0 && (
