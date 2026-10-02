@@ -889,9 +889,9 @@ export function AttendanceTab({
         </div>
       </Drawer>
 
-      {/* Success Toast */}
+      {/* Success Toast (above the admin tab bar on phones) */}
       {result?.success && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 sm:max-w-sm bg-emerald-50 border-emerald-200 border rounded-lg p-4 shadow-lg">
+        <div className="fixed bottom-[calc(1rem+var(--tab-bar-h,0px))] left-4 right-4 sm:left-auto sm:right-4 z-50 sm:max-w-sm bg-emerald-50 border-emerald-200 border rounded-lg p-4 shadow-lg">
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5" />
             <div>

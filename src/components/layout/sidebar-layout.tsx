@@ -36,10 +36,12 @@ import {
   Trophy,
   Award,
   Medal,
+  House,
+  MessageCircle,
 } from "lucide-react";
 import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
-import { PlayerTabBar } from "./player-tab-bar";
+import { MobileTabBar } from "./mobile-tab-bar";
 import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
 
 type Portal = "player" | "coach" | "admin";
@@ -76,6 +78,7 @@ const iconMap = {
   leaderboard: Trophy,
   achievements: Award,
   badges: Medal,
+  "whatsapp-templates": MessageCircle,
 } as const;
 
 /** badge: a short tag shown next to the label, e.g. "New" for a section players haven't seen yet */
@@ -125,11 +128,53 @@ const adminNav: NavItem[] = [
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
 
+/** Phones: a tab bar of the pages each portal opens most, with the rest under More.
+ *  Coaches have a short menu and keep the slide-out one. */
+const mobileTabs: Partial<Record<Portal, { key: string; label: string; icon: typeof House }[]>> = {
+  player: [
+    { key: "dashboard", label: "Home", icon: House },
+    { key: "sessions", label: "Sessions", icon: CalendarDays },
+    { key: "leaderboard", label: "Leaderboard", icon: Trophy },
+    { key: "achievements", label: "Achievements", icon: Award },
+  ],
+  admin: [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "players", label: "Players", icon: Users },
+    { key: "finances", label: "Finances", icon: Receipt },
+    { key: "daily-report", label: "Daily Report", icon: ClipboardList },
+  ],
+};
+
 function NavBadge({ label }: { label: string }) {
   return (
     <span className="ml-auto shrink-0 rounded-full bg-accent px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-primary-900">
       {label}
     </span>
+  );
+}
+
+/** Development only: jump between the three portals */
+function DevPortalSwitcher({ portal }: { portal: Portal }) {
+  return (
+    <>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
+      <div className="flex gap-1">
+        {(["admin", "coach", "player"] as const).map((p) => (
+          <a
+            key={p}
+            href={`/${p}/dashboard`}
+            className={cn(
+              "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
+              portal === p
+                ? "bg-primary-50 text-primary-700"
+                : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
+            )}
+          >
+            {p.charAt(0).toUpperCase() + p.slice(1)}
+          </a>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -157,8 +202,8 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const activeKey = matched || (pathname.startsWith(`/${portal}/subscribe`) ? "subscriptions" : "dashboard");
 
   const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
-  // Players get a tab bar on phones; coaches and admins keep the slide-out menu
-  const hasTabs = portal === "player";
+  const tabs = mobileTabs[portal];
+  const hasTabs = !!tabs;
 
   // While the phone menu is open the page behind it stays put, and Escape closes it
   useEffect(() => {
@@ -353,23 +398,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
         {/* Dev portal switcher */}
         {process.env.NODE_ENV === "development" && !collapsed && (
           <div className="px-3 border-t border-primary-200/60 pt-3 pb-4 mt-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
-            <div className="flex gap-1">
-              {(["admin", "coach", "player"] as const).map((p) => (
-                <a
-                  key={p}
-                  href={`/${p}/dashboard`}
-                  className={cn(
-                    "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
-                    portal === p
-                      ? "bg-primary-50 text-primary-700"
-                      : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
-                  )}
-                >
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </a>
-              ))}
-            </div>
+            <DevPortalSwitcher portal={portal} />
           </div>
         )}
 
@@ -514,43 +543,33 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
 
             {process.env.NODE_ENV === "development" && (
               <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
-                <div className="flex gap-1">
-                  {(["admin", "coach", "player"] as const).map((p) => (
-                    <a
-                      key={p}
-                      href={`/${p}/dashboard`}
-                      className={cn(
-                        "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
-                        portal === p
-                          ? "bg-primary-50 text-primary-700"
-                          : "text-primary-700/50 hover:text-primary-900 hover:bg-sand/50"
-                      )}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </a>
-                  ))}
-                </div>
+                <DevPortalSwitcher portal={portal} />
               </div>
             )}
           </div>
         </>
       )}
 
-      {hasTabs && (
-        <PlayerTabBar
+      {tabs && (
+        <MobileTabBar
+          tabs={tabs}
           items={navItems.map((item) => ({ ...item, icon: iconMap[item.key as keyof typeof iconMap] }))}
           activeKey={activeKey}
+          layout={config.foldSections ? "sections" : "tiles"}
+          footer={process.env.NODE_ENV === "development" ? <DevPortalSwitcher portal={portal} /> : undefined}
         />
       )}
 
-      {/* Main content — desktop gets sidebar margin via CSS variable */}
-      <style>{`:root { --sidebar-w: ${sidebarW}px; }`}</style>
+      {/* Main content — desktop gets sidebar margin via CSS variable. --tab-bar-h is how much
+          of the bottom the phone tab bar covers, for anything pinned there to sit above it. */}
+      <style>{`:root { --sidebar-w: ${sidebarW}px; --tab-bar-h: 0px; }${
+        hasTabs ? ` @media (max-width: 767.98px) { :root { --tab-bar-h: calc(4rem + env(safe-area-inset-bottom)); } }` : ""
+      }`}</style>
       <main
         className={cn(
           "relative flex-1 min-w-0 overflow-x-hidden pt-16 md:pt-20 md:ml-[var(--sidebar-w)] transition-[margin] duration-200 bg-sand/10",
           // Room for the tab bar so the end of every page can scroll clear of it
-          hasTabs && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+          "pb-[var(--tab-bar-h)]",
         )}
       >
         <div
@@ -562,7 +581,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
             backgroundRepeat: "repeat",
           }}
         />
-        <div className="relative z-10">{children}</div>
+        {/* Positioned without a z-index: it paints over the pattern, while the pages' own sheets
+            and modals still layer above the top bar and tab bar instead of underneath them */}
+        <div className="relative">{children}</div>
       </main>
     </div>
   );

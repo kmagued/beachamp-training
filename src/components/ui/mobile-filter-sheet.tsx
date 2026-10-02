@@ -46,10 +46,10 @@ export function MobileFilterSheet({ children, activeCount = 0, title = "Filters"
 
   return (
     <>
-      {/* Floating button — mobile only */}
+      {/* Floating button — mobile only, kept clear of the tab bar */}
       <button
         onClick={() => setOpen(true)}
-        className="sm:hidden fixed bottom-20 right-6 z-30 w-12 h-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
+        className="sm:hidden fixed bottom-[calc(var(--tab-bar-h,4rem)+1rem)] right-6 z-30 w-12 h-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
       >
         <SlidersHorizontal className="w-5 h-5" />
         {activeCount > 0 && (
