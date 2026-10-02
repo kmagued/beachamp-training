@@ -3,6 +3,8 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { validateBadge, type BadgeField, type BadgeFields, type BadgeInput } from "@/lib/badges/validate";
+import { groupHolders, type BadgeHolder, type HeldTierRow } from "@/lib/badges/holders";
+import type { TierNumber } from "@/lib/badges/config";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -114,4 +116,40 @@ export async function deleteBadge(id: string): Promise<BadgeResult> {
 
   revalidateBadges();
   return { success: true };
+}
+
+// Who holds a badge, for the holders drawer: one row per player with their highest tier.
+// Loaded when the drawer opens, not with the page. PostgREST returns at most 1000 tier
+// rows, which is far beyond this academy's players times five tiers.
+export async function loadBadgeHolders(badgeId: string): Promise<{ holders: BadgeHolder[] } | { error: string }> {
+  const user = await getCurrentUserRole();
+  const authErr = requireAdmin(user);
+  if (authErr) return authErr;
+  if (typeof badgeId !== "string" || !badgeId) return { error: "Invalid badge" };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data, error } = await admin
+    .from("player_badges")
+    .select("player_id, earned_on, badge_tiers!inner(tier, badge_id), profiles(first_name, last_name), credit_transactions(amount)")
+    .eq("badge_tiers.badge_id", badgeId);
+  if (error) return { error: `Couldn't load who holds this badge: ${error.message}` };
+
+  const rows: HeldTierRow[] = (
+    (data || []) as {
+      player_id: string;
+      earned_on: string;
+      badge_tiers: { tier: TierNumber };
+      profiles: { first_name: string | null; last_name: string | null } | null;
+      credit_transactions: { amount: number }[] | null;
+    }[]
+  ).map((r) => ({
+    player_id: r.player_id,
+    first_name: r.profiles?.first_name ?? null,
+    last_name: r.profiles?.last_name ?? null,
+    tier: r.badge_tiers.tier,
+    earned_on: r.earned_on,
+    paid: (r.credit_transactions ?? []).reduce((sum, c) => sum + c.amount, 0),
+  }));
+  return { holders: groupHolders(rows) };
 }

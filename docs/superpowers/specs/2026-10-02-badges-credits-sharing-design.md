@@ -359,6 +359,22 @@ One migration: `supabase/migrations/20261002000000_badges_and_credits.sql`.
   - When editing, a number has been raised or a tier removed: "Raising a number or
     removing a tier takes it, and its credits, back from players who no longer
     qualify."
+- **Holders** (added 2026-10-03 at the user's request):
+  - **Opening it:** a "View holders (12)" link on each badge card. Each tier's player
+    count is also a link.
+  - **The drawer** is titled "Court Regular · 12 holders". It has:
+    - tier chips (All, then the badge's tiers with counts), pre-selected when opened
+      from a tier;
+    - a name search;
+    - one row per player: initials, name, "since 3 Nov · +70 credits" (credits paid
+      by this badge), and a pill for their highest tier in its metal. Each row links to
+      `/admin/players/[id]`.
+  - **Order:** highest tier first, then whoever reached it first.
+  - **A tier chip** shows everyone holding that tier, including those who went higher,
+    matching the card's counts.
+  - **Loading:** holders load when the drawer opens, through the admin-only
+    `loadBadgeHolders` action. `groupHolders` and `filterHolders` in
+    `src/lib/badges/holders.ts` are unit-tested.
 - **Delete:** `ConfirmDialog`. It reads "12 players hold Court Regular. Deleting it
   takes it away from them, with the 840 credits it gave them." using the credits
   actually paid. If nobody holds it: "Nobody holds Court Regular yet."
@@ -537,8 +553,7 @@ One migration: `supabase/migrations/20261002000000_badges_and_credits.sql`.
 - Spending Beachamp Credits on merch, admin credit adjustments, and credits for monthly
   awards. The ledger is built to take them later.
 - Per-session competitions and the "Competitions won" tile.
-- A list of who holds a badge (the admin page shows counts), and showing badges or
-  credits on admin or coach player pages.
+- Showing badges or credits on admin or coach player pages.
 - Measures beyond the four, uploading badge artwork, and tiers beyond Diamond.
 - Moving or zooming the photo on the card.
 - Posting straight to Instagram or Facebook through their APIs.

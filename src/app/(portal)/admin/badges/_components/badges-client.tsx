@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Medal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Medal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Button, Card, ConfirmDialog, EmptyState, Toast } from "@/components/ui";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import { MEASURES, TIERS, type BadgeIconKey, type Measure, type TierNumber } from "@/lib/badges/config";
 import { creditsEarned, deleteBadgeWarning, formatBadgeDate, playersCount, tierRequirement } from "@/lib/badges/words";
 import { deleteBadge } from "@/app/_actions/badges";
 import { BadgeDrawer } from "./badge-drawer";
+import { HoldersDrawer } from "./holders-drawer";
 
 export interface AdminBadgeTier {
   id: string;
@@ -41,11 +42,19 @@ export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
   const [drawer, setDrawer] = useState<{ badge: AdminBadge | null; key: number } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [deleting, setDeleting] = useState<AdminBadge | null>(null);
+  // A fresh key per opening, so each badge's holders load afresh
+  const [holders, setHolders] = useState<{ badge: AdminBadge; tier: TierNumber | "all"; key: number } | null>(null);
+  const [holdersOpen, setHoldersOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   function openDrawer(badge: AdminBadge | null) {
     setDrawer((prev) => ({ badge, key: (prev?.key ?? 0) + 1 }));
     setDrawerOpen(true);
+  }
+
+  function openHolders(badge: AdminBadge, tier: TierNumber | "all") {
+    setHolders((prev) => ({ badge, tier, key: (prev?.key ?? 0) + 1 }));
+    setHoldersOpen(true);
   }
 
   function handleSaved(message: string) {
@@ -129,13 +138,32 @@ export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
                           </p>
                           <p className="text-xs text-slate-500">
                             {credits ? `${credits} · ` : ""}
-                            {playersCount(tier.holders)}
+                            {tier.holders > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => openHolders(badge, tier.tier)}
+                                className="font-medium text-primary-800 underline-offset-2 hover:underline"
+                              >
+                                {playersCount(tier.holders)}
+                              </button>
+                            ) : (
+                              playersCount(tier.holders)
+                            )}
                           </p>
                         </div>
                       </li>
                     );
                   })}
                 </ul>
+
+                <button
+                  type="button"
+                  onClick={() => openHolders(badge, "all")}
+                  className="mt-3 inline-flex items-center gap-1.5 self-start text-sm font-semibold text-primary-800 hover:text-primary-900"
+                >
+                  <Users className="w-4 h-4" />
+                  View holders ({badge.holders})
+                </button>
 
                 <p className="mt-3 text-xs text-slate-400">
                   Counting since {formatBadgeDate(badge.counts_from, "medium")}
@@ -171,6 +199,16 @@ export function BadgesClient({ badges }: { badges: AdminBadge[] }) {
           badge={drawer.badge}
           onClose={() => setDrawerOpen(false)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {holders && (
+        <HoldersDrawer
+          key={holders.key}
+          open={holdersOpen}
+          badge={holders.badge}
+          initialTier={holders.tier}
+          onClose={() => setHoldersOpen(false)}
         />
       )}
 
