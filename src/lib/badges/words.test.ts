@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   badgeDescription,
+  badgesDetail,
+  creditsDetail,
   creditsEarned,
   deleteBadgeWarning,
   formatBadgeDate,
@@ -79,4 +81,16 @@ test("deleteBadgeWarning: who loses it, and the credits that go with it", () => 
     "3 players hold Iron Streak. Deleting it takes it away from them."
   );
   assert.equal(deleteBadgeWarning("Court Regular", 0, 50), "Nobody holds Court Regular yet.");
+});
+
+test("badgesDetail: the Badges earned tile's second line", () => {
+  assert.equal(badgesDetail(4, 6), "2 still to unlock");
+  assert.equal(badgesDetail(5, 6), "1 still to unlock");
+  assert.equal(badgesDetail(6, 6), "All unlocked");
+});
+
+test("creditsDetail: the Beachamp Credits tile's second line", () => {
+  assert.equal(creditsDetail(4), "From 4 badges");
+  assert.equal(creditsDetail(1), "From 1 badge");
+  assert.equal(creditsDetail(0), "Earn badges to collect them");
 });

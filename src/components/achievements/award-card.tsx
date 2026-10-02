@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { awardSummary, placeLabel } from "@/lib/king-of-court/awards";
@@ -5,12 +6,12 @@ import type { PlayerAward } from "@/lib/king-of-court/awards-load";
 import { formatMonth } from "@/lib/king-of-court/format";
 
 /** One monthly award on the Achievements page: gold for 1st place, plain for 2nd */
-export function AwardCard({ award }: { award: PlayerAward }) {
+export function AwardCard({ award, share }: { award: PlayerAward; share?: ReactNode }) {
   const first = award.place === 1;
   return (
     <div
       className={cn(
-        "rounded-2xl border p-5 sm:p-6",
+        "rounded-2xl border p-5 sm:p-6 flex flex-col",
         first ? "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white" : "border-slate-200 bg-white"
       )}
     >
@@ -39,6 +40,7 @@ export function AwardCard({ award }: { award: PlayerAward }) {
       <p className="mt-1 text-sm text-slate-500">
         {award.group_name} · {awardSummary(award.points, award.sessions)}
       </p>
+      {share && <div className="mt-auto pt-5">{share}</div>}
     </div>
   );
 }

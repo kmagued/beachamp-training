@@ -87,3 +87,14 @@ export function deleteBadgeWarning(name: string, holders: number, credits: numbe
   const withCredits = credits > 0 ? `, with the ${formatCredits(credits)} it gave each` : "";
   return `${who} ${name}. Deleting it takes it away from them${withCredits}.`;
 }
+
+/** The Badges earned tile: "2 still to unlock", or "All unlocked" */
+export function badgesDetail(earned: number, total: number): string {
+  const left = total - earned;
+  return left <= 0 ? "All unlocked" : `${left} still to unlock`;
+}
+
+/** The Beachamp Credits tile: where the balance came from */
+export function creditsDetail(earnedBadges: number): string {
+  return earnedBadges === 0 ? "Earn badges to collect them" : `From ${plural(earnedBadges, "badge")}`;
+}
