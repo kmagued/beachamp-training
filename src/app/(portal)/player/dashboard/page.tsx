@@ -18,8 +18,14 @@ import {
 import { formatDate } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { placeLabel } from "@/lib/king-of-court/awards";
-import { loadLatestAwards } from "@/lib/king-of-court/awards-load";
 import { formatMonth } from "@/lib/king-of-court/format";
+import { loadLatestAchievements, loadStreak } from "@/lib/badges/load";
+import { TIERS } from "@/lib/badges/config";
+import { badgeDescription } from "@/lib/badges/words";
+import { BadgeMedallion } from "@/components/achievements/badge-icon";
+import { BadgeProgressCard } from "@/components/achievements/badge-progress-card";
+import { CreditsCard } from "@/components/achievements/credits-card";
+import { StreakCard } from "@/components/achievements/streak-card";
 import type { Subscription } from "@/types/database";
 import { PendingPaymentCard } from "./_components/pending-payment-card";
 
@@ -78,8 +84,12 @@ export default async function PlayerDashboard() {
     .limit(1)
     .maybeSingle();
 
-  // Never throws: the dashboard renders without the card if awards can't be read
-  const latestAwards = await loadLatestAwards(supabase, currentUser.id, 3);
+  // Neither throws: the dashboard renders without these if they can't be read
+  const [{ items: latestAchievements, badges, creditBalance }, streak] = await Promise.all([
+    loadLatestAchievements(supabase, currentUser.id, 3),
+    loadStreak(supabase, currentUser.id),
+  ]);
+  const paidTiers = badges.flatMap((b) => b.tiers).filter((t) => (t.credits_paid ?? 0) > 0).length;
 
   let daysRemaining: number | null = null;
   let isExpired = false;
@@ -166,6 +176,13 @@ export default async function PlayerDashboard() {
           />
         </div>
       )}
+
+      {/* Encouragement: the streak, the credit balance, and how close each badge is */}
+      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        <StreakCard streak={streak} />
+        <CreditsCard balance={creditBalance} paidTiers={paidTiers} />
+      </div>
+      {badges.length > 0 && <BadgeProgressCard badges={badges} />}
 
       {/* Two column grid */}
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -285,8 +302,8 @@ export default async function PlayerDashboard() {
         </Card>
       </div>
 
-      {/* Achievements: only for players who have one */}
-      {latestAwards.length > 0 && (
+      {/* Achievements: only for players who have an award or a badge */}
+      {latestAchievements.length > 0 && (
         <Card className="mb-6">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="font-display text-xl tracking-wide text-primary-900 flex items-center gap-2">
@@ -301,26 +318,40 @@ export default async function PlayerDashboard() {
             </Link>
           </div>
           <div className="divide-y divide-slate-100">
-            {latestAwards.map((award) => (
-              <div key={award.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <div
-                  className={cn(
-                    "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-                    award.place === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
-                  )}
-                >
-                  <Trophy className="w-4 h-4" />
+            {latestAchievements.map((item) =>
+              item.kind === "award" ? (
+                <div key={`award-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div
+                    className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                      item.award.place === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
+                    )}
+                  >
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-primary-900">
+                      {placeLabel(item.award.place)} · {formatMonth(item.award.month, "long")}
+                    </p>
+                    <p className="text-xs text-primary-700/60 truncate">
+                      {item.award.group_name} · {item.award.points} pts
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-primary-900">
-                    {placeLabel(award.place)} · {formatMonth(award.month, "long")}
-                  </p>
-                  <p className="text-xs text-primary-700/60 truncate">
-                    {award.group_name} · {award.points} pts
-                  </p>
+              ) : (
+                <div key={`badge-${item.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <BadgeMedallion icon={item.badge.icon} tier={item.tier.tier} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-primary-900">
+                      {item.badge.name} · {TIERS[item.tier.tier].label}
+                    </p>
+                    <p className="text-xs text-primary-700/60 truncate">
+                      {badgeDescription(item.badge.measure, item.tier.threshold)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </Card>
       )}

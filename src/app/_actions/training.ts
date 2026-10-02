@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
+import { isFutureCairoDate } from "@/lib/utils/cairo-time";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -589,12 +590,8 @@ export async function submitAttendance(data: {
   const authErr = requireCoachOrAdmin(user);
   if (authErr) return authErr;
 
-  // Past dates are allowed without limit; only future dates are rejected
-  const sessionDate = new Date(data.session_date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (sessionDate > today) {
+  // Past dates are allowed without limit; only future dates (in Cairo) are rejected
+  if (isFutureCairoDate(data.session_date)) {
     return { error: "Cannot log attendance for future dates" };
   }
 
@@ -1038,10 +1035,7 @@ export async function submitCoachAttendance(data: {
   if (authErr) return authErr;
 
   // Same rule as player attendance: backfilling the past is fine, the future is not
-  const sessionDate = new Date(data.session_date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (sessionDate > today) {
+  if (isFutureCairoDate(data.session_date)) {
     return { error: "Cannot log coach attendance for future dates" };
   }
 

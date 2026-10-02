@@ -1,4 +1,5 @@
-// A player's monthly leaderboard awards, for the Achievements page and the dashboard card.
+// A player's monthly leaderboard awards, for the Achievements page and the dashboard card
+// (through src/lib/badges/load.ts, which adds their badges).
 // Read with the player's own client: row-level security limits it to their rows.
 
 import { sortAwards, type Place } from "./awards";
@@ -10,6 +11,8 @@ export interface PlayerAward {
   place: Place;
   points: number;
   sessions: number;
+  /** When the award was given, which is when its month was closed */
+  awarded_at: string;
   group_name: string;
 }
 
@@ -18,7 +21,7 @@ export interface PlayerAward {
 export async function loadPlayerAwards(supabase: any, playerId: string): Promise<PlayerAward[]> {
   const { data, error } = await supabase
     .from("leaderboard_awards")
-    .select("id, month, place, points, sessions, groups(name)")
+    .select("id, month, place, points, sessions, created_at, groups(name)")
     .eq("player_id", playerId);
   if (error) throw new Error(`Could not load your achievements: ${error.message}`);
 
@@ -28,6 +31,7 @@ export async function loadPlayerAwards(supabase: any, playerId: string): Promise
     place: Place;
     points: number;
     sessions: number;
+    created_at: string;
     groups: { name: string } | null;
   }[];
   // A player holds a handful of awards, so they are sorted here rather than in the query
@@ -38,21 +42,8 @@ export async function loadPlayerAwards(supabase: any, playerId: string): Promise
       place: r.place,
       points: r.points,
       sessions: r.sessions,
+      awarded_at: r.created_at,
       group_name: r.groups?.name ?? "Your group",
     }))
   );
-}
-
-/**
- * The newest few, for the dashboard card. Never throws: the card is an extra, and a
- * problem reading awards must not take the player's dashboard down with it.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadLatestAwards(supabase: any, playerId: string, limit: number): Promise<PlayerAward[]> {
-  try {
-    return (await loadPlayerAwards(supabase, playerId)).slice(0, limit);
-  } catch (err) {
-    console.error("[achievements]", err);
-    return [];
-  }
 }
