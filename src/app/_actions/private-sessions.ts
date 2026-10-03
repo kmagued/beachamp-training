@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
+import { accountOf, isPlayer } from "@/lib/auth/portals";
 import { revalidatePath } from "next/cache";
 import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { isCoachBlocked } from "@/lib/scheduling/coach-availability";
@@ -325,10 +326,10 @@ export async function createPrivateSessionRequest(data: {
     }
     const { data: partner } = await admin
       .from("profiles")
-      .select("id, role, is_active")
+      .select("id, role, is_player, is_active")
       .eq("id", data.partner_player_id)
       .single();
-    if (!partner || partner.role !== "player" || !partner.is_active) {
+    if (!partner || !isPlayer(accountOf(partner)) || !partner.is_active) {
       return { error: "Selected second player is not available." };
     }
     partnerPlayerId = partner.id;
