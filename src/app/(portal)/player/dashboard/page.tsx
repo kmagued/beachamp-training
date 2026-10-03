@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, Badge, EmptyState } from "@/components/ui";
@@ -19,6 +19,9 @@ import { StreakCard } from "@/components/achievements/streak-card";
 import type { Subscription } from "@/types/database";
 import { PlanCard } from "./_components/plan-card";
 import { RenewalBanner } from "./_components/renewal-banner";
+import { PrivateSessionsCard } from "./_components/private-sessions-card";
+import { loadPlayerPrivateSessions } from "@/lib/private-sessions/load";
+import { cairoToday } from "@/lib/utils/cairo-time";
 
 export default async function PlayerDashboard() {
   const currentUser = await getCurrentUser();
@@ -32,6 +35,8 @@ export default async function PlayerDashboard() {
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .eq("status", "active")
+    // A paid private session shows on the private sessions card, not as the player's plan
+    .is("private_session_id", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string; session_count: number } }) | null };
@@ -41,6 +46,7 @@ export default async function PlayerDashboard() {
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .in("status", ["pending", "pending_payment"])
+    .is("private_session_id", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
@@ -66,6 +72,9 @@ export default async function PlayerDashboard() {
   const hasUsableActiveSub = !!subscription && subscription.sessions_remaining > 0;
   const showPaymentCard =
     !hasUsableActiveSub && pendingSubscription?.status === "pending_payment" && !!pendingPayment;
+
+  // Read with the service role (a partner can't read the payer's payment), limited to this player
+  const privateSessions = await loadPlayerPrivateSessions(createAdminClient(), currentUser.id, cairoToday());
 
   const { data: latestFeedback } = await supabase
     .from("feedback")
@@ -166,6 +175,7 @@ export default async function PlayerDashboard() {
         <StreakCard streak={streak} />
         <CreditsCard balance={creditBalance} paidTiers={paidTiers} />
       </div>
+      <PrivateSessionsCard data={privateSessions} />
       {badges.length > 0 && <BadgeProgressCard badges={badges} />}
 
       <div className={cn("grid gap-4 sm:gap-6", latestAchievements.length > 0 && "lg:grid-cols-2")}>
