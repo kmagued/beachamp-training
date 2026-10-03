@@ -13,6 +13,11 @@ import {
 // Routes that don't require authentication
 const publicRoutes = ["/", "/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/auth/callback", "/admin-setup"];
 
+/** Public routes, plus coach invite links (/invite/<token>) */
+function isPublic(pathname: string): boolean {
+  return publicRoutes.includes(pathname) || pathname.startsWith("/invite/");
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -45,7 +50,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // If user is not authenticated and trying to access a protected route
-  if (!user && !publicRoutes.includes(pathname)) {
+  if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
@@ -53,7 +58,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If authenticated but email not verified, block access to protected routes
-  if (user && !user.email_confirmed_at && !publicRoutes.includes(pathname)) {
+  if (user && !user.email_confirmed_at && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/verify-email";
     return NextResponse.redirect(url);
