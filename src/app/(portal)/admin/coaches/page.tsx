@@ -56,7 +56,7 @@ function AdminCoachesContent() {
     // Single nested-select query — coaches with their group assignments
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, area, is_active, created_at, coach_groups!coach_groups_coach_id_fkey(is_active, groups(name))")
+      .select("id, first_name, last_name, email, phone, area, is_active, created_at, role, coach_groups!coach_groups_coach_id_fkey(is_active, groups(name))")
       .eq("is_coach", true)
       .order("created_at", { ascending: false });
 
@@ -78,6 +78,7 @@ function AdminCoachesContent() {
           created_at: c.created_at,
           group_count: group_names.length,
           group_names,
+          is_player: c.role === "player",
         };
       }) as CoachRow[]);
     }
@@ -373,7 +374,7 @@ function AdminCoachesContent() {
                 Delete {selectedIds.size} coach{selectedIds.size === 1 ? "" : "es"}
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Their accounts are removed, any sessions they ran become unassigned, and their feedback is deleted. Admin accounts are skipped. This can&apos;t be undone.
+                Their accounts are removed, any sessions they ran become unassigned, and their feedback is deleted. Admin and player accounts are skipped. This can&apos;t be undone.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -391,7 +392,7 @@ function AdminCoachesContent() {
                     fetchCoaches();
                     setBulkNotice(
                       failed > 0
-                        ? `${failed} coach${failed === 1 ? "" : "es"} couldn't be deleted (admin accounts are skipped).`
+                        ? `${failed} coach${failed === 1 ? "" : "es"} couldn't be deleted (admin and player accounts are skipped).`
                         : null
                     );
                   });

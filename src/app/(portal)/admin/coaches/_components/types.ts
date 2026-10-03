@@ -9,6 +9,8 @@ export interface CoachRow {
   created_at: string;
   group_count: number;
   group_names: string[];
+  /** A player who coaches (role 'player', is_coach): removing coach access keeps their account */
+  is_player: boolean;
 }
 
 export type SortField = "name" | "date";

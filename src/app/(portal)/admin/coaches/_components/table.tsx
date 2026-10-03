@@ -186,8 +186,9 @@ export function CoachesTableView(props: CoachesTableProps) {
                       />
                     </td>
                     <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors group-hover:bg-primary-50", rowBg)}>
-                      <p className="text-sm font-medium text-slate-900">
+                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
                         {coach.first_name} {coach.last_name}
+                        {coach.is_player && <Badge variant="neutral">Player</Badge>}
                       </p>
                     </td>
                     <td className={cn(tdBase, "text-sm text-slate-700")}>
@@ -258,8 +259,9 @@ export function CoachesTableView(props: CoachesTableProps) {
               />
               <div className="flex items-start justify-between flex-1 min-w-0">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     {coach.first_name} {coach.last_name}
+                    {coach.is_player && <Badge variant="neutral">Player</Badge>}
                   </p>
                   <p className="text-xs text-slate-400">{coach.email || "No email"}</p>
                 </div>
