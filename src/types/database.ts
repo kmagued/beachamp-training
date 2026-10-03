@@ -230,6 +230,7 @@ export interface Database {
           description: string | null;
           is_active: boolean;
           sort_order: number;
+          private_session_players: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -242,6 +243,7 @@ export interface Database {
           description?: string | null;
           is_active?: boolean;
           sort_order?: number;
+          private_session_players?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -254,6 +256,7 @@ export interface Database {
           description?: string | null;
           is_active?: boolean;
           sort_order?: number;
+          private_session_players?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -272,6 +275,7 @@ export interface Database {
           promo_code_id: string | null;
           frozen_at: string | null;
           frozen_days_remaining: number | null;
+          private_session_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -287,6 +291,7 @@ export interface Database {
           promo_code_id?: string | null;
           frozen_at?: string | null;
           frozen_days_remaining?: number | null;
+          private_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -302,6 +307,7 @@ export interface Database {
           promo_code_id?: string | null;
           frozen_at?: string | null;
           frozen_days_remaining?: number | null;
+          private_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
