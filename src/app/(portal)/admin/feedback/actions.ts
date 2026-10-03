@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotification } from "@/app/_actions/notifications";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 
 export async function createFeedback(input: {
   player_id: string;
@@ -18,10 +19,11 @@ export async function createFeedback(input: {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_coach")
     .eq("id", user.id)
     .single();
-  if (!me || !["admin", "coach"].includes(me.role)) {
+  // Coaches, admins, and players with coach access
+  if (!me || !coachOrAdmin(accountOf(me))) {
     return { error: "Not authorized" };
   }
 

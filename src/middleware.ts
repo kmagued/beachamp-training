@@ -1,5 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  VIEW_COOKIE,
+  VIEW_COOKIE_OPTIONS,
+  accountOf,
+  homePath,
+  portalOfPath,
+  portalsFor,
+  viewToRemember,
+} from "@/lib/auth/portals";
 
 // Routes that don't require authentication
 const publicRoutes = ["/", "/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/auth/callback", "/admin-setup"];
@@ -52,55 +61,48 @@ export async function middleware(request: NextRequest) {
 
   // If user is authenticated and verified
   if (user && user.email_confirmed_at) {
+    // The view a player who coaches used last on this device
+    const lastView = request.cookies.get(VIEW_COOKIE)?.value;
+
     // Redirect away from login/register/verify-email if already verified
     if (pathname === "/login" || pathname === "/register" || pathname === "/verify-email") {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, is_coach")
         .eq("id", user.id)
         .single();
 
       const url = request.nextUrl.clone();
-
-      switch (profile?.role) {
-        case "admin":
-          url.pathname = "/admin/dashboard";
-          break;
-        case "coach":
-          url.pathname = "/coach/dashboard";
-          break;
-        default:
-          url.pathname = "/player/dashboard";
-      }
+      url.pathname = homePath(accountOf(profile), lastView);
       return NextResponse.redirect(url);
     }
 
-    // For portal routes, check role access (skip in dev mode for portal switching)
+    // Portal routes: remember the view of an account that has two, then check access
+    // (access is skipped in dev mode for portal switching)
     if (pathname.startsWith("/admin") || pathname.startsWith("/coach") || pathname.startsWith("/player")) {
-      if (process.env.NODE_ENV === "development") return supabaseResponse;
-
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, is_coach")
         .eq("id", user.id)
         .single();
 
-      const role = profile?.role || "player";
-      const url = request.nextUrl.clone();
+      const account = accountOf(profile);
+      const view = viewToRemember(account, pathname, lastView, request.headers);
+      if (view) supabaseResponse.cookies.set(VIEW_COOKIE, view, VIEW_COOKIE_OPTIONS);
+
+      if (process.env.NODE_ENV === "development") return supabaseResponse;
 
       // Admin can access everything
-      if (role === "admin") return supabaseResponse;
+      if (account.role === "admin") return supabaseResponse;
 
-      // Non-admin users can only access their own portal
-      if (role === "coach" && !pathname.startsWith("/coach")) {
-        url.pathname = "/coach/dashboard";
-        return NextResponse.redirect(url);
-      }
+      // Everyone else opens only the views their account has (a player who coaches has two).
+      // Anything else under these prefixes, like /admin-setup, still bounces non-admins home.
+      const portal = portalOfPath(pathname);
+      if (portal && portalsFor(account).includes(portal)) return supabaseResponse;
 
-      if (role === "player" && !pathname.startsWith("/player")) {
-        url.pathname = "/player/dashboard";
-        return NextResponse.redirect(url);
-      }
+      const url = request.nextUrl.clone();
+      url.pathname = homePath(account, lastView);
+      return NextResponse.redirect(url);
     }
   }
 

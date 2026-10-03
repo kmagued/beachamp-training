@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { VIEW_COOKIE, accountOf, homePath } from "@/lib/auth/portals";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 import { autoAssignGenderGroup } from "@/lib/players/auto-assign-group";
@@ -36,16 +38,14 @@ export async function login(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_coach")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role">[]>()
+    .returns<Pick<Profile, "role" | "is_coach">[]>()
     .single();
 
-  const role = profile?.role || "player";
-  const redirectTo =
-    role === "admin" ? "/admin/dashboard" : role === "coach" ? "/coach/dashboard" : "/player/dashboard";
-
-  redirect(redirectTo);
+  // A player who coaches lands in the view they used last on this device
+  const lastView = (await cookies()).get(VIEW_COOKIE)?.value;
+  redirect(homePath(accountOf(profile), lastView));
 }
 
 export async function register(formData: FormData) {
@@ -126,16 +126,14 @@ export async function verifyEmailOtp(email: string, token: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_coach")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role">[]>()
+    .returns<Pick<Profile, "role" | "is_coach">[]>()
     .single();
 
-  const role = profile?.role || "player";
-  const redirectTo =
-    role === "admin" ? "/admin/dashboard" : role === "coach" ? "/coach/dashboard" : "/player/dashboard";
-
-  redirect(redirectTo);
+  // A player who coaches lands in the view they used last on this device
+  const lastView = (await cookies()).get(VIEW_COOKIE)?.value;
+  redirect(homePath(accountOf(profile), lastView));
 }
 
 export async function completeProfile(formData: FormData) {

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
 import { isFutureCairoDate } from "@/lib/utils/cairo-time";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -17,11 +18,11 @@ async function getCurrentUserRole() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, is_coach")
     .eq("id", user.id)
     .single();
 
-  return profile ? { id: profile.id, role: profile.role as string } : null;
+  return profile ? { id: profile.id, role: profile.role as string, is_coach: profile.is_coach === true } : null;
 }
 
 function requireAdmin(user: { role: string } | null) {
@@ -31,8 +32,9 @@ function requireAdmin(user: { role: string } | null) {
   return null;
 }
 
-function requireCoachOrAdmin(user: { role: string } | null) {
-  if (!user || (user.role !== "coach" && user.role !== "admin")) {
+function requireCoachOrAdmin(user: { role: string; is_coach: boolean } | null) {
+  // Coaches, admins, and players with coach access
+  if (!user || !coachOrAdmin(accountOf(user))) {
     return { error: "Unauthorized: coach or admin access required" };
   }
   return null;

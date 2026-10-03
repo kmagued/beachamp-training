@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { VIEW_COOKIE, accountOf, homePath } from "@/lib/auth/portals";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -35,27 +36,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
-  // Determine redirect based on role
+  // Land by role; a player who coaches lands in the view they used last on this device
   const { data: { user } } = await supabase.auth.getUser();
   let redirectPath = "/player/dashboard";
 
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_coach")
       .eq("id", user.id)
       .single();
 
-    switch (profile?.role) {
-      case "admin":
-        redirectPath = "/admin/dashboard";
-        break;
-      case "coach":
-        redirectPath = "/coach/dashboard";
-        break;
-      default:
-        redirectPath = "/player/dashboard";
-    }
+    redirectPath = homePath(accountOf(profile), request.cookies.get(VIEW_COOKIE)?.value);
   }
 
   const response = NextResponse.redirect(`${origin}${redirectPath}`);
