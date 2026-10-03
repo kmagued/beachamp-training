@@ -290,6 +290,9 @@ export async function createPrivateSessionRequest(data: {
   if (data.requested_day_of_week < 0 || data.requested_day_of_week > 6) {
     return { error: "Invalid day of week" };
   }
+  if (data.coach_id && data.coach_id === user.id) {
+    return { error: "You can't book a private session with yourself." };
+  }
 
   // Defense in depth: never trust the client's slot pick. Re-check the full
   // requested window against the coach's real availability (blocks + sessions +

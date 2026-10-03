@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isLoadableRange, loadBirthdays } from "@/lib/birthdays/load";
 import type { BirthdayEntry } from "@/lib/birthdays/celebrations";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 
 async function getCurrentUserRole() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,11 +15,13 @@ async function getCurrentUserRole() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, is_coach")
     .eq("id", user.id)
     .single();
 
-  return profile ? { id: profile.id as string, role: profile.role as string } : null;
+  return profile
+    ? { id: profile.id as string, role: profile.role as string, is_coach: profile.is_coach === true }
+    : null;
 }
 
 /** Sessions a coach sees on their schedule: their groups' sessions and private sessions they run */
@@ -46,7 +49,7 @@ async function coachSessionIds(admin: any, coachId: string): Promise<Set<string>
  */
 export async function getBirthdays(from: string, to: string): Promise<BirthdayEntry[]> {
   const user = await getCurrentUserRole();
-  if (!user || (user.role !== "admin" && user.role !== "coach")) return [];
+  if (!user || !coachOrAdmin(accountOf(user))) return [];
   if (!isLoadableRange(from, to)) return [];
 
   try {

@@ -35,7 +35,7 @@ export default async function CoachDetailPage({ params }: { params: Promise<{ id
   const [{ data: profile }, { data: groupRows }, { data: sessionRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, area, is_active, created_at")
+      .select("id, first_name, last_name, email, phone, area, is_active, created_at, role")
       .eq("id", id)
       .eq("is_coach", true)
       .single(),
@@ -56,7 +56,7 @@ export default async function CoachDetailPage({ params }: { params: Promise<{ id
 
   const coach = profile as {
     id: string; first_name: string; last_name: string; email: string | null;
-    phone: string | null; area: string | null; is_active: boolean; created_at: string;
+    phone: string | null; area: string | null; is_active: boolean; created_at: string; role: string;
   };
   const groups = ((groupRows || []) as { groups: { id: string; name: string; level: string } | null }[])
     .map((r) => r.groups)
@@ -90,6 +90,7 @@ export default async function CoachDetailPage({ params }: { params: Promise<{ id
               <Badge variant={coach.is_active ? "success" : "neutral"}>
                 {coach.is_active ? "Active" : "Inactive"}
               </Badge>
+              {coach.role === "player" && <Badge variant="neutral">Player</Badge>}
               <span className="text-xs text-slate-400 inline-flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" /> Joined {formatDate(coach.created_at)}
               </span>

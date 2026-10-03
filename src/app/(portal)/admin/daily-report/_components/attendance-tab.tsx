@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
+import { attendanceOrder } from "@/lib/attendance/order";
 import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 
 interface ScheduleSession {
@@ -558,22 +559,13 @@ export function AttendanceTab({ date }: { date: string }) {
         })();
 
         const query = searchQuery.toLowerCase().trim();
-        // Order: already-recorded attendance, then players who can be charged, then name.
-        // The first term reads `saved`, not the live `state`. The live one changes on every
-        // tap, which made a row jump to the top the moment it was logged — that is what read
-        // as the list scrolling away under the coach. `saved` only moves on save or reload.
-        const hasSavedAttendance = Object.values(saved).some((v) => v !== undefined);
-        const sortedPlayers = [...players].sort((a, b) => {
-          if (hasSavedAttendance) {
-            const aLogged = saved[a.player_id] !== undefined ? 0 : 1;
-            const bLogged = saved[b.player_id] !== undefined ? 0 : 1;
-            if (aLogged !== bLogged) return aLogged - bLogged;
-          }
-          const aHasSub = (playerSessions[a.player_id]?.length ?? 0) > 0 ? 0 : 1;
-          const bHasSub = (playerSessions[b.player_id]?.length ?? 0) > 0 ? 0 : 1;
-          if (aHasSub !== bHasSub) return aHasSub - bHasSub;
-          return `${a.profiles.first_name} ${a.profiles.last_name}`.localeCompare(`${b.profiles.first_name} ${b.profiles.last_name}`);
-        });
+        // Saved attendance, then players who can be charged, then name; the coach's session
+        // page lists players the same way. `saved` (not the live `state`) keeps rows still while tapping.
+        const sortedPlayers = attendanceOrder(players, (gp) => ({
+          name: `${gp.profiles.first_name} ${gp.profiles.last_name}`,
+          saved: saved[gp.player_id] !== undefined,
+          canBeCharged: (playerSessions[gp.player_id]?.length ?? 0) > 0,
+        }));
         const filteredPlayers = query
           ? sortedPlayers.filter((gp) =>
               `${gp.profiles.first_name} ${gp.profiles.last_name}`.toLowerCase().includes(query)

@@ -14,9 +14,13 @@ interface ScheduleSectionProps {
   schedule: ScheduleRow[];
   coaches: CoachRow[];
   onRefresh: () => void;
+  /** Add, edit and remove sessions: admins and the group's primary coach */
+  canEdit?: boolean;
+  /** Choose which coach runs a session: admins only */
+  canPickCoach?: boolean;
 }
 
-export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: ScheduleSectionProps) {
+export function ScheduleSection({ groupId, schedule, coaches, onRefresh, canEdit = true, canPickCoach = true }: ScheduleSectionProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showSessionDrawer, setShowSessionDrawer] = useState(false);
@@ -118,13 +122,17 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
           Weekly Schedule
           <span className="bg-slate-100 text-slate-600 text-xs px-1.5 py-0.5 rounded-full">{activeSchedule.length}</span>
         </h2>
-        <Button size="sm" onClick={openAdd}>
-          <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span><span className="sm:hidden">Add</span></span>
-        </Button>
+        {canEdit && (
+          <Button size="sm" onClick={openAdd}>
+            <span className="flex items-center gap-1.5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Session</span><span className="sm:hidden">Add</span></span>
+          </Button>
+        )}
       </div>
 
       {activeSchedule.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">No active schedule. Add session slots for this group.</p>
+        <p className="text-sm text-slate-400 text-center py-8">
+          {canEdit ? "No active schedule. Add session slots for this group." : "No active schedule."}
+        </p>
       ) : (
         <>
           {/* Desktop table */}
@@ -157,21 +165,23 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
                       )}
                     </td>
                     <td className="py-2.5">
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => openEdit(s)}
-                          className="text-slate-400 hover:text-slate-600 p-1"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSession(s.id)}
-                          disabled={isPending}
-                          className="text-slate-400 hover:text-red-500 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => openEdit(s)}
+                            className="text-slate-400 hover:text-slate-600 p-1"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSession(s.id)}
+                            disabled={isPending}
+                            className="text-slate-400 hover:text-red-500 p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -185,18 +195,20 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
               <div key={s.id} className="border border-slate-100 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-slate-900 text-sm">{DAY_NAMES_FULL[s.day_of_week]}</span>
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-slate-600 p-1">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSession(s.id)}
-                      disabled={isPending}
-                      className="text-slate-400 hover:text-red-500 p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-slate-600 p-1">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSession(s.id)}
+                        disabled={isPending}
+                        className="text-slate-400 hover:text-red-500 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
@@ -321,15 +333,17 @@ export function ScheduleSection({ groupId, schedule, coaches, onRefresh }: Sched
               <Input name="end_time" type="time" required defaultValue={editingSession?.end_time?.slice(0, 5) || ""} />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
-            <Select name="coach_id" defaultValue={editingSession?.coach_id || ""}>
-              <option value="">No coach</option>
-              {coaches.map((c) => (
-                <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-              ))}
-            </Select>
-          </div>
+          {canPickCoach && (
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
+              <Select name="coach_id" defaultValue={editingSession?.coach_id || ""}>
+                <option value="">No coach</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                ))}
+              </Select>
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
             <Input name="location" placeholder="e.g. Court 1" defaultValue={editingSession?.location || ""} />

@@ -41,6 +41,8 @@ export default async function PlayerFeedbackPage() {
       .select("id, first_name, last_name")
       .eq("is_coach", true)
       .eq("is_active", true)
+      // A player who coaches doesn't leave feedback for themselves
+      .neq("id", currentUser.id)
       .order("first_name"),
   ]) as [
     { data: FeedbackFromCoachRow[] | null },

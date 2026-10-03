@@ -29,6 +29,8 @@ export default function CoachGroupDetailPage() {
   const [players, setPlayers] = useState<GroupPlayerRow[]>([]);
   const [coaches, setCoaches] = useState<CoachRow[]>([]);
   const [schedule, setSchedule] = useState<ScheduleRow[]>([]);
+  // Admins and the group's primary coach change its schedule; only admins pick a session's coach
+  const [viewer, setViewer] = useState<{ id: string; isAdmin: boolean } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -141,14 +143,23 @@ export default function CoachGroupDetailPage() {
     }
   }, [groupId, supabase]);
 
+  const fetchViewer = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    setViewer({ id: user.id, isAdmin: profile?.role === "admin" });
+  }, [supabase]);
+
   useEffect(() => {
     async function init() {
       await fetchGroup();
-      await Promise.all([fetchPlayers(), fetchCoaches(), fetchSchedule()]);
+      await Promise.all([fetchPlayers(), fetchCoaches(), fetchSchedule(), fetchViewer()]);
       setLoading(false);
     }
     init();
-  }, [fetchGroup, fetchPlayers, fetchCoaches, fetchSchedule]);
+  }, [fetchGroup, fetchPlayers, fetchCoaches, fetchSchedule, fetchViewer]);
+
+  const canEditSchedule = !!viewer && (viewer.isAdmin || coaches.some((c) => c.id === viewer.id && c.is_primary));
 
   const tabCounts: Record<TabKey, number> = {
     players: players.length,
@@ -301,6 +312,8 @@ export default function CoachGroupDetailPage() {
           schedule={schedule}
           coaches={coaches}
           onRefresh={fetchSchedule}
+          canEdit={canEditSchedule}
+          canPickCoach={!!viewer?.isAdmin}
         />
       )}
     </div>

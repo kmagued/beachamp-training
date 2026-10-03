@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
 import { isFutureCairoDate } from "@/lib/utils/cairo-time";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { canEditGroupSchedule, sessionCoachId, type ScheduleEditor } from "@/lib/scheduling/edit-access";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -17,11 +19,11 @@ async function getCurrentUserRole() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, is_coach")
     .eq("id", user.id)
     .single();
 
-  return profile ? { id: profile.id, role: profile.role as string } : null;
+  return profile ? { id: profile.id, role: profile.role as string, is_coach: profile.is_coach === true } : null;
 }
 
 function requireAdmin(user: { role: string } | null) {
@@ -31,8 +33,33 @@ function requireAdmin(user: { role: string } | null) {
   return null;
 }
 
-function requireCoachOrAdmin(user: { role: string } | null) {
-  if (!user || (user.role !== "coach" && user.role !== "admin")) {
+/** The caller as a schedule editor: an admin, or a coach with the groups they're the active
+ *  primary coach of. Null for anyone else. */
+async function getScheduleEditor(): Promise<ScheduleEditor | null> {
+  const user = await getCurrentUserRole();
+  if (!user || !coachOrAdmin(accountOf(user))) return null;
+  if (user.role === "admin") return { id: user.id, isAdmin: true, primaryGroupIds: new Set() };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data } = await admin
+    .from("coach_groups")
+    .select("group_id")
+    .eq("coach_id", user.id)
+    .eq("is_primary", true)
+    .eq("is_active", true);
+  return {
+    id: user.id,
+    isAdmin: false,
+    primaryGroupIds: new Set(((data ?? []) as { group_id: string }[]).map((r) => r.group_id)),
+  };
+}
+
+const SCHEDULE_DENIED = { error: "Only admins and the group's primary coach can change its schedule" };
+
+function requireCoachOrAdmin(user: { role: string; is_coach: boolean } | null) {
+  // Coaches, admins, and players with coach access
+  if (!user || !coachOrAdmin(accountOf(user))) {
     return { error: "Unauthorized: coach or admin access required" };
   }
   return null;
@@ -384,15 +411,16 @@ export async function setPrimaryCoach(groupId: string, coachId: string) {
 // ═══════════════════════════════════════
 
 export async function createScheduleSession(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
-
   const groupId = formData.get("group_id") as string;
-  const coachId = (formData.get("coach_id") as string) || null;
+  const editor = await getScheduleEditor();
+  if (!editor || !canEditGroupSchedule(editor, groupId || null)) return SCHEDULE_DENIED;
+
+  // Admins and the group's primary coach, checked above. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any;
+
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null);
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
 
@@ -426,15 +454,17 @@ export async function createScheduleSession(formData: FormData) {
 
 /** Create a one-off session on a specific date (not recurring) */
 export async function createSingleSession(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
-
   const groupId = formData.get("group_id") as string;
-  const coachId = (formData.get("coach_id") as string) || null;
+  if (!groupId) return { error: "A group is required." };
+  const editor = await getScheduleEditor();
+  if (!editor || !canEditGroupSchedule(editor, groupId)) return SCHEDULE_DENIED;
+
+  // Admins and the group's primary coach, checked above. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any;
+
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null);
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
   const sessionDate = (formData.get("session_date") as string)?.trim();
@@ -443,7 +473,6 @@ export async function createSingleSession(formData: FormData) {
   const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
   if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
   if (!sessionDate) return { error: "A date is required." };
-  if (!groupId) return { error: "A group is required." };
 
   // Derive day_of_week from the date, set end_date = same date so it only shows once
   const dayOfWeek = new Date(sessionDate + "T00:00:00").getDay();
@@ -469,14 +498,14 @@ export async function createSingleSession(formData: FormData) {
 }
 
 export async function updateScheduleSession(id: string, formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach, checked once the session is loaded. The
+  // schedule's database rules are admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
 
-  const coachId = (formData.get("coach_id") as string) || null;
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
 
@@ -497,10 +526,12 @@ export async function updateScheduleSession(id: string, formData: FormData) {
   //    Number(null) === 0 would otherwise reset the session to Sunday).
   const { data: existing, error: fetchErr } = await supabase
     .from("schedule_sessions")
-    .select("session_type, day_of_week")
+    .select("session_type, day_of_week, group_id, coach_id")
     .eq("id", id)
     .single();
   if (fetchErr || !existing) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, existing.group_id)) return SCHEDULE_DENIED;
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null, existing);
 
   const submittedDow = formData.get("day_of_week");
   const dayOfWeek =
@@ -531,12 +562,17 @@ export async function updateScheduleSession(id: string, formData: FormData) {
 }
 
 export async function deleteScheduleSession(id: string) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
+
+  const { data: existing } = await supabase.from("schedule_sessions").select("group_id").eq("id", id).single();
+  if (!existing) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, existing.group_id)) return SCHEDULE_DENIED;
 
   const { error } = await supabase
     .from("schedule_sessions")
@@ -553,17 +589,26 @@ export async function deleteScheduleSession(id: string) {
 
 /** Cancel a single occurrence of a recurring session on a specific date */
 export async function cancelScheduleSessionDate(scheduleSessionId: string, date: string) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach. Cancellations' database rules are
+  // admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
+
+  const { data: session } = await supabase
+    .from("schedule_sessions")
+    .select("group_id")
+    .eq("id", scheduleSessionId)
+    .single();
+  if (!session) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, session.group_id)) return SCHEDULE_DENIED;
 
   const { error } = await supabase.from("schedule_session_cancellations").insert({
     schedule_session_id: scheduleSessionId,
     cancelled_date: date,
-    cancelled_by: user!.id,
+    cancelled_by: editor.id,
   });
 
   if (error) {
@@ -810,78 +855,6 @@ export async function quickAddPlayer(firstName: string, lastName: string) {
 // COACH MANAGEMENT (Admin only)
 // ═══════════════════════════════════════
 
-export async function createCoach(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
-  const email = (formData.get("email") as string)?.trim();
-  const firstName = (formData.get("first_name") as string)?.trim();
-  const lastName = (formData.get("last_name") as string)?.trim();
-  const phone = (formData.get("phone") as string)?.trim() || null;
-  const password = (formData.get("password") as string)?.trim();
-
-  if (!email || !firstName || !lastName || !password) {
-    return { error: "Email, first name, last name, and password are required" };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
-
-  // Create auth user with coach role
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: authData, error: authError2 } = await (admin as any).auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      role: "coach",
-    },
-  });
-
-  if (authError2) {
-    if (authError2.message?.includes("already been registered")) {
-      return { error: "A user with this email already exists" };
-    }
-    return { error: authError2.message };
-  }
-
-  // Don't rely on the signup trigger to create the profile — for admin-created
-  // coach accounts it has been leaving no profile row at all, so the coach never
-  // shows in the coaches list and logging in routes them to the player portal
-  // (a blank /player/dashboard). Create/repair the profile explicitly.
-  if (authData?.user) {
-    const { error: profileErr } = await admin
-      .from("profiles")
-      .upsert(
-        {
-          id: authData.user.id,
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          phone,
-          role: "coach",
-          is_coach: true,
-          is_active: true,
-          profile_completed: true,
-        },
-        { onConflict: "id" },
-      );
-    if (profileErr) {
-      // Roll back the orphaned auth user so a failed create doesn't leave a
-      // login-able account with no profile.
-      await admin.auth.admin.deleteUser(authData.user.id);
-      return { error: `Failed to create coach profile: ${profileErr.message}` };
-    }
-  }
-
-  revalidatePath("/admin/coaches");
-  return { success: true, password };
-}
-
 export async function updateCoach(coachId: string, formData: FormData) {
   const user = await getCurrentUserRole();
   const authError = requireAdmin(user);
@@ -909,9 +882,15 @@ export async function updateCoach(coachId: string, formData: FormData) {
     }
   }
 
+  // For a player who coaches, is_active is their player account's status: it's managed
+  // from Players, never from here
+  const { data: target } = await admin.from("profiles").select("role").eq("id", coachId).single();
+  const update: Record<string, unknown> = { first_name: firstName, last_name: lastName, email, phone, area };
+  if (target?.role !== "player") update.is_active = isActive;
+
   const { error } = await admin
     .from("profiles")
-    .update({ first_name: firstName, last_name: lastName, email, phone, area, is_active: isActive })
+    .update(update)
     .eq("id", coachId)
     .eq("is_coach", true);
 
@@ -931,12 +910,15 @@ export async function deleteCoach(coachId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Never delete an admin via the coaches list — an admin can also be a coach
+  // Never delete an admin or a player via the coaches list — either can also be a coach
   // (is_coach=true), and identity/is_active live on the single shared profile row.
   const { data: target } = await admin.from("profiles").select("role").eq("id", coachId).single();
   if (!target) return { error: "Coach not found" };
   if (target.role === "admin") {
     return { error: "This account is also an admin and can't be deleted from the coaches list." };
+  }
+  if (target.role === "player") {
+    return { error: "This coach is also a player. Use Remove coach access instead." };
   }
 
   // Clean path first (works for a coach with no history). If FK references block
@@ -978,6 +960,71 @@ export async function bulkDeleteCoaches(coachIds: string[]) {
   revalidatePath("/admin/coaches");
   revalidatePath("/admin/dashboard");
   return { success: true, results };
+}
+
+/** Make an existing player a coach on their own account: they keep role 'player', so they
+ *  stay in every player list, and gain the coach view. */
+export async function assignPlayerAsCoach(playerId: string): Promise<{ error: string } | { success: true }> {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role, is_coach, is_active")
+    .eq("id", playerId)
+    .single();
+  if (!target || target.role !== "player") return { error: "Player not found" };
+  if (!target.is_active) return { error: "This player's account is inactive" };
+  if (target.is_coach) return { error: "This player is already a coach" };
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ is_coach: true, updated_at: new Date().toISOString() })
+    .eq("id", playerId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+/** Take coach access away from a player who coaches. Their player account and history stay;
+ *  they come off the groups they coach. Coach-only accounts are deleted instead (deleteCoach). */
+export async function removeCoachAccess(coachId: string): Promise<{ error: string } | { success: true }> {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: target } = await admin.from("profiles").select("role, is_coach").eq("id", coachId).single();
+  if (!target || target.role !== "player" || !target.is_coach) {
+    return { error: "Only a player who coaches can have coach access removed" };
+  }
+
+  // Groups first: if this fails they're still a coach, and the admin can try again from their drawer
+  const { error: groupsError } = await admin
+    .from("coach_groups")
+    .update({ is_active: false })
+    .eq("coach_id", coachId)
+    .eq("is_active", true);
+  if (groupsError) return { error: groupsError.message };
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ is_coach: false, updated_at: new Date().toISOString() })
+    .eq("id", coachId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/groups");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
 }
 
 // ═══════════════════════════════════════

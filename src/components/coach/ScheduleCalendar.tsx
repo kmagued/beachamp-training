@@ -337,6 +337,30 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
+  // A coach changes the schedule of the active groups they're the primary coach of
+  useEffect(() => {
+    if (isAdmin) return;
+    async function loadPrimaryGroups() {
+      const { data } = await supabase
+        .from("coach_groups")
+        .select("groups(id, name, is_active)")
+        .eq("coach_id", coachId)
+        .eq("is_primary", true)
+        .eq("is_active", true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const primary = ((data ?? []) as any[]).map((r) => r.groups).filter((g) => g?.is_active);
+      setGroups(primary.map((g) => ({ id: g.id, name: g.name })));
+    }
+    loadPrimaryGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, coachId]);
+
+  // Admins change every session; a primary coach, their groups' (private sessions stay with admins)
+  const editableGroupIds = new Set(groups.map((g) => g.id));
+  const canAddSession = isAdmin || groups.length > 0;
+  const canEditSession = (session: ScheduleBlock) =>
+    isAdmin || (session.group_id !== null && editableGroupIds.has(session.group_id));
+
   // Load coach blocks overlapping the visible week
   useEffect(() => {
     async function loadBlocks() {
@@ -531,7 +555,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
               <span className="hidden sm:inline">Block</span>
             </span>
           </Button>
-          {isAdmin && (
+          {canAddSession && (
             <Button size="sm" onClick={openAdd}>
               <span className="flex items-center gap-1.5">
                 <Plus className="w-4 h-4" />
@@ -635,7 +659,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                                 </div>
                               )}
                             </Link>
-                            {isAdmin && (
+                            {canEditSession(session) && (
                               <div className="absolute top-1 right-1 hidden group-hover/session:flex gap-0.5">
                                 <button
                                   onClick={(e) => { e.preventDefault(); openEdit(session); }}
@@ -725,7 +749,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs font-semibold text-slate-900">{session.group_name}</span>
                                   <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                    {isAdmin && (
+                                    {canEditSession(session) && (
                                       <>
                                         <button
                                           onClick={(e) => { e.preventDefault(); openEdit(session); }}
@@ -790,8 +814,8 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
         onChange={() => setRefreshKey((k) => k + 1)}
       />
 
-      {/* Admin Add Session Drawer */}
-      {isAdmin && (
+      {/* Add and Edit Session Drawers: admins, and primary coaches for their groups */}
+      {canAddSession && (
         <>
           <Drawer
             open={showAddDrawer}
@@ -827,15 +851,18 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                   <Input name="end_time" type="time" required />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
-                <Select name="coach_id" defaultValue="">
-                  <option value="">No coach</option>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-                  ))}
-                </Select>
-              </div>
+              {/* Only admins choose the coach; a primary coach's new session is theirs */}
+              {isAdmin && (
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
+                  <Select name="coach_id" defaultValue="">
+                    <option value="">No coach</option>
+                    {coaches.map((c) => (
+                      <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                    ))}
+                  </Select>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
                 <Input name="location" placeholder="e.g. Court 1" />
@@ -846,7 +873,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
             </form>
           </Drawer>
 
-          {/* Admin Edit Session Drawer */}
+          {/* Edit Session Drawer */}
           <Drawer
             open={editingSession !== null}
             onClose={() => setEditingSession(null)}
@@ -869,15 +896,18 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                     <Input name="end_time" type="time" required defaultValue={editingSession.end_time?.slice(0, 5) || ""} />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
-                  <Select name="coach_id" defaultValue={editingSession.coach_id || ""}>
-                    <option value="">No coach</option>
-                    {coaches.map((c) => (
-                      <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-                    ))}
-                  </Select>
-                </div>
+                {/* Only admins reassign; a primary coach's edit keeps the session's coach */}
+                {isAdmin && (
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">Coach</label>
+                    <Select name="coach_id" defaultValue={editingSession.coach_id || ""}>
+                      <option value="">No coach</option>
+                      {coaches.map((c) => (
+                        <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-slate-500 mb-1 block">Location</label>
                   <Input name="location" placeholder="e.g. Court 1" defaultValue={editingSession.location || ""} />

@@ -6,6 +6,7 @@ import { Button, Badge, Skeleton, Drawer, Select } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
+import { attendanceOrder } from "@/lib/attendance/order";
 import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 import {
   Check,
@@ -559,12 +560,13 @@ export function AttendanceTab({
             </div>
           )}
         <div className="divide-y divide-slate-100">
-          {[...players].sort((a, b) => {
-            const aLogged = records.get(a.id)?.status !== null ? 0 : 1;
-            const bLogged = records.get(b.id)?.status !== null ? 0 : 1;
-            if (aLogged !== bLogged) return aLogged - bLogged;
-            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
-          }).filter((p) => {
+          {/* Ordered like the Daily Report: saved attendance (not live taps, so rows hold still),
+              then players who can be charged, then name */}
+          {attendanceOrder(players, (p) => ({
+            name: `${p.first_name} ${p.last_name}`,
+            saved: (savedRecords.get(p.id)?.status ?? null) !== null,
+            canBeCharged: p.subscriptions.length > 0,
+          })).filter((p) => {
             const q = searchQuery.toLowerCase().trim();
             if (!q) return true;
             return `${p.first_name} ${p.last_name}`.toLowerCase().includes(q);

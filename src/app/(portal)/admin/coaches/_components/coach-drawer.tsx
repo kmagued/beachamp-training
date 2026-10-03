@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Badge, Button, Input, Label, Select } from "@/components/ui";
-import { X, Mail, Phone, MapPin, Calendar, Users, Pencil, ExternalLink, Loader2, ArrowLeft, Trash2 } from "lucide-react";
+import { X, Mail, Phone, MapPin, Calendar, Users, Pencil, ExternalLink, Loader2, ArrowLeft, Trash2, UserMinus, User } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { buildWhatsAppUrl } from "@/lib/whatsapp/url";
-import { updateCoach, deleteCoach } from "@/app/_actions/training";
+import { updateCoach, deleteCoach, removeCoachAccess } from "@/app/_actions/training";
 import type { CoachRow } from "./types";
 
 interface CoachDrawerProps {
@@ -128,10 +128,11 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
             <p className="text-lg font-bold text-slate-900 truncate">
               {coach.first_name} {coach.last_name}
             </p>
-            <div className="mt-1">
+            <div className="mt-1 flex items-center gap-1.5">
               <Badge variant={coach.is_active ? "success" : "neutral"}>
                 {coach.is_active ? "Active" : "Inactive"}
               </Badge>
+              {coach.is_player && <Badge variant="neutral">Player</Badge>}
             </div>
           </div>
         </div>
@@ -223,12 +224,14 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
               <Pencil className="w-3.5 h-3.5" /> Edit
             </span>
           </Button>
+          {/* A player who coaches keeps their account: coach access is removed, not the account */}
           <button
             onClick={() => setConfirmDelete(true)}
             className="px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
-            title="Delete Coach"
+            title={coach.is_player ? "Remove coach access" : "Delete Coach"}
+            aria-label={coach.is_player ? "Remove coach access" : "Delete Coach"}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            {coach.is_player ? <UserMinus className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
           </button>
         </div>
         <Link href={`/admin/coaches/${coach.id}`} className="block">
@@ -238,6 +241,15 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
             </span>
           </Button>
         </Link>
+        {coach.is_player && (
+          <Link href={`/admin/players/${coach.id}`} className="block">
+            <Button variant="secondary" fullWidth>
+              <span className="flex items-center justify-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> Player Profile
+              </span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Delete confirmation */}
@@ -246,12 +258,18 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
           <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Trash2 className="w-6 h-6 text-red-500" />
+                {coach.is_player ? <UserMinus className="w-6 h-6 text-red-500" /> : <Trash2 className="w-6 h-6 text-red-500" />}
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">Delete Coach</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Permanently delete <span className="font-medium text-slate-700">{coach.first_name} {coach.last_name}</span>? Their account is removed, any sessions they ran become unassigned, and their feedback is deleted. This can&apos;t be undone.
-              </p>
+              <h3 className="text-lg font-semibold text-slate-900">{coach.is_player ? "Remove Coach Access" : "Delete Coach"}</h3>
+              {coach.is_player ? (
+                <p className="text-sm text-slate-500 mt-1">
+                  <span className="font-medium text-slate-700">{coach.first_name} {coach.last_name}</span> stops being a coach and loses the Coach view. Their player account, subscriptions and history stay. They&apos;re taken off the groups they coach; sessions already on the schedule keep their name until you reassign them. Export their pay first if you still need it.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-500 mt-1">
+                  Permanently delete <span className="font-medium text-slate-700">{coach.first_name} {coach.last_name}</span>? Their account is removed, any sessions they ran become unassigned, and their feedback is deleted. This can&apos;t be undone.
+                </p>
+              )}
             </div>
             {deleteError && <p className="text-xs text-red-600 mb-2 text-center">{deleteError}</p>}
             <div className="flex items-center gap-3">
@@ -262,8 +280,8 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
                 onClick={() => {
                   startDeleteTransition(async () => {
                     setDeleteError(null);
-                    const res = await deleteCoach(coach.id);
-                    if ("error" in res) setDeleteError(res.error ?? "Failed to delete coach");
+                    const res = coach.is_player ? await removeCoachAccess(coach.id) : await deleteCoach(coach.id);
+                    if ("error" in res) setDeleteError(res.error ?? (coach.is_player ? "Failed to remove coach access" : "Failed to delete coach"));
                     else {
                       setConfirmDelete(false);
                       onClose();
@@ -275,7 +293,9 @@ function DrawerContent({ coach, onClose, onDataChange }: { coach: CoachRow; onCl
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {isDeleting ? (
-                  <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</span>
+                  <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {coach.is_player ? "Removing..." : "Deleting..."}</span>
+                ) : coach.is_player ? (
+                  "Remove Access"
                 ) : (
                   "Delete Coach"
                 )}
@@ -358,13 +378,16 @@ function EditView({ coach, onBack, onClose, onSuccess }: { coach: CoachRow; onBa
           <Label>Area</Label>
           <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Maadi, New Cairo" />
         </div>
-        <div>
-          <Label>Status</Label>
-          <Select value={isActive ? "true" : "false"} onChange={(e) => setIsActive(e.target.value === "true")}>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </Select>
-        </div>
+        {/* A player who coaches: Active/Inactive is their player account's status, set from Players */}
+        {!coach.is_player && (
+          <div>
+            <Label>Status</Label>
+            <Select value={isActive ? "true" : "false"} onChange={(e) => setIsActive(e.target.value === "true")}>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </Select>
+          </div>
+        )}
         {error && <div className="px-4 py-3 bg-red-50 rounded-lg text-sm text-red-600">{error}</div>}
       </div>
 
