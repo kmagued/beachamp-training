@@ -187,6 +187,8 @@ export interface Database {
           body: string;
           is_active: boolean;
           sort_order: number;
+          /** 'birthday' marks the template the birthday drawer opens with */
+          purpose: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -197,6 +199,7 @@ export interface Database {
           body: string;
           is_active?: boolean;
           sort_order?: number;
+          purpose?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -207,6 +210,7 @@ export interface Database {
           body?: string;
           is_active?: boolean;
           sort_order?: number;
+          purpose?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;

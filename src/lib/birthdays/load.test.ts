@@ -70,6 +70,7 @@ test("toBirthdayPlayer maps a profile row", () => {
     last_name: "Fathy",
     avatar_url: null,
     date_of_birth: "2002-10-05",
+    phone: "01012345678",
   };
   assert.deepEqual(toBirthdayPlayer(profile), {
     id: "p1",
@@ -77,7 +78,13 @@ test("toBirthdayPlayer maps a profile row", () => {
     lastName: "Fathy",
     avatarUrl: null,
     dateOfBirth: "2002-10-05",
+    phone: "01012345678",
   });
+});
+
+test("toBirthdayPlayer keeps a missing phone as null, so the WhatsApp drawer can say so", () => {
+  const p = toBirthdayPlayer({ id: "p1", first_name: "Ahmed", last_name: "Fathy", avatar_url: null, date_of_birth: "2002-10-05", phone: null });
+  assert.equal(p.phone, null);
 });
 
 test("isLoadableRange accepts a week, or a single day", () => {
@@ -92,7 +99,7 @@ test("isLoadableRange rejects malformed or backwards dates, and anything longer 
 });
 
 test("toBirthdayPlayer trims stray spaces around names", () => {
-  const p = toBirthdayPlayer({ id: "p1", first_name: "Rital ", last_name: " Adel", avatar_url: null, date_of_birth: "2008-10-01" });
+  const p = toBirthdayPlayer({ id: "p1", first_name: "Rital ", last_name: " Adel", avatar_url: null, date_of_birth: "2008-10-01", phone: null });
   assert.equal(p.firstName, "Rital");
   assert.equal(p.lastName, "Adel");
 });
