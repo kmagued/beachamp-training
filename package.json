@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test src/lib/merch/*.test.ts src/lib/nav/*.test.ts src/lib/king-of-court/*.test.ts src/lib/badges/*.test.ts src/lib/share/*.test.ts src/lib/utils/*.test.ts src/lib/coach-pay/*.test.ts",
+    "test": "tsx --test src/lib/merch/*.test.ts src/lib/nav/*.test.ts src/lib/king-of-court/*.test.ts src/lib/badges/*.test.ts src/lib/share/*.test.ts src/lib/utils/*.test.ts src/lib/coach-pay/*.test.ts src/lib/birthdays/*.test.ts",
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts",

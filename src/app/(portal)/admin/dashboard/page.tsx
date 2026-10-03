@@ -7,8 +7,10 @@ import { RevenueCard } from "./revenue-card";
 import { DashboardCharts } from "./_components/dashboard-charts";
 import { MonthlyFinancialTable } from "./_components/monthly-financial-table";
 import { MetricsTable } from "./_components/metrics-table";
+import { BirthdaysCard } from "./_components/birthdays-card";
 import type { PackageIncome } from "./_components/income-by-package";
-import { cairoMonthKey, cairoNowYearMonth } from "@/lib/utils/cairo-time";
+import { addDays, cairoMonthKey, cairoNowYearMonth, cairoToday } from "@/lib/utils/cairo-time";
+import { getBirthdays } from "@/app/_actions/birthdays";
 
 export default async function AdminDashboard() {
   const currentUser = await getCurrentUser();
@@ -19,6 +21,8 @@ export default async function AdminDashboard() {
 
   // Stats queries in parallel
   const currentMonthKey = cairoMonthKey(new Date()); // "YYYY-MM" in Africa/Cairo
+  const cairoTodayKey = cairoToday();
+  const birthdaysPromise = getBirthdays(cairoTodayKey, addDays(cairoTodayKey, 7));
 
   const [
     { data: allPlayerProfiles, count: playerCount },
@@ -233,6 +237,8 @@ export default async function AdminDashboard() {
   const groups = (groupsData || []) as { id: string; name: string; max_players: number }[];
   const allGpRows = (groupPlayersData || []) as { group_id: string; player_id: string; joined_at: string; is_active: boolean }[];
 
+  const birthdays = await birthdaysPromise;
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -297,6 +303,11 @@ export default async function AdminDashboard() {
             href="/admin/payments?statusFilter=Pending"
             className="col-span-2 lg:col-span-1"
           />
+        </div>
+
+        {/* Birthdays */}
+        <div className="mb-8">
+          <BirthdaysCard entries={birthdays} today={cairoTodayKey} />
         </div>
 
         {/* Key Metrics Table */}

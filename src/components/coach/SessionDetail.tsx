@@ -5,13 +5,17 @@ import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { getLevelLabel } from "@/lib/config/branding";
-import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, Target, Trophy } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, Target, Trophy, Cake } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
 import { SessionPlanTab } from "./SessionPlanTab";
 import { ScoresTab } from "@/components/leaderboard/scores-tab";
 import { scoringProblem } from "@/lib/king-of-court/access";
+import { getBirthdays } from "@/app/_actions/birthdays";
+import type { BirthdayEntry } from "@/lib/birthdays/celebrations";
+import { ageLine } from "@/lib/birthdays/format";
+import { cairoToday } from "@/lib/utils/cairo-time";
 
 interface PrivatePlayer {
   id: string;
@@ -87,6 +91,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("attendance");
+  const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -157,6 +162,15 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleSessionId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getBirthdays(dateParam, dateParam).then((entries) => {
+      if (cancelled) return;
+      setBirthdays(entries.filter((e) => e.session?.id === scheduleSessionId && e.session.date === dateParam));
+    });
+    return () => { cancelled = true; };
+  }, [scheduleSessionId, dateParam]);
+
   if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -220,6 +234,16 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
         </div>
       </div>
 
+      {birthdays.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-slate-800">
+          <Cake className="w-4 h-4 mt-0.5 text-accent-600 shrink-0" />
+          <p>
+            <span className="font-semibold">Birthday to celebrate: </span>
+            {birthdays.map((b) => `${b.player.firstName} ${b.player.lastName} ${ageLine(b, cairoToday())}`).join(" · ")}
+          </p>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
         {tabs.map((tab) => {
@@ -260,6 +284,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
               startTime={session.start_time}
               endTime={session.end_time}
               privatePlayers={session.session_type === "private" ? session.private_players : null}
+              birthdayPlayerIds={new Set(birthdays.map((b) => b.player.id))}
             />
           )}
           {activeTab === "plan" && (

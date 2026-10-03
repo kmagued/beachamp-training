@@ -32,6 +32,12 @@ export function cairoNowYearMonth(): { year: number; month: number } {
   return { year: y, month: m };
 }
 
+/** The Cairo calendar day (YYYY-MM-DD) a timestamp falls on, e.g. a
+ *  TIMESTAMPTZ such as created_at. */
+export function cairoDayKey(date: Date): string {
+  return dayKeyFmt.format(date);
+}
+
 /** Today's date as YYYY-MM-DD in Africa/Cairo. Use this instead of
  *  new Date().toISOString() when comparing against DATE columns such as
  *  subscriptions.end_date, which hold Cairo calendar days. */

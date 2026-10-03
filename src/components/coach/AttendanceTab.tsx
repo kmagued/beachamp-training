@@ -20,6 +20,7 @@ import {
   Search,
   RotateCcw,
   Trash2,
+  Cake,
 } from "lucide-react";
 import type { AttendanceStatus } from "@/types/database";
 
@@ -61,6 +62,8 @@ interface AttendanceTabProps {
     last_name: string;
     avatar_url: string | null;
   }[] | null;
+  /** Players whose birthday gets celebrated at this session */
+  birthdayPlayerIds?: Set<string>;
 }
 
 function formatTime(time: string) {
@@ -79,6 +82,7 @@ export function AttendanceTab({
   startTime,
   endTime,
   privatePlayers = null,
+  birthdayPlayerIds,
 }: AttendanceTabProps) {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [records, setRecords] = useState<Map<string, AttendanceRecord>>(new Map());
@@ -580,6 +584,11 @@ export function AttendanceTab({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 truncate">
                       {player.first_name} {player.last_name}
+                      {birthdayPlayerIds?.has(player.id) && (
+                        <span title="Birthday to celebrate">
+                          <Cake className="inline w-3.5 h-3.5 ml-1 -mt-0.5 text-accent-600" />
+                        </span>
+                      )}
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
                       {player.subscriptions.length > 1 ? (

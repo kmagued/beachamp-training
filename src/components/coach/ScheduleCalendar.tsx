@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback, useTransition } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Skeleton, Button, Input, Select, Drawer, Toast, DatePicker } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Clock, ClipboardCheck, Pencil, Trash2, Plus, Ban } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, ClipboardCheck, Pencil, Trash2, Plus, Ban, Cake } from "lucide-react";
 import Link from "next/link";
 import { createSingleSession, updateScheduleSession, cancelScheduleSessionDate } from "@/app/_actions/training";
+import { getBirthdays } from "@/app/_actions/birthdays";
 import { BlockTimeDrawer } from "./BlockTimeDrawer";
 import { CoachBlocksList } from "./CoachBlocksList";
 import type { CoachBlock } from "@/types/database";
@@ -86,6 +87,21 @@ function getWeekDatesFromSaturday(saturday: Date) {
   return dates;
 }
 
+interface BirthdayName { first: string; full: string }
+
+/** Players whose birthday gets celebrated at this session; first names, full names on hover */
+function BirthdayMarker({ names }: { names: BirthdayName[] | undefined }) {
+  if (!names?.length) return null;
+  return (
+    <div className="flex items-center gap-0.5 mt-0.5 min-w-0" title={`Birthday: ${names.map((n) => n.full).join(", ")}`}>
+      <Cake className="w-2.5 h-2.5 text-accent-600 shrink-0" />
+      <span className="text-[9px] text-amber-800 truncate">
+        {names.map((n) => n.first).join(", ")}
+      </span>
+    </div>
+  );
+}
+
 interface GroupOption { id: string; name: string }
 interface CoachOption { id: string; first_name: string; last_name: string }
 
@@ -107,6 +123,9 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Birthdays celebrated this week, keyed `${sessionId}_${date}`
+  const [celebrations, setCelebrations] = useState<Map<string, BirthdayName[]>>(new Map());
 
   // Coach blocks state
   const [blocks, setBlocks] = useState<CoachBlock[]>([]);
@@ -286,6 +305,22 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coachId, showAll, selectedSaturday, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBirthdays(formatLocalDate(weekDates[0]), formatLocalDate(weekDates[6])).then((entries) => {
+      if (cancelled) return;
+      const map = new Map<string, BirthdayName[]>();
+      for (const e of entries) {
+        if (!e.session) continue;
+        const key = `${e.session.id}_${e.session.date}`;
+        map.set(key, [...(map.get(key) ?? []), { first: e.player.firstName, full: `${e.player.firstName} ${e.player.lastName}` }]);
+      }
+      setCelebrations(map);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSaturday, refreshKey]);
 
   // Load groups + coaches for admin edit forms
   useEffect(() => {
@@ -592,6 +627,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                               <p className="text-[10px] text-slate-500">
                                 {formatTime(session.start_time)}
                               </p>
+                              <BirthdayMarker names={celebrations.get(`${session.id}_${sessionDate}`)} />
                               {session.has_attendance && (
                                 <div className="flex items-center gap-0.5 mt-0.5">
                                   <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
@@ -709,6 +745,7 @@ export function ScheduleCalendar({ coachId, isAdmin, sessionBasePath }: Schedule
                                     {formatTime(session.start_time)}
                                   </span>
                                 </div>
+                                <BirthdayMarker names={celebrations.get(`${session.id}_${sessionDate}`)} />
                                 {session.has_attendance && (
                                   <div className="flex items-center gap-0.5 mt-0.5">
                                     <ClipboardCheck className="w-2.5 h-2.5 text-emerald-500" />
