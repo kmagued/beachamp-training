@@ -41,9 +41,10 @@ export async function GET(request: NextRequest) {
   let redirectPath = "/player/dashboard";
 
   if (user) {
+    // Every column rather than a list: routing keeps working on a database that doesn't have a newer access column (is_player) yet
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, is_coach, is_player")
+      .select("*")
       .eq("id", user.id)
       .single();
 
