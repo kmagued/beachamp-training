@@ -127,14 +127,19 @@ const adminNav: NavItem[] = [
   { key: "users", label: "Admins", href: "/admin/users", section: "System" },
 ];
 
-/** Phones: a tab bar of the pages each portal opens most, with the rest under More.
- *  Coaches have a short menu and keep the slide-out one. */
+/** Phones: a tab bar of the pages each portal opens most, with the rest under More */
 const mobileTabs: Partial<Record<Portal, { key: string; label: string; icon: typeof House }[]>> = {
   player: [
     { key: "dashboard", label: "Home", icon: House },
     { key: "sessions", label: "Sessions", icon: CalendarDays },
     { key: "leaderboard", label: "Leaderboard", icon: Trophy },
     { key: "achievements", label: "Achievements", icon: Award },
+  ],
+  coach: [
+    { key: "dashboard", label: "Home", icon: House },
+    { key: "schedule", label: "Schedule", icon: Calendar },
+    { key: "my-groups", label: "My Groups", icon: UsersRound },
+    { key: "leaderboard", label: "Leaderboard", icon: Trophy },
   ],
   admin: [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
