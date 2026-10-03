@@ -67,9 +67,11 @@ export async function submitSubscription(formData: FormData) {
     if (problem) return { error: problem };
     if (session.end_date) privateWhen = sessionWhen(session.end_date, session.start_time);
   }
-  // Only the server writes the link to a session, and a normal subscription never sends it
+  // Players can't write subscriptions themselves (they could set any status or balance), so
+  // the server writes them, from the package's values. A normal subscription never sends the
+  // link to a private session.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subWriter = privateSessionId ? (createAdminClient() as any) : supabase;
+  const subWriter = createAdminClient() as any;
   const sessionLink = privateSessionId ? { private_session_id: privateSessionId } : {};
 
   // Validate and calculate promo discount
@@ -261,9 +263,8 @@ export async function submitSubscription(formData: FormData) {
   if (payError) {
     // Don't leave a subscription behind without its payment. Players can't delete
     // subscriptions under RLS, so clean up with the service role.
-    const admin = createAdminClient();
-    await admin.from("subscriptions").delete().eq("id", subscription.id);
-    if (screenshotUrl) await admin.storage.from("payment-screenshots").remove([screenshotUrl]);
+    await subWriter.from("subscriptions").delete().eq("id", subscription.id);
+    if (screenshotUrl) await subWriter.storage.from("payment-screenshots").remove([screenshotUrl]);
     return { error: payError.message };
   }
 

@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
 import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,6 +18,8 @@ export async function confirmPayment(paymentId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   // Fetch payment + subscription + package
   const { data: payment } = await supabase
@@ -97,6 +101,8 @@ export async function confirmPayment(paymentId: string) {
 export async function rejectPayment(paymentId: string, reason: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -164,6 +170,8 @@ export async function updatePayment(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -365,6 +373,8 @@ export async function bulkUpdatePaymentStatus(paymentIds: string[], status: stri
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const results = { success: 0, failed: 0 };
 
@@ -633,6 +643,8 @@ export async function linkPaymentToPlayer(paymentId: string, playerId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -728,6 +740,10 @@ export async function createPendingPaymentForSession(data: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  // Called by the attendance screens: coaches and admins only (it writes with the service role)
+  const { data: me } = await supabase.from("profiles").select("role, is_coach").eq("id", user.id).single();
+  if (!coachOrAdmin(accountOf(me))) return { error: "Not authorized" };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
