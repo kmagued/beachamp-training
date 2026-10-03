@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { cairoTimeLabel, sameDayDuplicate } from "@/lib/payments/duplicates";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
@@ -384,6 +385,8 @@ export async function createAdminPayment(data: {
   amount: number;
   method: PaymentMethod;
   payment_date?: string;
+  /** Record it even though the same payment was already recorded today */
+  allow_duplicate?: boolean;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -411,6 +414,27 @@ export async function createAdminPayment(data: {
     .single();
 
   if (pkgError || !pkg) return { error: "Package not found" };
+
+  // The same player, package and amount already recorded today (Cairo): ask before adding
+  // another, since retries used to pile up identical payments
+  if (!data.allow_duplicate) {
+    const { data: recent } = await admin
+      .from("payments")
+      .select("amount, created_at, subscriptions!payments_subscription_id_fkey(package_id)")
+      .eq("player_id", data.player_id)
+      .gte("created_at", new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString());
+    const duplicate = sameDayDuplicate(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((recent ?? []) as any[]).map((p) => ({
+        amount: p.amount,
+        created_at: p.created_at,
+        package_id: p.subscriptions?.package_id ?? null,
+      })),
+      { amount: data.amount, package_id: data.package_id },
+      new Date()
+    );
+    if (duplicate) return { duplicate: { at: cairoTimeLabel(duplicate.created_at) } };
+  }
 
   // Use provided date or smart start_date
   let startDate: Date;
