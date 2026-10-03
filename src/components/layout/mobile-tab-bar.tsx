@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { groupBySection } from "@/lib/nav/sections";
+import { pagesUnderMore } from "@/lib/nav/tab-bar";
 
 type Icon = ComponentType<{ className?: string }>;
 
@@ -22,8 +23,8 @@ const DISMISS_PX = 80;
 
 /**
  * Phone navigation: a tab bar of the pages used most, and a More sheet that rises from
- * behind it with the rest. "tiles" suits a short menu; "sections" keeps a long one in the
- * same groups as the desktop sidebar.
+ * behind it with the rest (no More at all when every page is a tab). "tiles" suits a
+ * short menu; "sections" keeps a long one in the same groups as the desktop sidebar.
  */
 export function MobileTabBar({
   tabs,
@@ -32,7 +33,7 @@ export function MobileTabBar({
   layout = "tiles",
   footer,
 }: {
-  /** Four pages; More is added as the fifth */
+  /** The pages on the bar; More comes after them when some pages are left over */
   tabs: { key: string; label: string; icon: Icon }[];
   /** The whole menu: whatever isn't a tab goes in the More sheet */
   items: TabBarItem[];
@@ -47,7 +48,8 @@ export function MobileTabBar({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const hrefOf = new Map(items.map((item) => [item.key, item.href]));
-  const moreItems = items.filter((item) => !tabs.some((t) => t.key === item.key));
+  const moreItems = pagesUnderMore(tabs, items);
+  const hasMore = moreItems.length > 0;
   const moreIsActive = moreItems.some((item) => item.key === activeKey);
   const moreHasNew = moreItems.some((item) => item.badge);
 
@@ -144,76 +146,80 @@ export function MobileTabBar({
 
   return (
     <div className="md:hidden">
-      {/* Dims the page above the tab bar; a tap anywhere on it closes the sheet */}
-      <div
-        aria-hidden
-        onClick={() => setOpen(false)}
-        className={cn(
-          "fixed inset-0 z-40 bg-primary-900/25 transition-opacity duration-300 motion-reduce:transition-none",
-          open ? "opacity-100" : "opacity-0 pointer-events-none",
-        )}
-      />
+      {hasMore && (
+        <>
+          {/* Dims the page above the tab bar; a tap anywhere on it closes the sheet */}
+          <div
+            aria-hidden
+            onClick={() => setOpen(false)}
+            className={cn(
+              "fixed inset-0 z-40 bg-primary-900/25 transition-opacity duration-300 motion-reduce:transition-none",
+              open ? "opacity-100" : "opacity-0 pointer-events-none",
+            )}
+          />
 
-      {/* More: slides up from behind the tab bar. Dragging it down closes it, once its list is
-          scrolled to the top (before that, a drag scrolls the list). */}
-      <div
-        id="more-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label="More pages"
-        inert={!open}
-        onTouchStart={(e) => {
-          drag.current = { startY: e.touches[0].clientY, fromTop: (scrollRef.current?.scrollTop ?? 0) <= 0 };
-        }}
-        onTouchMove={(e) => {
-          const dy = e.touches[0].clientY - drag.current.startY;
-          if (drag.current.fromTop && dy > 0) setDragY(dy);
-        }}
-        onTouchEnd={() => {
-          if ((dragY ?? 0) > DISMISS_PX) setOpen(false);
-          setDragY(null);
-        }}
-        style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
-        className={cn(
-          "fixed inset-x-0 z-40 bottom-[var(--tab-bar-h)] flex flex-col max-h-[calc(100dvh_-_var(--tab-bar-h)_-_5rem)] rounded-t-3xl bg-white",
-          "shadow-[0_-16px_40px_-16px_rgba(12,49,58,0.3)]",
-          dragY === null && "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-          open ? "translate-y-0" : "translate-y-full",
-        )}
-      >
-        <div className="shrink-0 pt-2.5 pb-3" aria-hidden>
-          <div className="mx-auto h-1 w-10 rounded-full bg-slate-300" />
-        </div>
-        <div
-          ref={scrollRef}
-          className={cn("overflow-y-auto overscroll-contain px-4", dragY ? "overflow-hidden" : "", footer ? "pb-2" : "pb-4")}
-        >
-          {layout === "tiles" ? (
-            <ul className="grid grid-cols-3 gap-2">{moreItems.map(tile)}</ul>
-          ) : (
-            <div className="space-y-4">
-              {groupBySection(moreItems).map((group) => (
-                <section key={group.section ?? `top-${group.items[0].key}`}>
-                  {group.section && (
-                    <h3 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-primary-700/45">
-                      {group.section}
-                    </h3>
-                  )}
-                  <ul className="grid grid-cols-2 gap-1">{group.items.map(row)}</ul>
-                </section>
-              ))}
+          {/* More: slides up from behind the tab bar. Dragging it down closes it, once its list is
+              scrolled to the top (before that, a drag scrolls the list). */}
+          <div
+            id="more-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More pages"
+            inert={!open}
+            onTouchStart={(e) => {
+              drag.current = { startY: e.touches[0].clientY, fromTop: (scrollRef.current?.scrollTop ?? 0) <= 0 };
+            }}
+            onTouchMove={(e) => {
+              const dy = e.touches[0].clientY - drag.current.startY;
+              if (drag.current.fromTop && dy > 0) setDragY(dy);
+            }}
+            onTouchEnd={() => {
+              if ((dragY ?? 0) > DISMISS_PX) setOpen(false);
+              setDragY(null);
+            }}
+            style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
+            className={cn(
+              "fixed inset-x-0 z-40 bottom-[var(--tab-bar-h)] flex flex-col max-h-[calc(100dvh_-_var(--tab-bar-h)_-_5rem)] rounded-t-3xl bg-white",
+              "shadow-[0_-16px_40px_-16px_rgba(12,49,58,0.3)]",
+              dragY === null && "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+              open ? "translate-y-0" : "translate-y-full",
+            )}
+          >
+            <div className="shrink-0 pt-2.5 pb-3" aria-hidden>
+              <div className="mx-auto h-1 w-10 rounded-full bg-slate-300" />
             </div>
-          )}
-        </div>
-        {footer && <div className="shrink-0 px-4 pt-2 pb-4 border-t border-primary-100">{footer}</div>}
-      </div>
+            <div
+              ref={scrollRef}
+              className={cn("overflow-y-auto overscroll-contain px-4", dragY ? "overflow-hidden" : "", footer ? "pb-2" : "pb-4")}
+            >
+              {layout === "tiles" ? (
+                <ul className="grid grid-cols-3 gap-2">{moreItems.map(tile)}</ul>
+              ) : (
+                <div className="space-y-4">
+                  {groupBySection(moreItems).map((group) => (
+                    <section key={group.section ?? `top-${group.items[0].key}`}>
+                      {group.section && (
+                        <h3 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-primary-700/45">
+                          {group.section}
+                        </h3>
+                      )}
+                      <ul className="grid grid-cols-2 gap-1">{group.items.map(row)}</ul>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+            {footer && <div className="shrink-0 px-4 pt-2 pb-4 border-t border-primary-100">{footer}</div>}
+          </div>
+        </>
+      )}
 
       {/* Above the sheet and its backdrop, so it stays usable while More is open */}
       <nav
         aria-label="Main"
         className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-primary-100 pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${tabs.length + (hasMore ? 1 : 0)}, minmax(0, 1fr))` }}>
           {tabs.map((tab) => {
             const isActive = !open && activeKey === tab.key;
             const TabIcon = tab.icon;
@@ -232,21 +238,23 @@ export function MobileTabBar({
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-controls="more-sheet"
-            className={tabClass(open || moreIsActive)}
-          >
-            <span className={pillClass(open || moreIsActive)}>
-              <LayoutGrid className="w-5 h-5" />
-              {moreHasNew && !open && (
-                <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-accent ring-2 ring-white" aria-label="Something new" />
-              )}
-            </span>
-            More
-          </button>
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-controls="more-sheet"
+              className={tabClass(open || moreIsActive)}
+            >
+              <span className={pillClass(open || moreIsActive)}>
+                <LayoutGrid className="w-5 h-5" />
+                {moreHasNew && !open && (
+                  <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-accent ring-2 ring-white" aria-label="Something new" />
+                )}
+              </span>
+              More
+            </button>
+          )}
         </div>
       </nav>
     </div>

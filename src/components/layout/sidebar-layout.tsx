@@ -140,6 +140,7 @@ const mobileTabs: Partial<Record<Portal, { key: string; label: string; icon: typ
     { key: "schedule", label: "Schedule", icon: Calendar },
     { key: "my-groups", label: "My Groups", icon: UsersRound },
     { key: "leaderboard", label: "Leaderboard", icon: Trophy },
+    { key: "feedback", label: "Feedback", icon: MessageSquare },
   ],
   admin: [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
