@@ -911,9 +911,15 @@ export async function updateCoach(coachId: string, formData: FormData) {
     }
   }
 
+  // For a player who coaches, is_active is their player account's status: it's managed
+  // from Players, never from here
+  const { data: target } = await admin.from("profiles").select("role").eq("id", coachId).single();
+  const update: Record<string, unknown> = { first_name: firstName, last_name: lastName, email, phone, area };
+  if (target?.role !== "player") update.is_active = isActive;
+
   const { error } = await admin
     .from("profiles")
-    .update({ first_name: firstName, last_name: lastName, email, phone, area, is_active: isActive })
+    .update(update)
     .eq("id", coachId)
     .eq("is_coach", true);
 
@@ -933,12 +939,15 @@ export async function deleteCoach(coachId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Never delete an admin via the coaches list — an admin can also be a coach
+  // Never delete an admin or a player via the coaches list — either can also be a coach
   // (is_coach=true), and identity/is_active live on the single shared profile row.
   const { data: target } = await admin.from("profiles").select("role").eq("id", coachId).single();
   if (!target) return { error: "Coach not found" };
   if (target.role === "admin") {
     return { error: "This account is also an admin and can't be deleted from the coaches list." };
+  }
+  if (target.role === "player") {
+    return { error: "This coach is also a player. Use Remove coach access instead." };
   }
 
   // Clean path first (works for a coach with no history). If FK references block
@@ -980,6 +989,71 @@ export async function bulkDeleteCoaches(coachIds: string[]) {
   revalidatePath("/admin/coaches");
   revalidatePath("/admin/dashboard");
   return { success: true, results };
+}
+
+/** Make an existing player a coach on their own account: they keep role 'player', so they
+ *  stay in every player list, and gain the coach view. */
+export async function assignPlayerAsCoach(playerId: string): Promise<{ error: string } | { success: true }> {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role, is_coach, is_active")
+    .eq("id", playerId)
+    .single();
+  if (!target || target.role !== "player") return { error: "Player not found" };
+  if (!target.is_active) return { error: "This player's account is inactive" };
+  if (target.is_coach) return { error: "This player is already a coach" };
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ is_coach: true, updated_at: new Date().toISOString() })
+    .eq("id", playerId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
+/** Take coach access away from a player who coaches. Their player account and history stay;
+ *  they come off the groups they coach. Coach-only accounts are deleted instead (deleteCoach). */
+export async function removeCoachAccess(coachId: string): Promise<{ error: string } | { success: true }> {
+  const user = await getCurrentUserRole();
+  const authError = requireAdmin(user);
+  if (authError) return authError;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: target } = await admin.from("profiles").select("role, is_coach").eq("id", coachId).single();
+  if (!target || target.role !== "player" || !target.is_coach) {
+    return { error: "Only a player who coaches can have coach access removed" };
+  }
+
+  // Groups first: if this fails they're still a coach, and the admin can try again from their drawer
+  const { error: groupsError } = await admin
+    .from("coach_groups")
+    .update({ is_active: false })
+    .eq("coach_id", coachId)
+    .eq("is_active", true);
+  if (groupsError) return { error: groupsError.message };
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ is_coach: false, updated_at: new Date().toISOString() })
+    .eq("id", coachId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/groups");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
 }
 
 // ═══════════════════════════════════════
