@@ -38,9 +38,9 @@ export async function login(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_coach")
+    .select("role, is_coach, is_player")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role" | "is_coach">[]>()
+    .returns<Pick<Profile, "role" | "is_coach" | "is_player">[]>()
     .single();
 
   // A player who coaches lands in the view they used last on this device
@@ -126,9 +126,9 @@ export async function verifyEmailOtp(email: string, token: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_coach")
+    .select("role, is_coach, is_player")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role" | "is_coach">[]>()
+    .returns<Pick<Profile, "role" | "is_coach" | "is_player">[]>()
     .single();
 
   // A player who coaches lands in the view they used last on this device

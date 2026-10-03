@@ -5,6 +5,7 @@ import {
   canCoach,
   coachOrAdmin,
   homePath,
+  isPlayer,
   isPrefetch,
   portalOfPath,
   portalsFor,
@@ -13,11 +14,13 @@ import {
   type Account,
 } from "./portals";
 
-const player: Account = { role: "player", is_coach: false };
-const playerCoach: Account = { role: "player", is_coach: true };
-const coach: Account = { role: "coach", is_coach: true };
-const admin: Account = { role: "admin", is_coach: false };
-const adminCoach: Account = { role: "admin", is_coach: true };
+const player: Account = { role: "player", is_coach: false, is_player: false };
+const playerCoach: Account = { role: "player", is_coach: true, is_player: false };
+const coach: Account = { role: "coach", is_coach: true, is_player: false };
+const admin: Account = { role: "admin", is_coach: false, is_player: false };
+const adminCoach: Account = { role: "admin", is_coach: true, is_player: false };
+const adminPlayer: Account = { role: "admin", is_coach: false, is_player: true };
+const adminPlayerCoach: Account = { role: "admin", is_coach: true, is_player: true };
 
 test("accountOf: a profile row as an account", () => {
   assert.deepEqual(accountOf({ role: "player", is_coach: true }), playerCoach);
@@ -29,6 +32,20 @@ test("accountOf: no profile, or a role it doesn't know, is a plain player", () =
   assert.deepEqual(accountOf(null), player);
   assert.deepEqual(accountOf(undefined), player);
   assert.deepEqual(accountOf({ role: "superuser", is_coach: null }), player);
+});
+
+test("accountOf: reads player access", () => {
+  assert.deepEqual(accountOf({ role: "admin", is_player: true }), adminPlayer);
+  assert.equal(accountOf({ role: "admin", is_player: null }).is_player, false);
+});
+
+test("isPlayer: player accounts, and admins who also play", () => {
+  assert.equal(isPlayer(player), true);
+  assert.equal(isPlayer(playerCoach), true);
+  assert.equal(isPlayer(adminPlayer), true);
+  assert.equal(isPlayer(admin), false);
+  assert.equal(isPlayer(adminCoach), false);
+  assert.equal(isPlayer(coach), false);
 });
 
 test("canCoach: coach accounts, and players or admins with coach access", () => {
@@ -53,6 +70,11 @@ test("portalsFor: only a player who coaches has two views, player first", () => 
   assert.deepEqual(portalsFor(coach), ["coach"]);
   assert.deepEqual(portalsFor(admin), ["admin"]);
   assert.deepEqual(portalsFor(adminCoach), ["admin"]);
+});
+
+test("portalsFor: an admin who plays has the admin view and the player view", () => {
+  assert.deepEqual(portalsFor(adminPlayer), ["admin", "player"]);
+  assert.deepEqual(portalsFor(adminPlayerCoach), ["admin", "player"]);
 });
 
 test("portalOfPath: the first path segment, matched exactly", () => {
@@ -84,7 +106,18 @@ test("homePath: a remembered view the account doesn't have is ignored", () => {
   assert.equal(homePath(adminCoach, "coach"), "/admin/dashboard");
 });
 
+test("homePath: an admin who plays lands in the view they used last, admin the first time", () => {
+  assert.equal(homePath(adminPlayer, "player"), "/player/dashboard");
+  assert.equal(homePath(adminPlayer, undefined), "/admin/dashboard");
+  assert.equal(homePath(admin, "player"), "/admin/dashboard");
+});
+
 const visit = new Headers({ rsc: "1" });
+
+test("viewToRemember: an admin who plays opening the player view", () => {
+  assert.equal(viewToRemember(adminPlayer, "/player/dashboard", "admin", visit), "player");
+  assert.equal(viewToRemember(adminPlayer, "/coach/dashboard", "admin", visit), null);
+});
 
 test("viewToRemember: a player who coaches opening the other view", () => {
   assert.equal(viewToRemember(playerCoach, "/coach/schedule", "player", visit), "coach");
@@ -120,6 +153,11 @@ test("switchesFor: only admins get the three-portal switcher, and only in develo
 test("switchesFor: a player who coaches always gets the Player | Coach switch", () => {
   assert.deepEqual(switchesFor("player", portalsFor(playerCoach), false), { devPortals: false, views: true });
   assert.deepEqual(switchesFor("player", portalsFor(playerCoach), true), { devPortals: false, views: true });
+});
+
+test("switchesFor: an admin who plays gets the Admin | Player switch", () => {
+  assert.deepEqual(switchesFor("admin", portalsFor(adminPlayer), false), { devPortals: false, views: true });
+  assert.deepEqual(switchesFor("admin", portalsFor(adminPlayer), true), { devPortals: true, views: true });
 });
 
 test("isPrefetch: Next.js link prefetches and browser prefetch hints", () => {

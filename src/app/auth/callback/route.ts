@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, is_coach")
+      .select("role, is_coach, is_player")
       .eq("id", user.id)
       .single();
 

@@ -73,7 +73,7 @@ export async function middleware(request: NextRequest) {
     if (pathname === "/login" || pathname === "/register" || pathname === "/verify-email") {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, is_coach")
+        .select("role, is_coach, is_player")
         .eq("id", user.id)
         .single();
 
@@ -87,7 +87,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/admin") || pathname.startsWith("/coach") || pathname.startsWith("/player")) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, is_coach")
+        .select("role, is_coach, is_player")
         .eq("id", user.id)
         .single();
 

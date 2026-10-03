@@ -46,6 +46,7 @@ export interface Database {
           occupation: string | null;
           is_active: boolean;
           is_coach: boolean;
+          is_player: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;
@@ -74,6 +75,7 @@ export interface Database {
           occupation?: string | null;
           is_active?: boolean;
           is_coach?: boolean;
+          is_player?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -102,6 +104,7 @@ export interface Database {
           occupation?: string | null;
           is_active?: boolean;
           is_coach?: boolean;
+          is_player?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -1339,6 +1342,7 @@ export interface Database {
           occupation: string | null;
           is_active: boolean;
           is_coach: boolean;
+          is_player: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;

@@ -1,15 +1,18 @@
 // Which views (portals) an account can open, and where it lands after login.
 // A player who coaches is role 'player' with is_coach = true: they have the player view
-// and the coach view, and each device remembers the last one they used.
+// and the coach view. An admin who plays is role 'admin' with is_player = true: they have
+// the admin view and the player view. Each device remembers the last view used.
 
 export type Portal = "player" | "coach" | "admin";
 
 export interface Account {
   role: "player" | "coach" | "admin";
   is_coach: boolean;
+  /** An admin who also plays */
+  is_player: boolean;
 }
 
-/** The cookie that remembers which view a player who coaches used last */
+/** The cookie that remembers which view an account with two views used last */
 export const VIEW_COOKIE = "beachamp-view";
 
 /** Kept a year; only the server reads it */
@@ -22,12 +25,20 @@ export const VIEW_COOKIE_OPTIONS = {
 };
 
 /** A profile row (or none) as an Account: a missing or unknown role is a player, as before */
-export function accountOf(profile: { role?: string | null; is_coach?: boolean | null } | null | undefined): Account {
+export function accountOf(
+  profile: { role?: string | null; is_coach?: boolean | null; is_player?: boolean | null } | null | undefined
+): Account {
   const role = profile?.role;
   return {
     role: role === "admin" || role === "coach" ? role : "player",
     is_coach: profile?.is_coach === true,
+    is_player: profile?.is_player === true,
   };
+}
+
+/** Plays: a player account, or an admin who also plays */
+export function isPlayer(a: Account): boolean {
+  return a.role === "player" || a.is_player;
 }
 
 /** Can do coach work: a coach account, or a player or admin with coach access */
@@ -42,13 +53,14 @@ export function coachOrAdmin(a: Account): boolean {
 
 /** The views this account can open, in switcher order */
 export function portalsFor(a: Account): Portal[] {
-  if (a.role === "admin") return ["admin"];
+  if (a.role === "admin") return a.is_player ? ["admin", "player"] : ["admin"];
   if (a.role === "coach") return ["coach"];
   return a.is_coach ? ["player", "coach"] : ["player"];
 }
 
 /** The switches the menu shows: admins jump between all three portals, in development only;
- *  an account with two views (a player who coaches) always gets the Player | Coach switch */
+ *  an account with two views (a player who coaches, an admin who plays) always gets the
+ *  switch between them */
 export function switchesFor(
   role: Account["role"],
   portals: Portal[],
