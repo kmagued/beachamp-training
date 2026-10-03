@@ -15,6 +15,8 @@ export default async function RequestPrivateSessionPage() {
     .select("id, first_name, last_name")
     .eq("is_coach", true)
     .eq("is_active", true)
+    // A player who coaches doesn't book a session with themselves
+    .neq("id", currentUser.id)
     .order("first_name");
 
   const { data: privatePackages } = await supabase

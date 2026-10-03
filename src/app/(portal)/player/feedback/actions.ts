@@ -27,6 +27,7 @@ export async function createCoachFeedback(input: {
   const comment = input.comment.trim();
   if (!comment) return { error: "Please enter feedback" };
   if (!input.coach_id) return { error: "Please select a coach" };
+  if (input.coach_id === user.id) return { error: "You can't leave feedback for yourself" };
   if (input.rating != null && (input.rating < 1 || input.rating > 5)) {
     return { error: "Rating must be between 1 and 5" };
   }
