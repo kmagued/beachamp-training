@@ -33,6 +33,8 @@ interface SessionInfo {
   /** Whether the group plays King of Court; null when the session has no group */
   in_leaderboard: boolean | null;
   private_players: PrivatePlayer[];
+  /** Who pays for a private session (its player_id); the other players aren't charged */
+  payer_id: string | null;
   coach_id: string | null;
   coach_name: string | null;
   day_of_week: number;
@@ -148,6 +150,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
         group_level: isPrivate ? "private" : (d.groups?.level || "mixed"),
         in_leaderboard: d.groups?.in_leaderboard ?? null,
         private_players: privatePlayers,
+        payer_id: isPrivate ? d.player_id ?? null : null,
         coach_id: d.coach_id,
         coach_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : null,
         day_of_week: d.day_of_week,
@@ -284,6 +287,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
               startTime={session.start_time}
               endTime={session.end_time}
               privatePlayers={session.session_type === "private" ? session.private_players : null}
+              privatePayerId={session.payer_id}
               birthdayPlayerIds={new Set(birthdays.map((b) => b.player.id))}
             />
           )}
