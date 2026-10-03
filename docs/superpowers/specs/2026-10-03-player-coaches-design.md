@@ -210,6 +210,17 @@ CREATE TABLE coach_invites (
   "create a coach account", which admins can already grant, and only admins can read the
   table.
 
+### `20261003220000_protect_profile_access.sql` (added after review)
+
+"Users can update own profile" let a signed-in user update every column of their own row
+through the API. That included `role` (making themselves an admin), `is_coach` and
+`is_active`. A `BEFORE UPDATE` trigger now refuses changes to those three columns unless
+an admin or the server makes them. The server is the service role, with no signed-in
+user. Players still edit the rest of their profile.
+
+The app only changes these columns from admin sessions or with the service role, so the
+migration is safe to apply ahead of the code.
+
 ## Shared code
 
 ### `src/lib/auth/portals.ts`
@@ -296,12 +307,22 @@ runs:
 
 ## Switching views
 
-- `DevPortalSwitcher` becomes `PortalSwitcher`. It sits in the same three places and
-  uses plain `<a>` links to `/<portal>/dashboard`, as before.
-  - **Production:** it shows only when the account has more than one view (Player |
-    Coach), under the heading "Switch view".
-  - **Development:** it shows all three portals under "Switch Portal", as today.
+This section was revised after the first build, at the user's request.
+
+- **Player | Coach switch in the top bar.** A player who coaches gets a small switch at
+  the left of the top bar, on every page, on phones and desktop. It links to
+  `/player/dashboard` and `/coach/dashboard`, with the current view filled in.
+  - On phones the logo shrinks beside it.
+  - On the narrowest phones (under 360px) the logo is left out, so they don't overlap.
+- **Dev switcher is admins only.** The three-portal "Switch Portal" control stays in the
+  sidebar, the phone menu and the More sheet, but only for admins and only in
+  development.
+- `switchesFor(role, portals, dev)` in `portals.ts` decides which switches show.
 - Each layout passes `portals={portalsFor(accountOf(profile))}` to `SidebarLayout`.
+- **Coach tab bar on phones.** The coach portal gets the same bottom tab bar as the other
+  portals, replacing the slide-out menu.
+  - All five of its pages are tabs: Home, Schedule, My Groups, Leaderboard, Feedback.
+  - The tab bar shows More only when some pages are left over, so coaches have none.
 - **Notification bell in the coach view.** There is no `/coach/notifications` page, so
   for players who coach the bell links to `/player/notifications`.
 - **After coach access is removed,** the switch disappears on their next page load, and
@@ -544,12 +565,12 @@ able to choose themselves:
 - `npx tsc --noEmit -p .`, then `git checkout tsconfig.tsbuildinfo`
 - No ESLint config exists, and `next build` is skipped while the dev server is running.
 
-**Manual check (staging, after both migrations are applied):**
+**Manual check (staging, after the three migrations are applied):**
 
 1. Coaches → Add Coach → Existing player: make a test player a coach. They show with the
    Player tag.
-2. Log in as them. The first landing is the player dashboard, and the switch shows
-   Player | Coach.
+2. Log in as them. The first landing is the player dashboard, and the top bar shows the
+   Player | Coach switch, on a phone too.
 3. Switch to Coach. Assign them a group from the group page, then open a session and
    mark attendance. Players' subscription balances appear, not "No active
    subscription".
@@ -570,6 +591,12 @@ able to choose themselves:
    left the pending list, and the new coach is in the table with no groups.
 10. Open the same link again: "already been used". Revoke another invite and open it:
     "isn't valid".
+11. On a phone, the coach portal has the bottom tab bar with five tabs (Home, Schedule,
+    My Groups, Leaderboard, Feedback) and no More.
+12. In development, only an admin sees "Switch Portal". A plain player or a player who
+    coaches doesn't.
+13. As a plain player, in the browser console, try to update your own `role` through
+    the Supabase client. The database refuses it.
 
 ## Out of scope
 
