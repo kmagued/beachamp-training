@@ -7,12 +7,13 @@ import { Pagination, SelectionBar, Button, Input, Drawer } from "@/components/ui
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 import { createCoach, bulkDeleteCoaches } from "@/app/_actions/training";
 import { Plus, Eye, EyeOff, Copy, CheckCircle2, Trash2, Loader2, Download } from "lucide-react";
-import type { CoachRow, SortField, SortDir } from "./_components/types";
+import type { CoachRow, SortField, SortDir, InviteRow } from "./_components/types";
 import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
 import { CoachesFilters } from "./_components/filters";
 import { CoachesTableView } from "./_components/table";
 import { CoachDrawer } from "./_components/coach-drawer";
 import { ExportPayDrawer } from "./_components/export-pay-drawer";
+import { PendingInvites } from "./_components/pending-invites";
 
 export default function AdminCoachesPage() {
   return (
@@ -36,6 +37,7 @@ function AdminCoachesContent() {
   const [bulkDeleting, startBulkDeleteTransition] = useTransition();
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [invites, setInvites] = useState<InviteRow[]>([]);
 
   // Add Coach state
   const [showAddCoach, setShowAddCoach] = useState(false);
@@ -88,6 +90,21 @@ function AdminCoachesContent() {
   useEffect(() => {
     fetchCoaches();
   }, [fetchCoaches]);
+
+  // Open invites: not accepted, not revoked (expired ones stay until removed)
+  const fetchInvites = useCallback(async () => {
+    const { data } = await supabase
+      .from("coach_invites")
+      .select("id, token, first_name, last_name, phone, email, created_at, expires_at, accepted_at, revoked_at")
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+    setInvites((data ?? []) as InviteRow[]);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchInvites();
+  }, [fetchInvites]);
 
   const filteredCoaches = useMemo(() => {
     const result = coaches.filter((c) => {
@@ -291,6 +308,8 @@ function AdminCoachesContent() {
           </form>
         )}
       </Drawer>
+
+      <PendingInvites invites={invites} onChange={fetchInvites} />
 
       <CoachesFilters
         search={search}

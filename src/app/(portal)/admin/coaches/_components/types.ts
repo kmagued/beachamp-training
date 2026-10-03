@@ -15,3 +15,17 @@ export interface CoachRow {
 
 export type SortField = "name" | "date";
 export type SortDir = "asc" | "desc";
+
+/** An open coach invite, as the Coaches page lists it */
+export interface InviteRow {
+  id: string;
+  token: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string | null;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
