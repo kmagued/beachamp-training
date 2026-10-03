@@ -237,8 +237,8 @@ export function portalsFor(a: Account): Portal[];
 export function portalOfPath(pathname: string): Portal | null;
 /** Where login lands: the remembered view if this account has it, else its first view */
 export function homePath(a: Account, lastView: string | undefined): string;
-/** The view to remember for this visit, or null to leave the cookie alone */
-export function viewToRemember(a: Account, pathname: string, current: string | undefined): Portal | null;
+/** The view to remember for this visit, or null to leave the cookie alone (always null for a prefetch) */
+export function viewToRemember(a: Account, pathname: string, current: string | undefined, headers: Headers): Portal | null;
 /** A background prefetch, not a visit (Next.js link prefetch, browser prefetch hints) */
 export function isPrefetch(headers: Headers): boolean;
 ```
@@ -348,8 +348,9 @@ coach**.
   - name
   - phone and email
   - "Expires Sat 10 Oct", or an **Expired** tag
-  - **Copy link**, **WhatsApp** and **Revoke**
-- Revoke asks for confirmation, then calls `revokeCoachInvite`.
+  - **Copy link**, **WhatsApp** and **Revoke**. An expired invite has a dead link, so it
+    shows only **Remove**.
+- Revoke and Remove ask for confirmation, then call `revokeCoachInvite`.
 - The card is hidden when there are no open invites.
 
 ### Coaches table and detail page
@@ -437,7 +438,7 @@ invite with the service role and shows one of:
 | Expired | "This invite has expired" / "Ask the academy for a new link." |
 | Accepted | "This invite has already been used" / a link to Log in |
 | Open, but someone is signed in | "You're signed in as {email}" / "Log out, then open this link again." with a Log out button |
-| Open | "Join Beachamp as a coach" and the signup form |
+| Open | "Join as a Coach" / "Create your Beachamp Academy coach account", and the signup form |
 
 - The signup form has first name, last name, email, phone and password, prefilled from
   the invite. It calls `acceptCoachInvite`.
