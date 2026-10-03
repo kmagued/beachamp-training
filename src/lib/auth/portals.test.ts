@@ -8,6 +8,7 @@ import {
   isPrefetch,
   portalOfPath,
   portalsFor,
+  switchesFor,
   viewToRemember,
   type Account,
 } from "./portals";
@@ -107,6 +108,18 @@ test("viewToRemember: a prefetch of the other view (the bell's link in the coach
   const prefetch = new Headers({ rsc: "1", "next-router-prefetch": "1" });
   assert.equal(viewToRemember(playerCoach, "/player/notifications", "coach", prefetch), null);
   assert.equal(viewToRemember(playerCoach, "/coach/dashboard", "player", new Headers({ "sec-purpose": "prefetch" })), null);
+});
+
+test("switchesFor: only admins get the three-portal switcher, and only in development", () => {
+  assert.deepEqual(switchesFor("admin", portalsFor(admin), true), { devPortals: true, views: false });
+  assert.deepEqual(switchesFor("admin", portalsFor(admin), false), { devPortals: false, views: false });
+  assert.deepEqual(switchesFor("player", portalsFor(player), true), { devPortals: false, views: false });
+  assert.deepEqual(switchesFor("coach", portalsFor(coach), true), { devPortals: false, views: false });
+});
+
+test("switchesFor: a player who coaches always gets the Player | Coach switch", () => {
+  assert.deepEqual(switchesFor("player", portalsFor(playerCoach), false), { devPortals: false, views: true });
+  assert.deepEqual(switchesFor("player", portalsFor(playerCoach), true), { devPortals: false, views: true });
 });
 
 test("isPrefetch: Next.js link prefetches and browser prefetch hints", () => {

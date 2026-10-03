@@ -43,7 +43,7 @@ import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
 import { MobileTabBar } from "./mobile-tab-bar";
 import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
-import type { Portal } from "@/lib/auth/portals";
+import { switchesFor, type Portal } from "@/lib/auth/portals";
 
 /** foldSections: section headings fold their links away (for portals with long menus) */
 const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string; foldSections: boolean }> = {
@@ -157,22 +157,16 @@ function NavBadge({ label }: { label: string }) {
   );
 }
 
-/** Links between the views this account has (a player who coaches: Player | Coach).
- *  In development, all three portals. */
-function PortalSwitcher({ portal, portals }: { portal: Portal; portals: Portal[] }) {
-  const dev = process.env.NODE_ENV === "development";
-  const shown: Portal[] = dev ? ["admin", "coach", "player"] : portals;
+/** Development only, for admins: jump between the three portals */
+function DevPortalSwitcher({ portal }: { portal: Portal }) {
   return (
     <>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">
-        {dev ? "Switch Portal" : "Switch view"}
-      </p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
       <div className="flex gap-1">
-        {shown.map((p) => (
+        {(["admin", "coach", "player"] as const).map((p) => (
           <a
             key={p}
             href={`/${p}/dashboard`}
-            aria-current={portal === p ? "page" : undefined}
             className={cn(
               "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
               portal === p
@@ -185,6 +179,27 @@ function PortalSwitcher({ portal, portals }: { portal: Portal; portals: Portal[]
         ))}
       </div>
     </>
+  );
+}
+
+/** The top bar's Player | Coach switch for a player who coaches; the view they're in is filled in */
+function ViewSwitch({ portal, portals }: { portal: Portal; portals: Portal[] }) {
+  return (
+    <nav aria-label="Switch view" className="flex items-center gap-0.5 rounded-full bg-primary-50 p-0.5">
+      {portals.map((p) => (
+        <Link
+          key={p}
+          href={`/${p}/dashboard`}
+          aria-current={portal === p ? "page" : undefined}
+          className={cn(
+            "rounded-full px-2 py-1 text-[11px] font-semibold transition-colors md:px-3 md:py-1.5 md:text-xs",
+            portal === p ? "bg-primary-800 text-white shadow-sm" : "text-primary-700/70 hover:text-primary-900"
+          )}
+        >
+          {p.charAt(0).toUpperCase() + p.slice(1)}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -214,7 +229,7 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
       : portal === "coach" && !portals.includes("player")
         ? "/coach/notifications"
         : "/player/notifications";
-  const showSwitcher = process.env.NODE_ENV === "development" || portals.length > 1;
+  const switches = switchesFor(user.role, portals, process.env.NODE_ENV === "development");
 
   const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
   const matched = sortedNav.find((item) => pathname.startsWith(item.href))?.key;
@@ -414,10 +429,10 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
               })}
         </nav>
 
-        {/* View switcher */}
-        {showSwitcher && !collapsed && (
+        {/* Dev portal switcher (admins) */}
+        {switches.devPortals && !collapsed && (
           <div className="px-3 border-t border-primary-200/60 pt-3 pb-4 mt-2">
-            <PortalSwitcher portal={portal} portals={portals} />
+            <DevPortalSwitcher portal={portal} />
           </div>
         )}
 
@@ -439,8 +454,9 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
       {/* Top navbar */}
       <header className="fixed top-0 right-0 left-0 md:left-[var(--sidebar-w)] z-30 bg-[#FDFCF9] shadow-[0_4px_24px_-12px_rgba(18,75,93,0.08)] h-16 md:h-20 transition-[left] duration-200">
         <div className="relative flex items-center justify-between h-full px-2 md:px-4">
-          {/* Left: menu button on mobile (players open the menu from the tab bar instead) */}
-          <div className="flex items-center">
+          {/* Left: menu button on mobile (portals with a tab bar open the menu from it instead),
+              and a player who coaches switches between their two views here */}
+          <div className="flex items-center gap-2">
             {!hasTabs && (
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
@@ -451,6 +467,7 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
                 {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             )}
+            {switches.views && <ViewSwitch portal={portal} portals={portals} />}
           </div>
 
           {/* Center: logo */}
@@ -465,7 +482,8 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
               width={240}
               height={80}
               priority
-              className="h-12 md:h-16 w-auto object-contain"
+              // Smaller on phones beside the view switch, and left out on the narrowest ones
+              className={cn("h-12 md:h-16 w-auto object-contain", switches.views && "h-9 sm:h-12 max-[359px]:hidden")}
             />
           </Link>
 
@@ -560,9 +578,9 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
                   })}
             </nav>
 
-            {showSwitcher && (
+            {switches.devPortals && (
               <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
-                <PortalSwitcher portal={portal} portals={portals} />
+                <DevPortalSwitcher portal={portal} />
               </div>
             )}
           </div>
@@ -575,7 +593,7 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
           items={navItems.map((item) => ({ ...item, icon: iconMap[item.key as keyof typeof iconMap] }))}
           activeKey={activeKey}
           layout={config.foldSections ? "sections" : "tiles"}
-          footer={showSwitcher ? <PortalSwitcher portal={portal} portals={portals} /> : undefined}
+          footer={switches.devPortals ? <DevPortalSwitcher portal={portal} /> : undefined}
         />
       )}
 

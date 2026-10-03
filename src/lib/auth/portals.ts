@@ -47,6 +47,16 @@ export function portalsFor(a: Account): Portal[] {
   return a.is_coach ? ["player", "coach"] : ["player"];
 }
 
+/** The switches the menu shows: admins jump between all three portals, in development only;
+ *  an account with two views (a player who coaches) always gets the Player | Coach switch */
+export function switchesFor(
+  role: Account["role"],
+  portals: Portal[],
+  dev: boolean
+): { devPortals: boolean; views: boolean } {
+  return { devPortals: dev && role === "admin", views: portals.length > 1 };
+}
+
 /** "/coach/groups/1" → "coach"; anything outside the three portals → null */
 export function portalOfPath(pathname: string): Portal | null {
   const first = pathname.split("/")[1];
