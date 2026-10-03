@@ -1,4 +1,4 @@
-"use server";
+// Server code only (called from server actions); not a public action, since it writes with the service role.
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSystemSetting } from "@/lib/settings/system-settings";
