@@ -3,10 +3,10 @@
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { createBrowserClient } from "@supabase/ssr";
-import { Pagination, SelectionBar, Button, Input, Drawer } from "@/components/ui";
+import { Pagination, SelectionBar, Button, Toast } from "@/components/ui";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
-import { createCoach, bulkDeleteCoaches } from "@/app/_actions/training";
-import { Plus, Eye, EyeOff, Copy, CheckCircle2, Trash2, Loader2, Download } from "lucide-react";
+import { bulkDeleteCoaches } from "@/app/_actions/training";
+import { Plus, Trash2, Loader2, Download } from "lucide-react";
 import type { CoachRow, SortField, SortDir, InviteRow } from "./_components/types";
 import { CoachesPageSkeleton, CoachesInlineSkeleton } from "./_components/skeleton";
 import { CoachesFilters } from "./_components/filters";
@@ -14,6 +14,7 @@ import { CoachesTableView } from "./_components/table";
 import { CoachDrawer } from "./_components/coach-drawer";
 import { ExportPayDrawer } from "./_components/export-pay-drawer";
 import { PendingInvites } from "./_components/pending-invites";
+import { AddCoachDrawer } from "./_components/add-coach-drawer";
 
 export default function AdminCoachesPage() {
   return (
@@ -39,13 +40,10 @@ function AdminCoachesContent() {
   const [showExport, setShowExport] = useState(false);
   const [invites, setInvites] = useState<InviteRow[]>([]);
 
-  // Add Coach state
+  // Add Coach
   const [showAddCoach, setShowAddCoach] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [addError, setAddError] = useState<string | null>(null);
-  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const clearToast = useCallback(() => setToast(null), []);
 
   const { getRowId, isHighlighted } = useHighlightRow();
 
@@ -204,27 +202,6 @@ function AdminCoachesContent() {
 
   const hasActiveFilters = !!search || !!statusFilter;
 
-  function handleAddCoach(formData: FormData) {
-    setAddError(null);
-    startTransition(async () => {
-      const result = await createCoach(formData);
-      if ("error" in result) {
-        setAddError((result as { error: string }).error);
-      } else {
-        setCreatedPassword((result as { password?: string }).password || null);
-        fetchCoaches();
-      }
-    });
-  }
-
-  function copyPassword() {
-    if (createdPassword) {
-      navigator.clipboard.writeText(createdPassword);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col min-h-[calc(100vh-3.5rem)] md:min-h-screen">
       <div className="flex items-center justify-between mb-6">
@@ -235,7 +212,7 @@ function AdminCoachesContent() {
             {hasActiveFilters && ` · ${filteredCoaches.length} matching`}
           </p>
         </div>
-        <Button size="sm" onClick={() => { setShowAddCoach(true); setAddError(null); setCreatedPassword(null); }}>
+        <Button size="sm" onClick={() => setShowAddCoach(true)}>
           <span className="flex items-center gap-1.5">
             <Plus className="w-4 h-4" />
             Add Coach
@@ -243,71 +220,18 @@ function AdminCoachesContent() {
         </Button>
       </div>
 
-      {/* Add Coach Drawer */}
-      <Drawer
+      <Toast message={toast} variant="success" onClose={clearToast} />
+
+      <AddCoachDrawer
         open={showAddCoach}
-        onClose={() => { setShowAddCoach(false); setCreatedPassword(null); }}
-        title={createdPassword ? "Coach Created!" : "Add New Coach"}
-        footer={
-          createdPassword ? (
-            <Button fullWidth onClick={() => { setShowAddCoach(false); setCreatedPassword(null); }}>Done</Button>
-          ) : (
-            <Button type="submit" form="add-coach-form" fullWidth disabled={isPending}>
-              {isPending ? "Creating..." : "Create Coach Account"}
-            </Button>
-          )
-        }
-      >
-        {createdPassword ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <p className="text-sm font-medium text-emerald-700">Coach account created successfully</p>
-            </div>
-            <p className="text-xs text-emerald-600 mb-3">Share this temporary password with the coach.</p>
-            <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 px-3 py-2">
-              <code className="flex-1 text-sm font-mono text-slate-900">
-                {showPassword ? createdPassword : "••••••••••••"}
-              </code>
-              <button onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600">
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-              <button onClick={copyPassword} className="text-slate-400 hover:text-slate-600">
-                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form id="add-coach-form" action={handleAddCoach} className="space-y-3">
-            {addError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{addError}</div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">First Name</label>
-                <Input name="first_name" required placeholder="John" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Last Name</label>
-                <Input name="last_name" required placeholder="Doe" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Email</label>
-              <Input name="email" type="email" required placeholder="coach@example.com" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Phone</label>
-              <Input name="phone" placeholder="+201234567890" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Password</label>
-              <Input name="password" type="text" required placeholder="Temporary password" defaultValue={Math.random().toString(36).slice(-10)} />
-              <p className="text-[10px] text-slate-400 mt-1">Coach should change this after first login</p>
-            </div>
-          </form>
-        )}
-      </Drawer>
+        onClose={() => setShowAddCoach(false)}
+        onAssigned={(name) => {
+          setShowAddCoach(false);
+          fetchCoaches();
+          setToast(`${name} is now a coach. They'll see the Coach view next time they open the app.`);
+        }}
+        onInvited={fetchInvites}
+      />
 
       <PendingInvites invites={invites} onChange={fetchInvites} />
 
