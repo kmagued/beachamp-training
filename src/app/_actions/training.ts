@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
 import { isFutureCairoDate } from "@/lib/utils/cairo-time";
 import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { canEditGroupSchedule, sessionCoachId, type ScheduleEditor } from "@/lib/scheduling/edit-access";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -31,6 +32,30 @@ function requireAdmin(user: { role: string } | null) {
   }
   return null;
 }
+
+/** The caller as a schedule editor: an admin, or a coach with the groups they're the active
+ *  primary coach of. Null for anyone else. */
+async function getScheduleEditor(): Promise<ScheduleEditor | null> {
+  const user = await getCurrentUserRole();
+  if (!user || !coachOrAdmin(accountOf(user))) return null;
+  if (user.role === "admin") return { id: user.id, isAdmin: true, primaryGroupIds: new Set() };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data } = await admin
+    .from("coach_groups")
+    .select("group_id")
+    .eq("coach_id", user.id)
+    .eq("is_primary", true)
+    .eq("is_active", true);
+  return {
+    id: user.id,
+    isAdmin: false,
+    primaryGroupIds: new Set(((data ?? []) as { group_id: string }[]).map((r) => r.group_id)),
+  };
+}
+
+const SCHEDULE_DENIED = { error: "Only admins and the group's primary coach can change its schedule" };
 
 function requireCoachOrAdmin(user: { role: string; is_coach: boolean } | null) {
   // Coaches, admins, and players with coach access
@@ -386,15 +411,16 @@ export async function setPrimaryCoach(groupId: string, coachId: string) {
 // ═══════════════════════════════════════
 
 export async function createScheduleSession(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
-
   const groupId = formData.get("group_id") as string;
-  const coachId = (formData.get("coach_id") as string) || null;
+  const editor = await getScheduleEditor();
+  if (!editor || !canEditGroupSchedule(editor, groupId || null)) return SCHEDULE_DENIED;
+
+  // Admins and the group's primary coach, checked above. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any;
+
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null);
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
 
@@ -428,15 +454,17 @@ export async function createScheduleSession(formData: FormData) {
 
 /** Create a one-off session on a specific date (not recurring) */
 export async function createSingleSession(formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
-
   const groupId = formData.get("group_id") as string;
-  const coachId = (formData.get("coach_id") as string) || null;
+  if (!groupId) return { error: "A group is required." };
+  const editor = await getScheduleEditor();
+  if (!editor || !canEditGroupSchedule(editor, groupId)) return SCHEDULE_DENIED;
+
+  // Admins and the group's primary coach, checked above. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any;
+
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null);
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
   const sessionDate = (formData.get("session_date") as string)?.trim();
@@ -445,7 +473,6 @@ export async function createSingleSession(formData: FormData) {
   const effectiveEnd = endTime === "00:00" ? "24:00" : endTime;
   if (effectiveEnd <= startTime) return { error: "End time must be after start time." };
   if (!sessionDate) return { error: "A date is required." };
-  if (!groupId) return { error: "A group is required." };
 
   // Derive day_of_week from the date, set end_date = same date so it only shows once
   const dayOfWeek = new Date(sessionDate + "T00:00:00").getDay();
@@ -471,14 +498,14 @@ export async function createSingleSession(formData: FormData) {
 }
 
 export async function updateScheduleSession(id: string, formData: FormData) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach, checked once the session is loaded. The
+  // schedule's database rules are admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
 
-  const coachId = (formData.get("coach_id") as string) || null;
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
 
@@ -499,10 +526,12 @@ export async function updateScheduleSession(id: string, formData: FormData) {
   //    Number(null) === 0 would otherwise reset the session to Sunday).
   const { data: existing, error: fetchErr } = await supabase
     .from("schedule_sessions")
-    .select("session_type, day_of_week")
+    .select("session_type, day_of_week, group_id, coach_id")
     .eq("id", id)
     .single();
   if (fetchErr || !existing) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, existing.group_id)) return SCHEDULE_DENIED;
+  const coachId = sessionCoachId(editor, (formData.get("coach_id") as string) || null, existing);
 
   const submittedDow = formData.get("day_of_week");
   const dayOfWeek =
@@ -533,12 +562,17 @@ export async function updateScheduleSession(id: string, formData: FormData) {
 }
 
 export async function deleteScheduleSession(id: string) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach. The schedule's database rules are
+  // admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
+
+  const { data: existing } = await supabase.from("schedule_sessions").select("group_id").eq("id", id).single();
+  if (!existing) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, existing.group_id)) return SCHEDULE_DENIED;
 
   const { error } = await supabase
     .from("schedule_sessions")
@@ -555,17 +589,26 @@ export async function deleteScheduleSession(id: string) {
 
 /** Cancel a single occurrence of a recurring session on a specific date */
 export async function cancelScheduleSessionDate(scheduleSessionId: string, date: string) {
-  const user = await getCurrentUserRole();
-  const authError = requireAdmin(user);
-  if (authError) return authError;
+  const editor = await getScheduleEditor();
+  if (!editor) return SCHEDULE_DENIED;
 
+  // Admins and the session's group's primary coach. Cancellations' database rules are
+  // admin-only, so the change is made with the service role.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = (await createClient()) as any;
+  const supabase = createAdminClient() as any;
+
+  const { data: session } = await supabase
+    .from("schedule_sessions")
+    .select("group_id")
+    .eq("id", scheduleSessionId)
+    .single();
+  if (!session) return { error: "Session not found." };
+  if (!canEditGroupSchedule(editor, session.group_id)) return SCHEDULE_DENIED;
 
   const { error } = await supabase.from("schedule_session_cancellations").insert({
     schedule_session_id: scheduleSessionId,
     cancelled_date: date,
-    cancelled_by: user!.id,
+    cancelled_by: editor.id,
   });
 
   if (error) {
