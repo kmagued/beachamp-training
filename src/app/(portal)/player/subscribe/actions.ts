@@ -2,7 +2,7 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { notifyAdmins } from "@/app/_actions/notifications";
+import { notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
 
 export async function submitSubscription(formData: FormData) {

@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { revalidatePath } from "next/cache";
-import { createNotification, notifyAdmins } from "./notifications";
+import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { isCoachBlocked } from "@/lib/scheduling/coach-availability";
 import {
   ClashApiError,

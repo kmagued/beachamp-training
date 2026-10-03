@@ -17,6 +17,9 @@ async function requireAdmin(): Promise<AdminAuth> {
 }
 
 export async function listTemplates(opts?: { activeOnly?: boolean }): Promise<WhatsappTemplate[]> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return [];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   let query = admin

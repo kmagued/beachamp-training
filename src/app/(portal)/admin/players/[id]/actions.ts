@@ -25,6 +25,9 @@ async function assertAdmin(): Promise<string | null> {
 }
 
 export async function updatePlayer(playerId: string, formData: FormData) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -90,6 +93,9 @@ export async function updatePlayer(playerId: string, formData: FormData) {
 }
 
 export async function updatePlayerLevel(playerId: string, level: string | null) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   const admin = createAdminClient();
   type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
   const { error } = await admin
@@ -102,6 +108,9 @@ export async function updatePlayerLevel(playerId: string, level: string | null) 
 }
 
 export async function bulkUpdatePlayerLevel(playerIds: string[], level: string | null) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   const admin = createAdminClient();
   type PlayingLevel = "beginner" | "intermediate" | "advanced" | "professional";
   const { error } = await admin
@@ -118,6 +127,9 @@ export async function updateSubscriptionBalance(
   sessionsRemaining: number,
   sessionsTotal: number
 ) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -262,6 +274,9 @@ export async function deleteSubscription(subscriptionId: string) {
 }
 
 export async function deletePlayer(playerId: string) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -276,6 +291,9 @@ export async function deletePlayer(playerId: string) {
 }
 
 export async function freezeSubscription(subscriptionId: string, reason?: string) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -319,6 +337,9 @@ export async function freezeSubscription(subscriptionId: string, reason?: string
 }
 
 export async function unfreezeSubscription(subscriptionId: string) {
+  const authError = await assertAdmin();
+  if (authError) return { error: authError };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 

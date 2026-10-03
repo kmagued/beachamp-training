@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { notifyAdmins } from "@/app/_actions/notifications";
+import { notifyAdmins } from "@/lib/notifications/send";
 import { sendEmail } from "@/lib/email/send";
 import { branding } from "@/lib/config/branding";
 import {

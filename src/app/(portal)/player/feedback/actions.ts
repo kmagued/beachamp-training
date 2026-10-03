@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "@/app/_actions/notifications";
+import { createNotification } from "@/lib/notifications/send";
 
 export async function createCoachFeedback(input: {
   coach_id: string;

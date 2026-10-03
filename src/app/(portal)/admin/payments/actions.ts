@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
-import { createNotification, notifyAdmins } from "@/app/_actions/notifications";
+import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
 
 export async function confirmPayment(paymentId: string) {

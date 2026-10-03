@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "@/app/_actions/notifications";
+import { createNotification } from "@/lib/notifications/send";
 import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 
 export async function createFeedback(input: {

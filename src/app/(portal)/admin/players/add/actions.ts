@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
 import { revalidatePath } from "next/cache";
 import { generatePassword } from "@/lib/utils/password";
 import type { PaymentMethod } from "@/types/database";
@@ -16,6 +17,8 @@ interface AddPlayerResult {
 }
 
 export async function addSinglePlayer(formData: FormData): Promise<AddPlayerResult> {
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
+
   const firstName = (formData.get("first_name") as string)?.trim();
   const lastName = (formData.get("last_name") as string)?.trim();
   const email = (formData.get("email") as string)?.trim().toLowerCase();
@@ -195,6 +198,10 @@ function normalizeDate(v?: string | null): string | null {
 }
 
 export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerResult[]> {
+  if (!(await isAdminCaller())) {
+    return rows.map((row) => ({ name: `${row.first_name} ${row.last_name}`, email: row.email, status: "error", error: "Not authorized" }));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -296,6 +303,8 @@ export async function addBulkPlayers(rows: BulkPlayerRow[]): Promise<BulkPlayerR
 }
 
 export async function checkExistingEmails(emails: string[]): Promise<string[]> {
+  if (!(await isAdminCaller())) return [];
+
   if (emails.length === 0) return [];
   const admin = createAdminClient();
   const { data } = await admin
