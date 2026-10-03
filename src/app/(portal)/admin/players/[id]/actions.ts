@@ -280,6 +280,12 @@ export async function deletePlayer(playerId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
+  // An admin who plays is listed here too; deleting the account would delete an admin
+  const { data: target } = await admin.from("profiles").select("role").eq("id", playerId).single();
+  if (target?.role === "admin") {
+    return { error: "This player is also an admin. Remove Player access on the Admins page instead." };
+  }
+
   // Delete auth user (profile cascade-deletes via FK)
   const { error } = await admin.auth.admin.deleteUser(playerId);
   if (error) return { error: error.message };

@@ -214,6 +214,7 @@ function DrawerContent({
               {player.first_name} {player.last_name}
             </p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {player.role === "admin" && <Badge variant="info">Admin</Badge>}
               <ActivityBadge status={activity} />
               <SubscriptionBadge status={subStatus} />
               <LevelBadge level={player.playing_level} />
@@ -700,13 +701,16 @@ function DrawerContent({
               <Pencil className="w-3.5 h-3.5" /> Edit
             </span>
           </Button>
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
-            title="Delete Player"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {/* An admin who plays is managed on the Admins page */}
+          {player.role !== "admin" && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+              title="Delete Player"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         <Button onClick={() => setShowAddPayment(true)} fullWidth>
           + Add Payment

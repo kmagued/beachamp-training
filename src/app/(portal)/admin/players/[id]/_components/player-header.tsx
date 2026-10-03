@@ -19,6 +19,7 @@ export function PlayerHeader({ player, isCurrentlyActive, actions }: PlayerHeade
           {player.first_name} {player.last_name}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-primary-700/60">
+          {player.role === "admin" && <Badge variant="info">Admin</Badge>}
           <Badge variant={isCurrentlyActive ? "success" : "neutral"}>
             {isCurrentlyActive ? "Active" : "Inactive"}
           </Badge>

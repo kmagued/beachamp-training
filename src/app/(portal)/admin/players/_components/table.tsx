@@ -250,9 +250,12 @@ export function PlayersTableView(props: PlayersTableProps) {
                     </td>
                     {/* Sticky left: player */}
                     <td className={cn(tdBase, "sticky left-12 z-10 min-w-[150px] border-r border-r-slate-100 transition-colors", selected ? "group-hover:bg-primary-100" : "group-hover:bg-primary-50", rowBg)}>
-                      <p className="text-sm font-medium text-slate-900">
-                        {player.first_name} {player.last_name}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-slate-900">
+                          {player.first_name} {player.last_name}
+                        </p>
+                        {player.role === "admin" && <Badge variant="info">Admin</Badge>}
+                      </div>
                       <p className="text-xs text-slate-400 truncate max-w-[200px]">{player.email}</p>
                     </td>
                     {/* Scrollable middle */}
@@ -411,6 +414,7 @@ export function PlayersTableView(props: PlayersTableProps) {
                     <p className="text-[15px] font-semibold text-primary-900 truncate">
                       {player.first_name} {player.last_name}
                     </p>
+                    {player.role === "admin" && <Badge variant="info">Admin</Badge>}
                     <ActivityIcon status={activity} />
                   </div>
                   <p className="text-[11px] text-primary-700/50 truncate mt-0.5">{player.email}</p>
