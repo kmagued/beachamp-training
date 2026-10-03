@@ -466,6 +466,32 @@ invite with the service role and shows one of:
 - After the email code, `verifyEmailOtp()` lands them in the coach portal, because their
   role is coach.
 
+## Schedule changes: admins and a group's primary coach (added at the user's request)
+
+**Before this branch:**
+
+- Every schedule change was admin-only on the server: create a weekly or one-off
+  session, edit, remove, cancel a date.
+- A coach's group page still showed Add, Edit and Delete buttons, and they always
+  failed.
+
+**Now:**
+
+- Admins change any session, as before. The active primary coach of a group changes
+  that group's sessions:
+  - add, edit and remove weekly sessions (the group page's Schedule tab)
+  - add a one-off session, change times, and cancel a date (the calendar)
+- Only admins choose which coach runs a session. A primary coach's new session is
+  theirs, and their edits keep the session's coach.
+- Private sessions have no group, so they stay with admins.
+- Other coaches see the schedule read-only, with no edit controls.
+- Rules are in `src/lib/scheduling/edit-access.ts`:
+  - `canEditGroupSchedule(editor, groupId)`
+  - `sessionCoachId(editor, requested, existing?)`
+- The five schedule actions in `training.ts` load the caller's primary groups, check
+  the session's group, and then write with the service role. The schedule's database
+  rules stay admin-only.
+
 ## Player portal
 
 A player who coaches is also on the coach lists that players see, so they must not be
@@ -597,6 +623,15 @@ able to choose themselves:
     coaches doesn't.
 13. As a plain player, in the browser console, try to update your own `role` through
     the Supabase client. The database refuses it.
+14. As a group's primary coach:
+    - the group page's Schedule tab and the calendar let you add, edit and cancel that
+      group's sessions
+    - there is no coach picker
+    - other groups' sessions have no edit controls
+    As an assistant coach of the same group, the Schedule tab is read-only.
+15. In a session's Attendance tab, players with saved attendance come first, then those
+    with a subscription, then the rest by name, the same as the Daily Report.
+    Marking a player doesn't move their row.
 
 ## Out of scope
 
