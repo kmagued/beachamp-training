@@ -14,6 +14,7 @@ import {
   toCairoIso,
 } from "@/lib/clash/client";
 import { PLAYERS_FILTER } from "@/lib/players/filter";
+import { paymentPrompt, privatePackageFor, sessionWhen } from "@/lib/private-sessions/payment";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -402,6 +403,17 @@ function addMinutesToTime(start: string, minutes: number): string {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+/** The active private package for a session with this many players, or null. Not exported:
+ *  in a "use server" file that would make it a public endpoint. */
+async function privatePackageForCount(admin: ReturnType<typeof createAdminClient>, playerCount: number) {
+  const { data } = await admin
+    .from("packages")
+    .select("id, price, private_session_players")
+    .not("private_session_players", "is", null)
+    .eq("is_active", true);
+  return privatePackageFor(playerCount, (data || []) as { id: string; price: number; private_session_players: number | null }[]);
+}
+
 export async function confirmPrivateSessionRequest(
   requestId: string,
   sessionDate: string,
@@ -504,12 +516,16 @@ export async function confirmPrivateSessionRequest(
   if (updateErr) return { error: updateErr.message };
 
   const dayName = DAY_NAMES[req.requested_day_of_week];
+  // The player who booked pays; they're told what and where when a package fits the session
+  const payPkg = await privatePackageForCount(admin, partnerPlayerId ? 2 : 1);
   await createNotification({
     user_id: req.player_id,
     title: "Private Session Confirmed",
-    body: `Your private session has been scheduled for ${dayName} ${sessionDate} at ${startTime}.`,
+    body: payPkg
+      ? paymentPrompt(sessionWhen(sessionDate, startTime), payPkg.price)
+      : `Your private session has been scheduled for ${dayName} ${sessionDate} at ${startTime}.`,
     type: "private_session",
-    link: "/player/private-sessions",
+    link: payPkg ? "/player/dashboard" : "/player/private-sessions",
   });
 
   if (partnerPlayerId) {
@@ -698,13 +714,19 @@ export async function createAdminPrivateSession(data: {
     if ("error" in reserveRes) return { error: reserveRes.error };
   }
 
+  // The first player pays (the session's player_id); they're told what and where when a
+  // package fits the session
+  const payPkg = await privatePackageForCount(admin, playerIds.length);
   for (const pid of playerIds) {
+    const pays = pid === playerIds[0] ? payPkg : null;
     await createNotification({
       user_id: pid,
       title: "Private Session Scheduled",
-      body: `A private session has been scheduled for ${data.session_date} at ${start}.`,
+      body: pays
+        ? paymentPrompt(sessionWhen(data.session_date, start), pays.price)
+        : `A private session has been scheduled for ${data.session_date} at ${start}.`,
       type: "private_session",
-      link: "/player/private-sessions",
+      link: pays ? "/player/dashboard" : "/player/private-sessions",
     });
   }
 

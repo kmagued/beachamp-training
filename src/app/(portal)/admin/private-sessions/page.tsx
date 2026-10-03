@@ -9,6 +9,7 @@ import { CreatePrivateSessionButton } from "./_components/create-private-session
 import { DeletePrivateSessionButton } from "./_components/delete-private-session-button";
 import { PrivateSessionsTabs } from "./_components/private-sessions-tabs";
 import { PLAYERS_FILTER } from "@/lib/players/filter";
+import { paymentState, privatePackageFor, type PaymentState } from "@/lib/private-sessions/payment";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -21,6 +22,14 @@ function statusBadge(status: string) {
     case "completed": return <Badge variant="info">Completed</Badge>;
     default: return <Badge variant="neutral">{status}</Badge>;
   }
+}
+
+/** Where a scheduled session's payment stands; "—" when no package fits it or it has no payer */
+function PaymentBadge({ state }: { state: PaymentState | null }) {
+  if (state === "paid") return <Badge variant="success">Paid</Badge>;
+  if (state === "pending") return <Badge variant="warning">Payment pending</Badge>;
+  if (state === "unpaid") return <Badge variant="neutral">Unpaid</Badge>;
+  return <span className="text-sm text-slate-400">—</span>;
 }
 
 function formatTime(time: string) {
@@ -51,7 +60,7 @@ export default async function AdminPrivateSessionsPage() {
     supabase
       .from("schedule_sessions")
       .select(`
-        id, end_date, start_time, end_time, location, created_at,
+        id, player_id, end_date, start_time, end_time, location, created_at,
         private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(first_name, last_name, phone)),
         coach:profiles!schedule_sessions_coach_id_fkey(first_name, last_name)
       `)
@@ -71,6 +80,20 @@ export default async function AdminPrivateSessionsPage() {
       .eq("is_active", true)
       .order("first_name"),
   ]);
+
+  // Payments linked to private sessions, and the packages that price them
+  const [{ data: linkedSubs }, { data: privatePackages }] = await Promise.all([
+    supabase.from("subscriptions").select("private_session_id, status").not("private_session_id", "is", null),
+    supabase
+      .from("packages")
+      .select("id, private_session_players")
+      .not("private_session_players", "is", null)
+      .eq("is_active", true),
+  ]);
+  const linkedBySession = new Map<string, string[]>();
+  for (const l of (linkedSubs || []) as { private_session_id: string; status: string }[]) {
+    linkedBySession.set(l.private_session_id, [...(linkedBySession.get(l.private_session_id) ?? []), l.status]);
+  }
 
   const items = (requests || []) as {
     id: string;
@@ -92,6 +115,7 @@ export default async function AdminPrivateSessionsPage() {
 
   const scheduledItems = ((scheduled || []) as {
     id: string;
+    player_id: string | null;
     end_date: string | null;
     start_time: string;
     end_time: string;
@@ -103,7 +127,9 @@ export default async function AdminPrivateSessionsPage() {
     const players = (s.private_players || [])
       .map((pp) => pp.profiles)
       .filter((p): p is { first_name: string; last_name: string; phone: string | null } => Boolean(p));
-    return { ...s, players };
+    const pkg = privatePackageFor((s.private_players || []).length, privatePackages || []);
+    const payment: PaymentState | null = pkg && s.player_id ? paymentState(linkedBySession.get(s.id) ?? []) : null;
+    return { ...s, players, payment };
   });
 
   const today = new Date();
@@ -168,6 +194,7 @@ export default async function AdminPrivateSessionsPage() {
                       <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Time</th>
                       <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Coach</th>
                       <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Location</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Payment</th>
                       <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3">Status</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -205,6 +232,9 @@ export default async function AdminPrivateSessionsPage() {
                             {s.coach ? `${s.coach.first_name} ${s.coach.last_name}` : "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-600">{s.location || "—"}</td>
+                          <td className="px-4 py-3">
+                            <PaymentBadge state={s.payment} />
+                          </td>
                           <td className="px-4 py-3">
                             {isPast ? (
                               <Badge variant="neutral">Past</Badge>
@@ -297,6 +327,10 @@ export default async function AdminPrivateSessionsPage() {
                           <p className="text-slate-700 font-medium">{s.location}</p>
                         </div>
                       )}
+                      <div>
+                        <span className="text-slate-400 block mb-0.5">Payment</span>
+                        <PaymentBadge state={s.payment} />
+                      </div>
                     </div>
                   </Card>
                 );
