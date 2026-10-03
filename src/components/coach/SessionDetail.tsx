@@ -5,11 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { getLevelLabel } from "@/lib/config/branding";
-import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, Target } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Users, Calendar, ClipboardCheck, Target, Trophy } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
 import { SessionPlanTab } from "./SessionPlanTab";
+import { ScoresTab } from "@/components/leaderboard/scores-tab";
+import { scoringProblem } from "@/lib/king-of-court/access";
 
 interface PrivatePlayer {
   id: string;
@@ -24,6 +26,8 @@ interface SessionInfo {
   group_id: string | null;
   group_name: string;
   group_level: string;
+  /** Whether the group plays King of Court; null when the session has no group */
+  in_leaderboard: boolean | null;
   private_players: PrivatePlayer[];
   coach_id: string | null;
   coach_name: string | null;
@@ -41,6 +45,8 @@ interface SessionDetailProps {
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
+  // Admins only, and only for sessions that play King of Court (see canScore)
+  { key: "scores", label: "Scores", icon: Trophy },
   { key: "plan", label: "Plan", icon: Target },
 ] as const;
 
@@ -91,7 +97,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
     async function load() {
       const { data } = await supabase
         .from("schedule_sessions")
-        .select("id, session_type, group_id, player_id, coach_id, day_of_week, start_time, end_time, location, groups(id, name, level), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(id, first_name, last_name, avatar_url)), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
+        .select("id, session_type, group_id, player_id, coach_id, day_of_week, start_time, end_time, location, groups(id, name, level, in_leaderboard), private_players:schedule_session_players(profiles!schedule_session_players_player_id_fkey(id, first_name, last_name, avatar_url)), profiles!schedule_sessions_coach_id_fkey(first_name, last_name)")
         .eq("id", scheduleSessionId)
         .single();
 
@@ -135,6 +141,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
         group_id: d.group_id,
         group_name: isPrivate ? privateDisplay : (d.groups?.name || "Unknown"),
         group_level: isPrivate ? "private" : (d.groups?.level || "mixed"),
+        in_leaderboard: d.groups?.in_leaderboard ?? null,
         private_players: privatePlayers,
         coach_id: d.coach_id,
         coach_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : null,
@@ -172,6 +179,10 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
       </div>
     );
   }
+
+  // Scores are admin-only, as in the Daily Report; coaches see Attendance and Plan
+  const canScore = basePath === "/admin" && scoringProblem(session) === null;
+  const tabs = TABS.filter((tab) => tab.key !== "scores" || canScore);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -211,7 +222,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
           return (
@@ -231,23 +242,31 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
         })}
       </div>
 
-      {/* Tab Content */}
-      <Card>
-        {activeTab === "attendance" && (
-          <AttendanceTab
-            scheduleSessionId={session.id}
-            groupId={session.group_id}
-            groupName={session.group_name}
-            sessionDate={dateParam}
-            startTime={session.start_time}
-            endTime={session.end_time}
-            privatePlayers={session.session_type === "private" ? session.private_players : null}
-          />
-        )}
-        {activeTab === "plan" && (
-          <SessionPlanTab scheduleSessionId={session.id} sessionDate={dateParam} />
-        )}
-      </Card>
+      {/* Tab Content (Scores brings its own card) */}
+      {activeTab === "scores" && canScore ? (
+        <ScoresTab
+          date={dateParam}
+          scheduleSessionId={session.id}
+          onOpenAttendance={() => setActiveTab("attendance")}
+        />
+      ) : (
+        <Card>
+          {activeTab === "attendance" && (
+            <AttendanceTab
+              scheduleSessionId={session.id}
+              groupId={session.group_id}
+              groupName={session.group_name}
+              sessionDate={dateParam}
+              startTime={session.start_time}
+              endTime={session.end_time}
+              privatePlayers={session.session_type === "private" ? session.private_players : null}
+            />
+          )}
+          {activeTab === "plan" && (
+            <SessionPlanTab scheduleSessionId={session.id} sessionDate={dateParam} />
+          )}
+        </Card>
+      )}
     </div>
   );
 }

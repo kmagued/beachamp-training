@@ -44,7 +44,20 @@ function boxesFor(players: PresentPlayer[], saved: Record<string, number>): Reco
   return Object.fromEntries(players.map((p) => [p.id, p.id in saved ? String(saved[p.id]) : ""]));
 }
 
-export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAttendance: () => void }) {
+/**
+ * King of Court scoring for a date: a card per group session on the leaderboard. Used by the
+ * Daily Report for the whole day, and by a session's page for that one session.
+ */
+export function ScoresTab({
+  date,
+  onOpenAttendance,
+  scheduleSessionId,
+}: {
+  date: string;
+  onOpenAttendance: () => void;
+  /** Only this session, instead of every session that day */
+  scheduleSessionId?: string;
+}) {
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [bySession, setBySession] = useState<Record<string, SessionScores>>({});
   const [loading, setLoading] = useState(true);
@@ -75,13 +88,14 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
       setLoading(true);
       const dayOfWeek = new Date(date + "T00:00:00").getDay();
 
-      const { data: sessionData } = await supabase
+      let sessionQuery = supabase
         .from("schedule_sessions")
         .select("id, start_time, end_time, location, end_date, created_at, groups(name, level, in_leaderboard)")
         .eq("day_of_week", dayOfWeek)
         .eq("is_active", true)
-        .eq("session_type", "group")
-        .order("start_time");
+        .eq("session_type", "group");
+      if (scheduleSessionId) sessionQuery = sessionQuery.eq("id", scheduleSessionId);
+      const { data: sessionData } = await sessionQuery.order("start_time");
 
       if (cancelled) return;
 
@@ -150,7 +164,7 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, reloadKey]);
+  }, [date, reloadKey, scheduleSessionId]);
 
   function setBox(sessionId: string, playerId: string, text: string) {
     setBySession((prev) => ({
@@ -229,14 +243,18 @@ export function ScoresTab({ date, onOpenAttendance }: { date: string; onOpenAtte
   }
 
   if (sessions.length === 0) {
+    const weekday = new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
     return (
       <Card>
         <div className="text-center py-10">
           <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-700">No group sessions</p>
+          <p className="text-sm font-medium text-slate-700">
+            {scheduleSessionId ? "Nothing to score" : "No group sessions"}
+          </p>
           <p className="text-xs text-slate-400 mt-1">
-            There are no group sessions on{" "}
-            {new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })}
+            {scheduleSessionId
+              ? `This session isn't on the schedule on ${weekday}`
+              : `There are no group sessions on ${weekday}`}
           </p>
         </div>
       </Card>

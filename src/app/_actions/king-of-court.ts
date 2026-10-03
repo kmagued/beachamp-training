@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { cairoMonthKey, cairoToday } from "@/lib/utils/cairo-time";
+import { scoringProblem } from "@/lib/king-of-court/access";
 import { awardNotification, canCloseMonth, monthAwards } from "@/lib/king-of-court/awards";
 import { formatMonth } from "@/lib/king-of-court/format";
 import { loadLeaderboard } from "@/lib/king-of-court/load";
@@ -72,12 +73,8 @@ export async function saveKingOfCourtScores(data: {
     .select("id, group_id, session_type, groups(in_leaderboard)")
     .eq("id", data.schedule_session_id)
     .maybeSingle();
-  if (!session || session.session_type !== "group" || !session.group_id) {
-    return { error: "Scores can only be logged for group sessions" };
-  }
-  if (session.groups?.in_leaderboard === false) {
-    return { error: "This group isn't on the leaderboard, so it has no scores" };
-  }
+  const notScored = scoringProblem(session && { ...session, in_leaderboard: session.groups?.in_leaderboard });
+  if (notScored) return { error: notScored };
 
   const { data: presentRows, error: attErr } = await admin
     .from("attendance")

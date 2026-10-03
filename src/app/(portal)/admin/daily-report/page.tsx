@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format-date";
 import { DatePicker } from "@/components/ui";
 import { AttendanceTab } from "./_components/attendance-tab";
-import { ScoresTab } from "./_components/scores-tab";
+import { ScoresTab } from "@/components/leaderboard/scores-tab";
 import { CoachesTab } from "./_components/coaches-tab";
 import { ExpensesTab } from "./_components/expenses-tab";
 import { PaymentsTab } from "./_components/payments-tab";

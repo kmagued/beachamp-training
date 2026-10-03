@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupsForViewer, groupsToShow, openingGroup, type GroupRow } from "./access";
+import { groupsForViewer, groupsToShow, openingGroup, scoringProblem, type GroupRow } from "./access";
 
 /** A group row; defaults to active and on the leaderboard */
 function g(id: string, extra: Partial<GroupRow> = {}): GroupRow {
@@ -45,4 +45,24 @@ test("openingGroup: otherwise the first group with scores, else the first group"
 
 test("openingGroup: a tab that isn't shown this month (e.g. after changing month) falls back", () => {
   assert.equal(openingGroup(["a", "b"], new Set(["b"]), "old"), "b");
+});
+
+test("scoringProblem: a group session on the leaderboard can be scored", () => {
+  assert.equal(scoringProblem({ session_type: "group", group_id: "g1", in_leaderboard: true }), null);
+  // Older rows may not say either way: only an explicit false takes a group off the leaderboard
+  assert.equal(scoringProblem({ session_type: "group", group_id: "g1", in_leaderboard: null }), null);
+});
+
+test("scoringProblem: private sessions and sessions without a group can't be scored", () => {
+  const groupOnly = "Scores can only be logged for group sessions";
+  assert.equal(scoringProblem({ session_type: "private", group_id: null, in_leaderboard: null }), groupOnly);
+  assert.equal(scoringProblem({ session_type: "group", group_id: null, in_leaderboard: true }), groupOnly);
+  assert.equal(scoringProblem(null), groupOnly);
+});
+
+test("scoringProblem: a group off the leaderboard has no scores", () => {
+  assert.equal(
+    scoringProblem({ session_type: "group", group_id: "g1", in_leaderboard: false }),
+    "This group isn't on the leaderboard, so it has no scores"
+  );
 });
