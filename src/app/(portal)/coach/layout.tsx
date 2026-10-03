@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
-import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { accountOf, coachOrAdmin, portalsFor } from "@/lib/auth/portals";
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
   const currentUser = await getCurrentUser();
@@ -14,7 +14,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <SidebarLayout portal="coach" user={currentUser.profile}>
+    <SidebarLayout portal="coach" portals={portalsFor(account)} user={currentUser.profile}>
       {children}
     </SidebarLayout>
   );

@@ -43,8 +43,7 @@ import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
 import { MobileTabBar } from "./mobile-tab-bar";
 import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
-
-type Portal = "player" | "coach" | "admin";
+import type { Portal } from "@/lib/auth/portals";
 
 /** foldSections: section headings fold their links away (for portals with long menus) */
 const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string; foldSections: boolean }> = {
@@ -153,16 +152,22 @@ function NavBadge({ label }: { label: string }) {
   );
 }
 
-/** Development only: jump between the three portals */
-function DevPortalSwitcher({ portal }: { portal: Portal }) {
+/** Links between the views this account has (a player who coaches: Player | Coach).
+ *  In development, all three portals. */
+function PortalSwitcher({ portal, portals }: { portal: Portal; portals: Portal[] }) {
+  const dev = process.env.NODE_ENV === "development";
+  const shown: Portal[] = dev ? ["admin", "coach", "player"] : portals;
   return (
     <>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">Switch Portal</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-700/40 px-3 mb-1.5">
+        {dev ? "Switch Portal" : "Switch view"}
+      </p>
       <div className="flex gap-1">
-        {(["admin", "coach", "player"] as const).map((p) => (
+        {shown.map((p) => (
           <a
             key={p}
             href={`/${p}/dashboard`}
+            aria-current={portal === p ? "page" : undefined}
             className={cn(
               "flex-1 text-center py-1.5 rounded-md text-[11px] font-medium transition-colors",
               portal === p
@@ -180,6 +185,8 @@ function DevPortalSwitcher({ portal }: { portal: Portal }) {
 
 interface SidebarLayoutProps {
   portal: Portal;
+  /** The views this account can open (portalsFor); more than one shows the switcher */
+  portals: Portal[];
   user: Pick<Profile, "id" | "first_name" | "last_name" | "role" | "email">;
   children: React.ReactNode;
 }
@@ -187,7 +194,7 @@ interface SidebarLayoutProps {
 const SIDEBAR_W = 220;
 const SIDEBAR_COLLAPSED_W = 64;
 
-export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
+export function SidebarLayout({ portal, portals, user, children }: SidebarLayoutProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -195,7 +202,14 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
   const navItems = portal === "admin" ? adminNav : portal === "coach" ? coachNav : playerNav;
 
   const initials = `${(user.first_name || "")[0] || ""}${(user.last_name || "")[0] || ""}`.toUpperCase() || "U";
-  const notifHref = portal === "admin" ? "/admin/notifications" : portal === "coach" ? "/coach/notifications" : "/player/notifications";
+  // There's no coach notifications page yet: a player who coaches reads theirs on the player side
+  const notifHref =
+    portal === "admin"
+      ? "/admin/notifications"
+      : portal === "coach" && !portals.includes("player")
+        ? "/coach/notifications"
+        : "/player/notifications";
+  const showSwitcher = process.env.NODE_ENV === "development" || portals.length > 1;
 
   const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
   const matched = sortedNav.find((item) => pathname.startsWith(item.href))?.key;
@@ -395,10 +409,10 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
               })}
         </nav>
 
-        {/* Dev portal switcher */}
-        {process.env.NODE_ENV === "development" && !collapsed && (
+        {/* View switcher */}
+        {showSwitcher && !collapsed && (
           <div className="px-3 border-t border-primary-200/60 pt-3 pb-4 mt-2">
-            <DevPortalSwitcher portal={portal} />
+            <PortalSwitcher portal={portal} portals={portals} />
           </div>
         )}
 
@@ -541,9 +555,9 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
                   })}
             </nav>
 
-            {process.env.NODE_ENV === "development" && (
+            {showSwitcher && (
               <div className="px-3 border-t border-primary-200/60 pt-3 pb-4">
-                <DevPortalSwitcher portal={portal} />
+                <PortalSwitcher portal={portal} portals={portals} />
               </div>
             )}
           </div>
@@ -556,7 +570,7 @@ export function SidebarLayout({ portal, user, children }: SidebarLayoutProps) {
           items={navItems.map((item) => ({ ...item, icon: iconMap[item.key as keyof typeof iconMap] }))}
           activeKey={activeKey}
           layout={config.foldSections ? "sections" : "tiles"}
-          footer={process.env.NODE_ENV === "development" ? <DevPortalSwitcher portal={portal} /> : undefined}
+          footer={showSwitcher ? <PortalSwitcher portal={portal} portals={portals} /> : undefined}
         />
       )}
 
