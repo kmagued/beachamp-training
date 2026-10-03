@@ -8,6 +8,7 @@ import { ActionButtons } from "./_components/action-buttons";
 import { CreatePrivateSessionButton } from "./_components/create-private-session-button";
 import { DeletePrivateSessionButton } from "./_components/delete-private-session-button";
 import { PrivateSessionsTabs } from "./_components/private-sessions-tabs";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -60,7 +61,7 @@ export default async function AdminPrivateSessionsPage() {
     supabase
       .from("profiles")
       .select("id, first_name, last_name")
-      .eq("role", "player")
+      .or(PLAYERS_FILTER)
       .eq("is_active", true)
       .order("first_name"),
     supabase

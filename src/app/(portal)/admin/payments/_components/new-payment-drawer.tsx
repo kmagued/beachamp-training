@@ -8,6 +8,7 @@ import { Input, Select, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createAdminPayment, createStandalonePayment } from "../actions";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 interface PackageOption {
   id: string;
@@ -129,7 +130,7 @@ export function NewPaymentDrawer({
       let query = supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
-        .eq("role", "player")
+        .or(PLAYERS_FILTER)
         .eq("is_active", true);
       if (words.length >= 2) {
         query = query.or(

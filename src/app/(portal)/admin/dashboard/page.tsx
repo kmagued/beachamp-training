@@ -11,6 +11,7 @@ import { BirthdaysCard } from "./_components/birthdays-card";
 import type { PackageIncome } from "./_components/income-by-package";
 import { addDays, cairoMonthKey, cairoNowYearMonth, cairoToday } from "@/lib/utils/cairo-time";
 import { getBirthdays } from "@/app/_actions/birthdays";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 export default async function AdminDashboard() {
   const currentUser = await getCurrentUser();
@@ -43,7 +44,7 @@ export default async function AdminDashboard() {
     supabase
       .from("profiles")
       .select("id, created_at", { count: "exact" })
-      .eq("role", "player"),
+      .or(PLAYERS_FILTER),
     supabase
       .from("payments")
       .select("amount", { count: "exact" })

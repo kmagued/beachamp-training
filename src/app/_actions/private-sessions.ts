@@ -12,6 +12,7 @@ import {
   isClashConfigured,
   toCairoIso,
 } from "@/lib/clash/client";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -727,7 +728,7 @@ export async function searchPlayersForPartner(query: string): Promise<{ id: stri
   const { data } = await admin
     .from("profiles")
     .select("id, first_name, last_name")
-    .eq("role", "player")
+    .or(PLAYERS_FILTER)
     .eq("is_active", true)
     .neq("id", user.id)
     .or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`)
