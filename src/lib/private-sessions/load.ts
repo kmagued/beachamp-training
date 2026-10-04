@@ -69,6 +69,8 @@ export function buildUpcoming(input: {
   packages: { id: string; price: number; private_session_players: number | null }[];
   playerId: string;
   limit: number;
+  /** false when the linked payments couldn't be read: the state is unknown, not unpaid */
+  paymentsKnown?: boolean;
 }): UpcomingSession[] {
   return input.sessions
     .filter((s) => s.end_date && !input.cancelled.has(`${s.id}|${s.end_date}`))
@@ -76,7 +78,7 @@ export function buildUpcoming(input: {
     .map((s) => {
       const pkg = privatePackageFor(s.private_players.length, input.packages);
       const statuses = input.linked.filter((l) => l.private_session_id === s.id).map((l) => l.status);
-      const state = pkg && s.player_id ? paymentState(statuses) : null;
+      const state = input.paymentsKnown !== false && pkg && s.player_id ? paymentState(statuses) : null;
       const youPay = s.player_id === input.playerId;
       const payer = s.private_players.find((p) => p.player_id === s.player_id)?.profiles ?? null;
       return {
@@ -136,7 +138,7 @@ export async function loadPlayerPrivateSessions(
   if (rows.length === 0) return { pending, upcoming: [] };
 
   const rowIds = rows.map((s) => s.id);
-  const [{ data: cancellations }, { data: linked }, { data: packages }] = await Promise.all([
+  const [{ data: cancellations }, { data: linked, error: linkedError }, { data: packages }] = await Promise.all([
     admin
       .from("schedule_session_cancellations")
       .select("schedule_session_id, cancelled_date")
@@ -164,6 +166,8 @@ export async function loadPlayerPrivateSessions(
       packages: packages || [],
       playerId,
       limit: UPCOMING_LIMIT,
+      // e.g. a database without private_session_id yet: never offer Pay on a guess
+      paymentsKnown: !linkedError,
     }),
   };
 }

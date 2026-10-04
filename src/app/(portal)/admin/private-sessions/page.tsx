@@ -82,7 +82,7 @@ export default async function AdminPrivateSessionsPage() {
   ]);
 
   // Payments linked to private sessions, and the packages that price them
-  const [{ data: linkedSubs }, { data: privatePackages }] = await Promise.all([
+  const [{ data: linkedSubs, error: linkedError }, { data: privatePackages }] = await Promise.all([
     supabase.from("subscriptions").select("private_session_id, status").not("private_session_id", "is", null),
     supabase
       .from("packages")
@@ -128,7 +128,9 @@ export default async function AdminPrivateSessionsPage() {
       .map((pp) => pp.profiles)
       .filter((p): p is { first_name: string; last_name: string; phone: string | null } => Boolean(p));
     const pkg = privatePackageFor((s.private_players || []).length, privatePackages || []);
-    const payment: PaymentState | null = pkg && s.player_id ? paymentState(linkedBySession.get(s.id) ?? []) : null;
+    // Unknown (shown as "—") when the linked payments couldn't be read, not Unpaid
+    const payment: PaymentState | null =
+      !linkedError && pkg && s.player_id ? paymentState(linkedBySession.get(s.id) ?? []) : null;
     return { ...s, players, payment };
   });
 

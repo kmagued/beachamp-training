@@ -84,3 +84,9 @@ test("requestWhen: the requested date when there is one, else the day of the wee
   assert.equal(requestWhen({ requested_date: "2026-10-10", requested_day_of_week: 6, requested_time: "20:00:00" }), "Sat 10 Oct at 8:00 PM");
   assert.equal(requestWhen({ requested_date: null, requested_day_of_week: 2, requested_time: "18:30:00" }), "Tue at 6:30 PM");
 });
+
+test("buildUpcoming: when payments can't be read, there's no state and no Pay button", () => {
+  const [s] = build([session()], "booker", { paymentsKnown: false });
+  assert.equal(s.state, null);
+  assert.equal(s.pay, null);
+});
