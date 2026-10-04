@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Drawer, Toast } from "@/components/ui";
 import { ShieldCheck, Plus, Search, Loader2, Mail, Phone } from "lucide-react";
-import { updateUserRole, updateUserIsCoach } from "./actions";
+import { updateUserRole, updateUserIsCoach, updateUserIsPlayer } from "./actions";
 import type { UserRole } from "@/types/database";
 
 interface AdminUser {
@@ -15,6 +15,7 @@ interface AdminUser {
   phone: string | null;
   is_active: boolean;
   is_coach: boolean;
+  is_player: boolean;
   created_at: string;
 }
 
@@ -75,7 +76,7 @@ function AdminUsersContent() {
       supabase.auth.getUser(),
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, is_active, is_coach, created_at")
+        .select("id, first_name, last_name, email, phone, is_active, is_coach, is_player, created_at")
         .eq("role", "admin")
         .order("first_name"),
     ]);
@@ -138,6 +139,19 @@ function AdminUsersContent() {
       setToast({ message: result.error, variant: "error" });
     } else {
       setToast({ message: next ? "Coach access granted" : "Coach access removed", variant: "success" });
+    }
+  }
+
+  async function handleTogglePlayer(userId: string, next: boolean) {
+    // Optimistic
+    setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, is_player: next } : a));
+    const result = await updateUserIsPlayer(userId, next);
+    if (result.error) {
+      // Revert
+      setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, is_player: !next } : a));
+      setToast({ message: result.error, variant: "error" });
+    } else {
+      setToast({ message: next ? "Player access granted" : "Player access removed", variant: "success" });
     }
   }
 
@@ -230,6 +244,17 @@ function AdminUsersContent() {
                       }`}
                     >
                       {admin.is_coach ? "✓ Coach" : "+ Coach"}
+                    </button>
+                    <button
+                      onClick={() => handleTogglePlayer(admin.id, !admin.is_player)}
+                      title={admin.is_player ? "Click to remove player access" : "Click to also add as a player"}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                        admin.is_player
+                          ? "border-primary bg-primary-50 text-primary hover:bg-primary-100"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      {admin.is_player ? "✓ Player" : "+ Player"}
                     </button>
                     {!isSelf && (
                       <button

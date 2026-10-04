@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
 import { getLevelLabel } from "@/lib/config/branding";
 
 /**
@@ -8,6 +9,9 @@ import { getLevelLabel } from "@/lib/config/branding";
  * Keys are always present in the returned map; values are null when unresolved.
  */
 export async function resolvePlayerVariables(playerId: string): Promise<Map<string, string | null>> {
+  // Admins only: this reads a player's contact details and subscriptions with the service role
+  if (!(await isAdminCaller())) return new Map();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const today = new Date().toISOString().slice(0, 10);

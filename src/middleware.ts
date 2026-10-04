@@ -71,9 +71,10 @@ export async function middleware(request: NextRequest) {
 
     // Redirect away from login/register/verify-email if already verified
     if (pathname === "/login" || pathname === "/register" || pathname === "/verify-email") {
+      // Every column rather than a list: routing keeps working on a database that doesn't have a newer access column (is_player) yet
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, is_coach")
+        .select("*")
         .eq("id", user.id)
         .single();
 
@@ -87,7 +88,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/admin") || pathname.startsWith("/coach") || pathname.startsWith("/player")) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, is_coach")
+        .select("*")
         .eq("id", user.id)
         .single();
 

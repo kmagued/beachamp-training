@@ -6,6 +6,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { Input, Textarea, Label, Button } from "@/components/ui";
 import { Loader2, Search, X } from "lucide-react";
 import { createFeedback } from "../actions";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 interface PlayerOption {
   id: string;
@@ -61,7 +62,7 @@ export function NewFeedbackDrawer({ open, onClose, onSuccess }: NewFeedbackDrawe
       let query = supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
-        .eq("role", "player")
+        .or(PLAYERS_FILTER)
         .eq("is_active", true);
       if (words.length >= 2) {
         query = query.or(

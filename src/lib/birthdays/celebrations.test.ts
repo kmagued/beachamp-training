@@ -11,7 +11,7 @@ import {
 // October 2026: Sat 3, Sun 4, Mon 5, Tue 6, Wed 7, Thu 8, Fri 9, Sat 10, Sun 11, Mon 12
 
 function player(over: Partial<BirthdayPlayer> = {}): BirthdayPlayer {
-  return { id: "p1", firstName: "Ahmed", lastName: "Fathy", avatarUrl: null, dateOfBirth: "2002-10-05", ...over };
+  return { id: "p1", firstName: "Ahmed", lastName: "Fathy", avatarUrl: null, dateOfBirth: "2002-10-05", phone: null, ...over };
 }
 
 /** Group A trains Mon + Thu at 18:00; the two weekdays are separate schedule rows */

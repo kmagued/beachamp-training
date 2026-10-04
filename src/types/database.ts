@@ -46,6 +46,7 @@ export interface Database {
           occupation: string | null;
           is_active: boolean;
           is_coach: boolean;
+          is_player: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;
@@ -74,6 +75,7 @@ export interface Database {
           occupation?: string | null;
           is_active?: boolean;
           is_coach?: boolean;
+          is_player?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -102,6 +104,7 @@ export interface Database {
           occupation?: string | null;
           is_active?: boolean;
           is_coach?: boolean;
+          is_player?: boolean;
           profile_completed?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -187,6 +190,8 @@ export interface Database {
           body: string;
           is_active: boolean;
           sort_order: number;
+          /** 'birthday' marks the template the birthday drawer opens with */
+          purpose: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -197,6 +202,7 @@ export interface Database {
           body: string;
           is_active?: boolean;
           sort_order?: number;
+          purpose?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -207,6 +213,7 @@ export interface Database {
           body?: string;
           is_active?: boolean;
           sort_order?: number;
+          purpose?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -223,6 +230,7 @@ export interface Database {
           description: string | null;
           is_active: boolean;
           sort_order: number;
+          private_session_players: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -235,6 +243,7 @@ export interface Database {
           description?: string | null;
           is_active?: boolean;
           sort_order?: number;
+          private_session_players?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -247,6 +256,7 @@ export interface Database {
           description?: string | null;
           is_active?: boolean;
           sort_order?: number;
+          private_session_players?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -265,6 +275,7 @@ export interface Database {
           promo_code_id: string | null;
           frozen_at: string | null;
           frozen_days_remaining: number | null;
+          private_session_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -280,6 +291,7 @@ export interface Database {
           promo_code_id?: string | null;
           frozen_at?: string | null;
           frozen_days_remaining?: number | null;
+          private_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -295,6 +307,7 @@ export interface Database {
           promo_code_id?: string | null;
           frozen_at?: string | null;
           frozen_days_remaining?: number | null;
+          private_session_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1335,6 +1348,7 @@ export interface Database {
           occupation: string | null;
           is_active: boolean;
           is_coach: boolean;
+          is_player: boolean;
           profile_completed: boolean;
           created_at: string;
           updated_at: string;

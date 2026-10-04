@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatDateTime } from "@/lib/utils/format-date";
 import { updatePayment, linkPaymentToPlayer, deletePayment } from "../actions";
 import type { PaymentRow } from "./types";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 interface PlayerOption {
   id: string;
@@ -159,7 +160,7 @@ function DrawerContent({
       let query = supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
-        .eq("role", "player")
+        .or(PLAYERS_FILTER)
         .eq("is_active", true);
       if (words.length >= 2) {
         query = query.or(

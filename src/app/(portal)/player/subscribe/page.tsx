@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Alert, Input, Textarea, MultiSelect, Skeleton } from "@/components/ui";
 import { Check, Upload, CreditCard, Tag, Info, X } from "lucide-react";
@@ -12,6 +13,7 @@ import { branding } from "@/lib/config/branding";
 import { INSTAPAY } from "@/lib/config/payment";
 import { submitSubscription } from "./actions";
 import { validatePromoCode } from "@/app/(portal)/admin/promo-codes/actions";
+import { sessionWhen } from "@/lib/private-sessions/payment";
 import type { Package, Subscription, Profile } from "@/types/database";
 
 const paymentMethods = [
@@ -44,6 +46,9 @@ function SubscribePageSkeleton() {
 function PlayerSubscribeContent() {
   const searchParams = useSearchParams();
   const preselectedPackage = searchParams.get("package");
+  // Paying for a confirmed private session (the dashboard's Pay button): only its package
+  const privateSessionId = searchParams.get("privateSession");
+  const [privateWhen, setPrivateWhen] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -86,7 +91,17 @@ function PlayerSubscribeContent() {
         .select("*")
         .eq("is_active", true)
         .order("session_count", { ascending: true });
-      if (pkgs) setPackages(pkgs as Package[]);
+      if (pkgs) {
+        setPackages((privateSessionId ? pkgs.filter((p) => p.id === preselectedPackage) : pkgs) as Package[]);
+      }
+      if (privateSessionId) {
+        const { data: ps } = await supabase
+          .from("schedule_sessions")
+          .select("end_date, start_time")
+          .eq("id", privateSessionId)
+          .maybeSingle();
+        if (ps?.end_date) setPrivateWhen(sessionWhen(ps.end_date, ps.start_time));
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -176,6 +191,7 @@ function PlayerSubscribeContent() {
 
     const formData = new FormData();
     formData.set("package_id", selectedPackage);
+    if (privateSessionId) formData.set("private_session_id", privateSessionId);
     if (!isFree && selectedMethod) formData.set("method", selectedMethod);
     if (!isFree && screenshot) formData.set("screenshot", screenshot);
     if (promoResult?.valid && promoResult.promo_code_id) {
@@ -202,10 +218,16 @@ function PlayerSubscribeContent() {
             <Check className="w-7 h-7 text-emerald-600" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-2">
-            {result.activated ? "Subscription Activated" : "Subscription Request Submitted"}
+            {privateSessionId
+              ? "Payment Submitted"
+              : result.activated ? "Subscription Activated" : "Subscription Request Submitted"}
           </h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            {result.activated ? (
+            {privateSessionId ? (
+              result.activated
+                ? "Your promo code covered the full price, so your private session is paid."
+                : "Your payment for your private session is awaiting review. You'll be notified once the admin confirms it."
+            ) : result.activated ? (
               "Your promo code covered the full price, so your subscription is active now."
             ) : (
               <>
@@ -214,6 +236,11 @@ function PlayerSubscribeContent() {
               </>
             )}
           </p>
+          {privateSessionId && (
+            <Link href="/player/dashboard" className="inline-block mt-5">
+              <Button size="sm">Back to dashboard</Button>
+            </Link>
+          )}
         </Card>
       </div>
     );
@@ -268,12 +295,14 @@ function PlayerSubscribeContent() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-slate-900">
-          {activeSubscription ? "Renew Subscription" : "New Subscription"}
+          {privateSessionId ? "Pay for your private session" : activeSubscription ? "Renew Subscription" : "New Subscription"}
         </h1>
         <p className="text-slate-500 text-sm">
-          {activeSubscription
-            ? "Renew your training package to continue attending sessions."
-            : "Choose a training package and submit your payment to get started."}
+          {privateSessionId
+            ? privateWhen ? `For your private session on ${privateWhen}` : "For your private session"
+            : activeSubscription
+              ? "Renew your training package to continue attending sessions."
+              : "Choose a training package and submit your payment to get started."}
         </p>
       </div>
 
@@ -281,8 +310,8 @@ function PlayerSubscribeContent() {
         <Alert variant="error" className="mb-4">{result.error}</Alert>
       )}
 
-      {/* Current subscription info */}
-      {activeSubscription && (
+      {/* Current subscription info (not about a private session's payment) */}
+      {activeSubscription && !privateSessionId && (
         <Card className="mb-6 bg-primary-50/50 border-primary-200">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">

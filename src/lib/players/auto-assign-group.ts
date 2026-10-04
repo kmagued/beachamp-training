@@ -1,8 +1,8 @@
-"use server";
+// Server code only (called from server actions); not a public action, since it writes with the service role.
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSystemSetting } from "@/lib/settings/system-settings";
-import { notifyAdmins } from "@/app/_actions/notifications";
+import { notifyAdmins } from "@/lib/notifications/send";
 
 export type AutoAssignResult =
   | { assigned: true; groupId: string; groupName: string }

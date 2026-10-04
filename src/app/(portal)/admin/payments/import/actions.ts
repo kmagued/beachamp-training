@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
 import { revalidatePath } from "next/cache";
 import type { PaymentImportRow, PaymentImportResult, PackageInfo } from "./_components/types";
 
@@ -31,6 +32,8 @@ function formatDateYMD(date: Date): string {
 }
 
 export async function getPackageMap(): Promise<PackageInfo[]> {
+  if (!(await isAdminCaller())) return [];
+
   const admin = createAdminClient();
   const { data } = await admin
     .from("packages")
@@ -42,6 +45,8 @@ export async function getPackageMap(): Promise<PackageInfo[]> {
 export async function checkImportEmails(
   emails: string[]
 ): Promise<Record<string, string>> {
+  if (!(await isAdminCaller())) return {};
+
   if (emails.length === 0) return {};
   const admin = createAdminClient();
   const { data } = await admin
@@ -59,6 +64,10 @@ export async function checkImportEmails(
 export async function importBulkPayments(
   rows: PaymentImportRow[]
 ): Promise<PaymentImportResult[]> {
+  if (!(await isAdminCaller())) {
+    return rows.map((row) => ({ email: row.email, package: row.package, amount: row.amount, status: "error", error: "Not authorized" }));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const results: PaymentImportResult[] = [];

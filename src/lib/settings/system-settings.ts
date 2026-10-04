@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
 
 export type SystemSettingKey = "default_male_group_id" | "default_female_group_id";
 
@@ -23,6 +24,8 @@ export async function setSystemSetting(
   key: SystemSettingKey,
   value: Record<string, unknown>
 ): Promise<{ error?: string }> {
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const { error } = await admin.from("system_settings").upsert(
@@ -41,6 +44,8 @@ export async function setSystemSetting(
 export async function clearSystemSetting(
   key: SystemSettingKey
 ): Promise<{ error?: string }> {
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const { error } = await admin.from("system_settings").delete().eq("key", key);

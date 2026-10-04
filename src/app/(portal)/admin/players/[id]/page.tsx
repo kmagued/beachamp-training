@@ -10,6 +10,7 @@ import { SubscriptionHistory } from "./_components/subscription-history";
 import { SessionHistory } from "./_components/session-history";
 import { FeedbackHistory } from "./_components/feedback-history";
 import { PlayerActionsMenu } from "./_components/player-actions";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,9 +27,9 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, occupation, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at")
+      .select("id, role, first_name, last_name, email, phone, date_of_birth, area, gender, occupation, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at")
       .eq("id", id)
-      .eq("role", "player")
+      .or(PLAYERS_FILTER)
       .single(),
     supabase
       .from("subscriptions")

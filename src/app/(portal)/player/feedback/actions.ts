@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "@/app/_actions/notifications";
+import { createNotification } from "@/lib/notifications/send";
+import { accountOf, isPlayer } from "@/lib/auth/portals";
 
 export async function createCoachFeedback(input: {
   coach_id: string;
@@ -19,10 +20,10 @@ export async function createCoachFeedback(input: {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("id, role, first_name, last_name")
+    .select("id, role, is_player, first_name, last_name")
     .eq("id", user.id)
     .single();
-  if (!me || me.role !== "player") return { error: "Not authorized" };
+  if (!me || !isPlayer(accountOf(me))) return { error: "Not authorized" };
 
   const comment = input.comment.trim();
   if (!comment) return { error: "Please enter feedback" };

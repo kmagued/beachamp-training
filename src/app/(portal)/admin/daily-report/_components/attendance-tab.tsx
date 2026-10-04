@@ -10,6 +10,7 @@ import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/ac
 import { hasLapsed } from "@/lib/subscriptions/expiry";
 import { attendanceOrder } from "@/lib/attendance/order";
 import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
+import { heldForAnotherSession, isChargedOnSession } from "@/lib/private-sessions/payment";
 
 interface ScheduleSession {
   id: string;
@@ -51,6 +52,8 @@ interface PlayerSubscription {
   end_date: string | null;
   status: string;
   package_name: string;
+  /** The private session this subscription pays for, if any */
+  private_session_id: string | null;
 }
 
 interface AttendanceRecord {
@@ -74,6 +77,8 @@ export function AttendanceTab({ date }: { date: string }) {
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
   const [savedAttendanceState, setSavedAttendanceState] = useState<Record<string, SessionAttendanceState>>({});
   const [playerSessions, setPlayerSessions] = useState<Record<string, PlayerSubscription[]>>({});
+  // Private sessions still on the schedule that have a payment held for them
+  const [scheduledHeld, setScheduledHeld] = useState<Set<string>>(new Set());
   const [packages, setPackages] = useState<{ id: string; price: number; name: string; session_count: number }[]>([]);
   const [paymentDialog, setPaymentDialog] = useState<{ session: ScheduleSession; players: GroupPlayer[]; playerPackages: Record<string, string> } | null>(null);
   const [chosenSubs, setChosenSubs] = useState<Record<string, string>>({});
@@ -186,7 +191,7 @@ export function AttendanceTab({ date }: { date: string }) {
       if (allPlayerIds.length > 0) {
         const { data: subs } = await supabase
           .from("subscriptions")
-          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, packages(name)")
+          .select("*, packages(name)")
           .in("player_id", allPlayerIds)
           .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });
@@ -206,11 +211,31 @@ export function AttendanceTab({ date }: { date: string }) {
             end_date: s.end_date,
             status: s.status,
             package_name: s.packages?.name || "Package",
+            private_session_id: s.private_session_id ?? null,
           };
           if (!sessionsMap[s.player_id]) sessionsMap[s.player_id] = [];
           sessionsMap[s.player_id].push(entry);
         });
         setPlayerSessions(sessionsMap);
+
+        // A payment held for a private session still on the schedule is only used at that session
+        const linkedIds = [
+          ...new Set(
+            ((subs || []) as { private_session_id?: string | null }[])
+              .map((s) => s.private_session_id)
+              .filter((id): id is string => !!id)
+          ),
+        ];
+        if (linkedIds.length > 0) {
+          const { data: scheduled } = await supabase
+            .from("schedule_sessions")
+            .select("id")
+            .in("id", linkedIds)
+            .eq("is_active", true);
+          setScheduledHeld(new Set(((scheduled || []) as { id: string }[]).map((r) => r.id)));
+        } else {
+          setScheduledHeld(new Set());
+        }
       }
 
       // Existing attendance was prefetched in parallel above
@@ -271,6 +296,22 @@ export function AttendanceTab({ date }: { date: string }) {
     });
   }
 
+  /** This player's subscriptions that can pay for this session: never a payment held for
+   *  another private session that's still on the schedule */
+  function usableSubs(session: ScheduleSession, playerId: string) {
+    return (playerSessions[playerId] || []).filter((s) => !heldForAnotherSession(s, session.id, scheduledHeld));
+  }
+
+  /** The payer's payment for this private session, when they have one with a session left */
+  function linkedSub(session: ScheduleSession, playerId: string) {
+    if (session.session_type !== "private" || session.player_id !== playerId) return undefined;
+    return (playerSessions[playerId] || []).find((s) => s.private_session_id === session.id);
+  }
+
+  function payerFirstName(session: ScheduleSession) {
+    return session.private_players.find((pp) => pp.profiles?.id === session.player_id)?.profiles?.first_name ?? "The booker";
+  }
+
   function getZeroBalancePresentPlayers(session: ScheduleSession) {
     const state = attendanceState[session.id] || {};
     const saved = savedAttendanceState[session.id] || {};
@@ -281,7 +322,9 @@ export function AttendanceTab({ date }: { date: string }) {
       const wasPreviouslyPresent = saved[gp.player_id] === "present";
       // Only flag newly marked present players (not already saved as present)
       if (status !== "present" || wasPreviouslyPresent) return false;
-      const subs = playerSessions[gp.player_id] || [];
+      // Another player on a private session is never charged, so there's nothing to pay
+      if (!isChargedOnSession(session, gp.player_id)) return false;
+      const subs = usableSubs(session, gp.player_id);
       const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
       return subs.length === 0 || totalRemaining <= 0;
     });
@@ -296,7 +339,10 @@ export function AttendanceTab({ date }: { date: string }) {
       const status = state[gp.player_id];
       const wasPreviouslyPresent = saved[gp.player_id] === "present";
       if (status !== "present" || wasPreviouslyPresent) return false;
-      const subs = playerSessions[gp.player_id] || [];
+      // Nothing to choose: other players on a private session aren't charged, and the payer
+      // is charged from their payment for the session
+      if (!isChargedOnSession(session, gp.player_id) || linkedSub(session, gp.player_id)) return false;
+      const subs = usableSubs(session, gp.player_id);
       const activeSubs = subs.filter((s) => s.remaining > 0);
       return activeSubs.length > 1;
     });
@@ -328,7 +374,7 @@ export function AttendanceTab({ date }: { date: string }) {
     if (multiSubPlayers.length > 0) {
       const defaults: Record<string, string> = {};
       for (const gp of multiSubPlayers) {
-        const subs = playerSessions[gp.player_id] || [];
+        const subs = usableSubs(session, gp.player_id);
         const activeSubs = subs.filter((s) => s.remaining > 0);
         if (activeSubs.length >= 1 && !chosenSubs[gp.player_id]) {
           defaults[gp.player_id] = activeSubs[0].id;
@@ -382,10 +428,15 @@ export function AttendanceTab({ date }: { date: string }) {
 
       // Submit remaining records (if any)
       if (records.length > 0) {
-        const attendanceRecords = records.map((r) => ({
-          ...r,
-          subscription_id: r.status === "present" ? chosenSubs[r.player_id] || undefined : undefined,
-        }));
+        const attendanceRecords = records.map((r) => {
+          let subscriptionId: string | undefined;
+          if (r.status === "present" && isChargedOnSession(session, r.player_id)) {
+            // The payer's payment for this private session, never a pick left over from
+            // another session (chosenSubs is per player, across the whole day)
+            subscriptionId = linkedSub(session, r.player_id)?.id ?? (chosenSubs[r.player_id] || undefined);
+          }
+          return { ...r, subscription_id: subscriptionId };
+        });
         const res = await submitAttendance({
           group_id: session.group_id,
           schedule_session_id: session.id,
@@ -453,7 +504,7 @@ export function AttendanceTab({ date }: { date: string }) {
       if (removedPlayerIds.length > 0) {
         const { data: updatedSubs } = await supabase
           .from("subscriptions")
-          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, packages(name)")
+          .select("*, packages(name)")
           .in("player_id", removedPlayerIds)
           .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });
@@ -475,6 +526,7 @@ export function AttendanceTab({ date }: { date: string }) {
                 end_date: s.end_date,
                 status: s.status,
                 package_name: s.packages?.name || "Package",
+                private_session_id: s.private_session_id ?? null,
               };
               if (!updated[s.player_id]) updated[s.player_id] = [];
               updated[s.player_id].push(entry);
@@ -564,7 +616,7 @@ export function AttendanceTab({ date }: { date: string }) {
         const sortedPlayers = attendanceOrder(players, (gp) => ({
           name: `${gp.profiles.first_name} ${gp.profiles.last_name}`,
           saved: saved[gp.player_id] !== undefined,
-          canBeCharged: (playerSessions[gp.player_id]?.length ?? 0) > 0,
+          canBeCharged: usableSubs(session, gp.player_id).length > 0,
         }));
         const filteredPlayers = query
           ? sortedPlayers.filter((gp) =>
@@ -726,7 +778,7 @@ export function AttendanceTab({ date }: { date: string }) {
                 <div className="divide-y divide-slate-100">
                   {filteredPlayers.map((gp) => {
                     const status = state[gp.player_id];
-                    const subs = playerSessions[gp.player_id] || [];
+                    const subs = usableSubs(session, gp.player_id);
                     const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
                     return (
                       <div
@@ -740,7 +792,9 @@ export function AttendanceTab({ date }: { date: string }) {
                           <p className="text-sm font-medium text-slate-900 truncate">
                             {gp.profiles.first_name} {gp.profiles.last_name}
                           </p>
-                          {subs.length > 1 ? (
+                          {!isChargedOnSession(session, gp.player_id) ? (
+                            <p className="text-[11px] text-slate-400">Not charged &middot; {payerFirstName(session)} pays</p>
+                          ) : subs.length > 1 ? (
                             <p className="text-[11px] text-slate-400">
                               {subs.map((s) => {
                                 const exp = s.end_date ? new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
@@ -874,7 +928,7 @@ export function AttendanceTab({ date }: { date: string }) {
                 </p>
                 <div className="space-y-2">
                   {multiSubDialog.multiSubPlayers.map((gp) => {
-                    const subs = (playerSessions[gp.player_id] || []).filter((s) => s.remaining > 0);
+                    const subs = usableSubs(multiSubDialog.session, gp.player_id).filter((s) => s.remaining > 0);
                     return (
                       <div key={gp.player_id} className="bg-blue-50 rounded-lg p-3 space-y-2">
                         <div className="flex items-center gap-2">

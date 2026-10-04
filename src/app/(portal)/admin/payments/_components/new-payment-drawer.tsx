@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";
+import { cairoToday } from "@/lib/utils/cairo-time";
 import { createBrowserClient } from "@supabase/ssr";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Select, Label, Button, DatePicker } from "@/components/ui";
 import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { createAdminPayment, createStandalonePayment } from "../actions";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 interface PackageOption {
   id: string;
@@ -60,8 +62,11 @@ export function NewPaymentDrawer({
   const [packageId, setPackageId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "instapay">(defaultMethod || "cash");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  // Today in Cairo: after midnight there, the UTC date is still yesterday
+  const [paymentDate, setPaymentDate] = useState(cairoToday());
   const [note, setNote] = useState("");
+  // Set when the same payment was already recorded today; the next click records it anyway
+  const [duplicateAt, setDuplicateAt] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,12 +105,18 @@ export function NewPaymentDrawer({
       setPackageId("");
       setAmount("");
       setMethod(defaultMethod || "cash");
-      setPaymentDate(new Date().toISOString().split("T")[0]);
+      setPaymentDate(cairoToday());
       setNote("");
       setError("");
+      setDuplicateAt(null);
       setPaymentType(prefillPlayerId ? "subscription" : "subscription");
     }
   }, [open, prefillPlayerId, prefillPlayerName, defaultMethod]);
+
+  // A different player, package or amount is a different payment: ask again
+  useEffect(() => {
+    setDuplicateAt(null);
+  }, [selectedPlayer, packageId, amount]);
 
   // Search players with debounce
   useEffect(() => {
@@ -119,7 +130,7 @@ export function NewPaymentDrawer({
       let query = supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
-        .eq("role", "player")
+        .or(PLAYERS_FILTER)
         .eq("is_active", true);
       if (words.length >= 2) {
         query = query.or(
@@ -218,9 +229,12 @@ export function NewPaymentDrawer({
           amount: Number(amount),
           method,
           payment_date: paymentDate,
+          allow_duplicate: duplicateAt !== null,
         });
         if (res.error) {
           setError(res.error);
+        } else if ("duplicate" in res && res.duplicate) {
+          setDuplicateAt(res.duplicate.at);
         } else {
           onSuccess();
           onClose();
@@ -246,6 +260,8 @@ export function NewPaymentDrawer({
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Creating...
               </span>
+            ) : duplicateAt ? (
+              "Record Anyway"
             ) : (
               "Create Payment"
             )}
@@ -254,6 +270,13 @@ export function NewPaymentDrawer({
       }
     >
       <div className="space-y-5">
+        {duplicateAt && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2">
+            This payment was already recorded today at {duplicateAt}: same player, package and amount.
+            Check the player&apos;s payments first; press Record Anyway only if it&apos;s really a second payment.
+          </div>
+        )}
+
         {/* Payment type toggle */}
         {!prefillPlayerId && (
           <div>

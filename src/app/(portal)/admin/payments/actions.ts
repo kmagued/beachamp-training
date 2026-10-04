@@ -1,11 +1,15 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { cairoTimeLabel, sameDayDuplicate } from "@/lib/payments/duplicates";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PaymentMethod } from "@/types/database";
-import { createNotification, notifyAdmins } from "@/app/_actions/notifications";
+import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
+import { isAdminCaller } from "@/lib/auth/admin-caller";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { subscriptionWriteProblem } from "@/lib/private-sessions/payment";
 
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,6 +19,8 @@ export async function confirmPayment(paymentId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   // Fetch payment + subscription + package
   const { data: payment } = await supabase
@@ -25,18 +31,6 @@ export async function confirmPayment(paymentId: string) {
 
   if (!payment) return { error: "Payment not found" };
   if (payment.status !== "pending") return { error: "Payment is not pending" };
-
-  // Update payment status
-  const { error: payError } = await supabase
-    .from("payments")
-    .update({
-      status: "confirmed",
-      confirmed_by: user.id,
-      confirmed_at: new Date().toISOString(),
-    })
-    .eq("id", paymentId);
-
-  if (payError) return { error: payError.message };
 
   // Activate subscription (only if payment has one)
   if (payment.subscription_id && payment.subscriptions?.packages) {
@@ -49,7 +43,7 @@ export async function confirmPayment(paymentId: string) {
         .from("subscriptions")
         .update({ status: "active" })
         .eq("id", payment.subscription_id);
-      if (subError) return { error: subError.message };
+      if (subError) return { error: subscriptionWriteProblem(subError) };
     } else {
       const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
       const isSingleSession = pkg.session_count === 1;
@@ -71,9 +65,21 @@ export async function confirmPayment(paymentId: string) {
         })
         .eq("id", payment.subscription_id);
 
-      if (subError) return { error: subError.message };
+      if (subError) return { error: subscriptionWriteProblem(subError) };
     }
   }
+
+  // The payment is confirmed only once its subscription is active
+  const { error: payError } = await supabase
+    .from("payments")
+    .update({
+      status: "confirmed",
+      confirmed_by: user.id,
+      confirmed_at: new Date().toISOString(),
+    })
+    .eq("id", paymentId);
+
+  if (payError) return { error: payError.message };
 
   // Notify player that payment is confirmed
   if (payment.player_id) {
@@ -96,6 +102,8 @@ export async function confirmPayment(paymentId: string) {
 export async function rejectPayment(paymentId: string, reason: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -163,6 +171,8 @@ export async function updatePayment(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -236,10 +246,11 @@ export async function updatePayment(
         if (pkg) {
           // For pending_payment subs (auto-created after attendance), keep existing dates
           if (subStatus === "pending_payment") {
-            await supabase
+            const { error: subError } = await supabase
               .from("subscriptions")
               .update({ status: "active" })
               .eq("id", payment.subscription_id);
+            if (subError) return { error: subscriptionWriteProblem(subError) };
           } else {
             const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
             const isSingleSession = pkg.session_count === 1;
@@ -251,7 +262,7 @@ export async function updatePayment(
                   return d.toISOString().split("T")[0];
                 })();
 
-            await supabase
+            const { error: subError } = await supabase
               .from("subscriptions")
               .update({
                 status: "active",
@@ -259,6 +270,7 @@ export async function updatePayment(
                 end_date: endDateStr,
               })
               .eq("id", payment.subscription_id);
+            if (subError) return { error: subscriptionWriteProblem(subError) };
           }
         }
       }
@@ -268,20 +280,22 @@ export async function updatePayment(
       paymentUpdate.rejection_reason = null;
 
       if (payment.subscription_id) {
-        await supabase
+        const { error: subError } = await supabase
           .from("subscriptions")
           .update({ status: "pending", start_date: null, end_date: null })
           .eq("id", payment.subscription_id);
+        if (subError) return { error: subscriptionWriteProblem(subError) };
       }
     } else if (updates.status === "rejected") {
       paymentUpdate.confirmed_by = null;
       paymentUpdate.confirmed_at = null;
 
       if (payment.subscription_id) {
-        await supabase
+        const { error: subError } = await supabase
           .from("subscriptions")
           .update({ status: "cancelled" })
           .eq("id", payment.subscription_id);
+        if (subError) return { error: subscriptionWriteProblem(subError) };
       }
     }
   }
@@ -364,6 +378,8 @@ export async function bulkUpdatePaymentStatus(paymentIds: string[], status: stri
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const results = { success: 0, failed: 0 };
 
@@ -384,6 +400,8 @@ export async function createAdminPayment(data: {
   amount: number;
   method: PaymentMethod;
   payment_date?: string;
+  /** Record it even though the same payment was already recorded today */
+  allow_duplicate?: boolean;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
@@ -411,6 +429,27 @@ export async function createAdminPayment(data: {
     .single();
 
   if (pkgError || !pkg) return { error: "Package not found" };
+
+  // The same player, package and amount already recorded today (Cairo): ask before adding
+  // another, since retries used to pile up identical payments
+  if (!data.allow_duplicate) {
+    const { data: recent } = await admin
+      .from("payments")
+      .select("amount, created_at, subscriptions!payments_subscription_id_fkey(package_id)")
+      .eq("player_id", data.player_id)
+      .gte("created_at", new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString());
+    const duplicate = sameDayDuplicate(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((recent ?? []) as any[]).map((p) => ({
+        amount: p.amount,
+        created_at: p.created_at,
+        package_id: p.subscriptions?.package_id ?? null,
+      })),
+      { amount: data.amount, package_id: data.package_id },
+      new Date()
+    );
+    if (duplicate) return { duplicate: { at: cairoTimeLabel(duplicate.created_at) } };
+  }
 
   // Use provided date or smart start_date
   let startDate: Date;
@@ -609,6 +648,8 @@ export async function linkPaymentToPlayer(paymentId: string, playerId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  // Writes payments and subscriptions; a server action is a public endpoint, so admins only
+  if (!(await isAdminCaller())) return { error: "Not authorized" };
 
   const { data: payment } = await supabase
     .from("payments")
@@ -704,6 +745,10 @@ export async function createPendingPaymentForSession(data: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  // Called by the attendance screens: coaches and admins only (it writes with the service role)
+  const { data: me } = await supabase.from("profiles").select("role, is_coach").eq("id", user.id).single();
+  if (!coachOrAdmin(accountOf(me))) return { error: "Not authorized" };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

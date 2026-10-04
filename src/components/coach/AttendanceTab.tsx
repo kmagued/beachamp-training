@@ -6,6 +6,7 @@ import { Button, Badge, Skeleton, Drawer, Select } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
+import { heldForAnotherSession, isChargedOnSession } from "@/lib/private-sessions/payment";
 import { attendanceOrder } from "@/lib/attendance/order";
 import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 import {
@@ -42,6 +43,8 @@ interface PlayerRow {
   subscription_status: string | null;
   subscription_end_date: string | null;
   subscriptions: PlayerSubscription[];
+  /** "Not charged · Youssef pays": another player on a private session, never charged */
+  charge_note?: string | null;
 }
 
 interface AttendanceRecord {
@@ -63,6 +66,8 @@ interface AttendanceTabProps {
     last_name: string;
     avatar_url: string | null;
   }[] | null;
+  /** Who pays for a private session; the other players aren't charged */
+  privatePayerId?: string | null;
   /** Players whose birthday gets celebrated at this session */
   birthdayPlayerIds?: Set<string>;
 }
@@ -83,6 +88,7 @@ export function AttendanceTab({
   startTime,
   endTime,
   privatePlayers = null,
+  privatePayerId = null,
   birthdayPlayerIds,
 }: AttendanceTabProps) {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -142,10 +148,30 @@ export function AttendanceTab({
 
       const { data: subscriptions } = await supabase
         .from("subscriptions")
-        .select("id, player_id, sessions_remaining, status, end_date, packages(name)")
+        // Every column: private_session_id may not exist yet on an older database
+        .select("*, packages(name)")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
         .in("status", ["active", "pending"])
         .order("created_at", { ascending: false });
+
+      // Payments held for other private sessions that are still scheduled aren't offered here
+      const linkedIds = [
+        ...new Set(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((subscriptions || []) as any[])
+            .map((sub) => sub.private_session_id as string | null | undefined)
+            .filter((id): id is string => !!id && id !== scheduleSessionId)
+        ),
+      ];
+      const scheduledHeld = new Set<string>();
+      if (linkedIds.length > 0) {
+        const { data: scheduled } = await supabase
+          .from("schedule_sessions")
+          .select("id")
+          .in("id", linkedIds)
+          .eq("is_active", true);
+        for (const row of (scheduled || []) as { id: string }[]) scheduledHeld.add(row.id);
+      }
 
       const subMap = new Map<string, PlayerSubscription[]>();
       if (subscriptions) {
@@ -154,6 +180,7 @@ export function AttendanceTab({
           // judged against the session's own date rather than today
           if (sub.sessions_remaining <= 0) continue;
           if (hasLapsed(sub.end_date, sessionDate)) continue;
+          if (heldForAnotherSession(sub, scheduleSessionId, scheduledHeld)) continue;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pkgName = (sub as any).packages?.name || "Package";
           const entry: PlayerSubscription = {
@@ -164,7 +191,10 @@ export function AttendanceTab({
             package_name: pkgName,
           };
           const existing = subMap.get(sub.player_id) || [];
-          existing.push(entry);
+          // The payer's payment for this private session comes first, so it's the default pick
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((sub as any).private_session_id === scheduleSessionId) existing.unshift(entry);
+          else existing.push(entry);
           subMap.set(sub.player_id, existing);
         }
       }
@@ -186,8 +216,29 @@ export function AttendanceTab({
       }
       setExistingAttendance(existingMap);
 
+      // On a private session only the payer is charged; the others show who pays instead
+      const isPrivate = !!privatePlayers && privatePlayers.length > 0;
+      const payerFirstName = privatePlayers?.find((pp) => pp.id === privatePayerId)?.first_name ?? "The booker";
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const playerRows: PlayerRow[] = groupPlayers.map((gp: any) => {
+        const charged = isChargedOnSession(
+          { session_type: isPrivate ? "private" : "group", player_id: privatePayerId },
+          gp.profiles?.id || ""
+        );
+        if (!charged) {
+          return {
+            id: gp.profiles?.id || "",
+            first_name: gp.profiles?.first_name || "",
+            last_name: gp.profiles?.last_name || "",
+            avatar_url: gp.profiles?.avatar_url,
+            sessions_remaining: null,
+            subscription_status: null,
+            subscription_end_date: null,
+            subscriptions: [],
+            charge_note: `Not charged \u00b7 ${payerFirstName} pays`,
+          };
+        }
         const subs = subMap.get(gp.profiles?.id) || [];
         const primarySub = subs[0] || null;
         const totalRemaining = subs.reduce((sum, s) => sum + s.remaining, 0);
@@ -231,7 +282,7 @@ export function AttendanceTab({
 
     loadPlayers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, sessionDate, scheduleSessionId, privatePlayers]);
+  }, [groupId, sessionDate, scheduleSessionId, privatePlayers, privatePayerId]);
 
   function setPlayerStatus(playerId: string, status: AttendanceStatus) {
     setRecords((prev) => {
@@ -313,6 +364,8 @@ export function AttendanceTab({
       const savedRecord = savedRecords.get(p.id);
       // Only flag newly marked present players
       if (record?.status !== "present" || savedRecord?.status === "present") return false;
+      // Another player on a private session is never charged, so there's nothing to pay
+      if (p.charge_note) return false;
       return p.sessions_remaining === null || p.sessions_remaining <= 0;
     });
   }
@@ -593,7 +646,9 @@ export function AttendanceTab({
                       )}
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {player.subscriptions.length > 1 ? (
+                      {player.charge_note ? (
+                        <span className="text-xs text-slate-400">{player.charge_note}</span>
+                      ) : player.subscriptions.length > 1 ? (
                         <span className="text-xs text-slate-400">
                           {player.subscriptions.map((s) => {
                             const exp = s.end_date ? new Date(s.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;

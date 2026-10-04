@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Drawer, Button, Textarea } from "@/components/ui";
 import { ExternalLink } from "lucide-react";
 import { listTemplates } from "@/app/_actions/whatsapp-templates";
@@ -15,9 +16,13 @@ interface WhatsappSendDrawerProps {
   playerId: string;
   playerName: string;
   playerPhone: string | null;
+  /** Open with the active template marked for this purpose already filled in, e.g. "birthday" */
+  preferPurpose?: string;
+  /** Link the recipient's name, e.g. to their player page */
+  profileHref?: string;
 }
 
-export function WhatsappSendDrawer({ open, onClose, playerId, playerName, playerPhone }: WhatsappSendDrawerProps) {
+export function WhatsappSendDrawer({ open, onClose, playerId, playerName, playerPhone, preferPurpose, profileHref }: WhatsappSendDrawerProps) {
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
   const [vars, setVars] = useState<Map<string, string | null>>(new Map());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -36,9 +41,15 @@ export function WhatsappSendDrawer({ open, onClose, playerId, playerName, player
       ]);
       setTemplates(tpl);
       setVars(v);
+      // Start from the template marked for this purpose (the birthday one), when there is one
+      const preferred = preferPurpose ? tpl.find((t) => t.purpose === preferPurpose) : undefined;
+      if (preferred) {
+        setSelectedId(preferred.id);
+        setText(renderTemplate(preferred.body, v));
+      }
       setLoading(false);
     })();
-  }, [open, playerId]);
+  }, [open, playerId, preferPurpose]);
 
   function handlePickTemplate(t: WhatsappTemplate) {
     setSelectedId(t.id);
@@ -66,7 +77,13 @@ export function WhatsappSendDrawer({ open, onClose, playerId, playerName, player
       <div className="space-y-4">
         <div className="text-sm">
           <p className="text-xs text-slate-400 mb-0.5">To</p>
-          <p className="text-slate-900 font-medium">{playerName}</p>
+          {profileHref ? (
+            <Link href={profileHref} className="text-slate-900 font-medium hover:underline">
+              {playerName}
+            </Link>
+          ) : (
+            <p className="text-slate-900 font-medium">{playerName}</p>
+          )}
           <p className="text-slate-500 text-xs">{playerPhone ?? "(no phone on file)"}</p>
         </div>
 

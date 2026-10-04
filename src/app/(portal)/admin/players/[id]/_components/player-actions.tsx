@@ -42,13 +42,16 @@ export function PlayerActionsMenu({ player }: PlayerActionsProps) {
             <Pencil className="w-3.5 h-3.5" /> Edit
           </span>
         </Button>
-        <button
-          onClick={() => setConfirmDelete(true)}
-          className="px-2.5 py-2 rounded-xl text-danger border border-primary-200 hover:bg-danger/5 hover:border-danger/30 transition-colors"
-          title="Delete Player"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {/* An admin who plays is managed on the Admins page */}
+        {player.role !== "admin" && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="px-2.5 py-2 rounded-xl text-danger border border-primary-200 hover:bg-danger/5 hover:border-danger/30 transition-colors"
+            title="Delete Player"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {editing && (

@@ -36,11 +36,12 @@ export async function login(formData: FormData) {
     redirect(`/verify-email?email=${encodeURIComponent(loginEmail)}`);
   }
 
+  // Every column rather than a list: routing keeps working on a database that doesn't have a newer access column (is_player) yet
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_coach")
+    .select("*")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role" | "is_coach">[]>()
+    .returns<Pick<Profile, "role" | "is_coach" | "is_player">[]>()
     .single();
 
   // A player who coaches lands in the view they used last on this device
@@ -126,9 +127,9 @@ export async function verifyEmailOtp(email: string, token: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_coach")
+    .select("*")
     .eq("id", user.id)
-    .returns<Pick<Profile, "role" | "is_coach">[]>()
+    .returns<Pick<Profile, "role" | "is_coach" | "is_player">[]>()
     .single();
 
   // A player who coaches lands in the view they used last on this device

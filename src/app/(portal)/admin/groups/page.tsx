@@ -11,6 +11,7 @@ import { GroupModal } from "./_components/group-modal";
 import { DAY_NAMES, formatTime, getLevelVariant } from "./_components/types";
 import type { GroupData } from "./_components/types";
 import { getSystemSetting, setSystemSetting, clearSystemSetting } from "@/lib/settings/system-settings";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<GroupData[]>([]);
@@ -190,7 +191,7 @@ export default function AdminGroupsPage() {
       const { count: totalPlayerCount } = await supabase
         .from("profiles")
         .select("*", { count: "exact", head: true })
-        .eq("role", "player")
+        .or(PLAYERS_FILTER)
         .eq("is_active", true);
 
       const { data: assignedPlayers } = await supabase.from("group_players").select("player_id").eq("is_active", true);

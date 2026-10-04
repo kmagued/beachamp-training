@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Cake } from "lucide-react";
+import { Cake, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui";
+import { WhatsappSendDrawer } from "@/components/whatsapp/WhatsappSendDrawer";
 import type { BirthdayEntry } from "@/lib/birthdays/celebrations";
 import { ageLine, shortDate, timeLabel } from "@/lib/birthdays/format";
 
@@ -11,6 +15,9 @@ interface BirthdaysCardProps {
 }
 
 export function BirthdaysCard({ entries, today }: BirthdaysCardProps) {
+  // Clicking a birthday opens the WhatsApp drawer with the birthday template, to their phone
+  const [wishing, setWishing] = useState<BirthdayEntry | null>(null);
+
   return (
     <Card>
       <div className="flex items-baseline justify-between gap-3 mb-4">
@@ -28,17 +35,22 @@ export function BirthdaysCard({ entries, today }: BirthdaysCardProps) {
           {entries.map((e) => (
             <li
               key={`${e.player.id}_${e.birthday}`}
-              className="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4"
+              className="py-1.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4"
             >
-              <div className="min-w-0">
-                <Link
-                  href={`/admin/players/${e.player.id}`}
-                  className="font-medium text-primary-900 hover:underline"
-                >
-                  {e.player.firstName} {e.player.lastName}
-                </Link>
-                <span className="text-sm text-primary-700/60"> {ageLine(e, today)}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setWishing(e)}
+                title="Send birthday wishes on WhatsApp"
+                className="min-w-0 -mx-2 px-2 py-1 rounded-lg text-left flex items-center gap-2 hover:bg-sand/40 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  <span className="font-medium text-primary-900">
+                    {e.player.firstName} {e.player.lastName}
+                  </span>
+                  <span className="text-sm text-primary-700/60"> {ageLine(e, today)}</span>
+                </span>
+              </button>
 
               {e.session ? (
                 <Link
@@ -59,6 +71,16 @@ export function BirthdaysCard({ entries, today }: BirthdaysCardProps) {
           ))}
         </ul>
       )}
+
+      <WhatsappSendDrawer
+        open={wishing !== null}
+        onClose={() => setWishing(null)}
+        playerId={wishing?.player.id ?? ""}
+        playerName={wishing ? `${wishing.player.firstName} ${wishing.player.lastName}` : ""}
+        playerPhone={wishing?.player.phone ?? null}
+        preferPurpose="birthday"
+        profileHref={wishing ? `/admin/players/${wishing.player.id}` : undefined}
+      />
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { redirect } from "next/navigation";
 import { Card, Badge, EmptyState } from "@/components/ui";
@@ -19,6 +19,10 @@ import { StreakCard } from "@/components/achievements/streak-card";
 import type { Subscription } from "@/types/database";
 import { PlanCard } from "./_components/plan-card";
 import { RenewalBanner } from "./_components/renewal-banner";
+import { PrivateSessionsCard } from "./_components/private-sessions-card";
+import { loadPlayerPrivateSessions } from "@/lib/private-sessions/load";
+import { newestPlanSubscription } from "@/lib/private-sessions/payment";
+import { cairoToday } from "@/lib/utils/cairo-time";
 
 export default async function PlayerDashboard() {
   const currentUser = await getCurrentUser();
@@ -27,23 +31,26 @@ export default async function PlayerDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { data: subscription } = await supabase
+  // The plan card shows the newest subscription that isn't a private session's payment (those
+  // show on the private sessions card). Picked here, not filtered in the query, so the card
+  // still works on a database that doesn't have private_session_id yet.
+  const { data: activeSubs } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .eq("status", "active")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle() as { data: (Subscription & { packages: { name: string; session_count: number } }) | null };
+    .limit(20) as { data: (Subscription & { packages: { name: string; session_count: number } })[] | null };
+  const subscription = newestPlanSubscription(activeSubs ?? []);
 
-  const { data: pendingSubscription } = await supabase
+  const { data: pendingSubs } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .in("status", ["pending", "pending_payment"])
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
+    .limit(20) as { data: (Subscription & { packages: { name: string } })[] | null };
+  const pendingSubscription = newestPlanSubscription(pendingSubs ?? []);
 
   // For an unpaid (pending_payment) sub, load its payment so the player can
   // upload an Instapay screenshot right from the dashboard.
@@ -66,6 +73,9 @@ export default async function PlayerDashboard() {
   const hasUsableActiveSub = !!subscription && subscription.sessions_remaining > 0;
   const showPaymentCard =
     !hasUsableActiveSub && pendingSubscription?.status === "pending_payment" && !!pendingPayment;
+
+  // Read with the service role (a partner can't read the payer's payment), limited to this player
+  const privateSessions = await loadPlayerPrivateSessions(createAdminClient(), currentUser.id, cairoToday());
 
   const { data: latestFeedback } = await supabase
     .from("feedback")
@@ -166,6 +176,7 @@ export default async function PlayerDashboard() {
         <StreakCard streak={streak} />
         <CreditsCard balance={creditBalance} paidTiers={paidTiers} />
       </div>
+      <PrivateSessionsCard data={privateSessions} />
       {badges.length > 0 && <BadgeProgressCard badges={badges} />}
 
       <div className={cn("grid gap-4 sm:gap-6", latestAchievements.length > 0 && "lg:grid-cols-2")}>

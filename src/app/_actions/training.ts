@@ -7,6 +7,7 @@ import { closedMonthScoreBlock } from "@/lib/king-of-court/lock";
 import { isFutureCairoDate } from "@/lib/utils/cairo-time";
 import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
 import { canEditGroupSchedule, sessionCoachId, type ScheduleEditor } from "@/lib/scheduling/edit-access";
+import { isChargedOnSession } from "@/lib/private-sessions/payment";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -727,6 +728,13 @@ export async function removeAttendanceRecords(data: {
   const closed = await closedMonthScoreBlock(admin, data, data.player_ids);
   if (closed) return { error: closed };
 
+  // Who was charged on this session: on a private session only its payer
+  const { data: sessionRow } = await admin
+    .from("schedule_sessions")
+    .select("session_type, player_id")
+    .eq("id", data.schedule_session_id)
+    .maybeSingle();
+
   // Find existing attendance records for these players (match via schedule_session_id)
   let existingQuery = admin
     .from("attendance")
@@ -752,6 +760,9 @@ export async function removeAttendanceRecords(data: {
   ) as { player_id: string; subscription_id: string | null }[];
 
   for (const record of presentRecords) {
+    // Nothing was taken from another player on a private session; the fallback for rows
+    // with no subscription would credit one of theirs
+    if (!record.subscription_id && sessionRow && !isChargedOnSession(sessionRow, record.player_id)) continue;
     await admin.rpc("restore_session_credit", {
       p_player_id: record.player_id,
       p_subscription_id: record.subscription_id,

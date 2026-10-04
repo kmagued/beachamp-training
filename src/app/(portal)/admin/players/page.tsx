@@ -15,6 +15,7 @@ import { branding, getLevelValue } from "@/lib/config/branding";
 import { PlayersFilters } from "./_components/filters";
 import { PlayersTableView } from "./_components/table";
 import { PlayerDrawer } from "./_components/player-drawer";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 export default function AdminPlayersPage() {
   return (
@@ -81,8 +82,8 @@ function AdminPlayersContent() {
     const [{ data: profileData }, { data: attendanceData }, { data: groupPlayerData }, { data: statusRows }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, date_of_birth, area, gender, occupation, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
-        .eq("role", "player")
+        .select("id, role, first_name, last_name, email, phone, date_of_birth, area, gender, occupation, playing_level, training_goals, health_conditions, height, weight, preferred_hand, preferred_position, guardian_name, guardian_phone, is_active, created_at, subscriptions(id, status, sessions_remaining, sessions_total, start_date, end_date, packages(name))")
+        .or(PLAYERS_FILTER)
         .order("created_at", { ascending: false }),
       supabase
         .from("attendance")

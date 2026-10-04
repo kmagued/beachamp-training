@@ -2,6 +2,8 @@ import { hasLapsed } from "@/lib/subscriptions/expiry";
 
 export interface PlayerRow {
   id: string;
+  /** "admin" for an admin who also plays */
+  role: string;
   first_name: string;
   last_name: string;
   email: string | null;

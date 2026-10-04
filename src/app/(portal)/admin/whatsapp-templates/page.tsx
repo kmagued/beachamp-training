@@ -114,7 +114,14 @@ export default function WhatsappTemplatesPage() {
                   </button>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{t.name}</p>
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {t.name}
+                    {t.purpose === "birthday" && (
+                      <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        Used for birthdays
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-slate-400 truncate">{t.body.slice(0, 80)}{t.body.length > 80 ? "…" : ""}</p>
                 </div>
                 <button

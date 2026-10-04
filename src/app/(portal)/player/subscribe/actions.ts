@@ -2,8 +2,9 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { notifyAdmins } from "@/app/_actions/notifications";
+import { notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
+import { ALREADY_PAID, privatePaymentProblem, sessionWhen } from "@/lib/private-sessions/payment";
 
 export async function submitSubscription(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +32,47 @@ export async function submitSubscription(formData: FormData) {
     .single();
 
   if (!pkg) return { error: "Package not found" };
+
+  // Paying for a confirmed private session: the caller must be the session's payer, the
+  // package must fit its players, and the session must not already have a payment. Read
+  // with the service role; a player can't see a payment that isn't theirs.
+  const privateSessionId = (formData.get("private_session_id") as string) || null;
+  let privateWhen: string | null = null;
+  if (privateSessionId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = createAdminClient() as any;
+    const [{ data: session }, { count: playerCount }, { count: liveCount }] = await Promise.all([
+      admin
+        .from("schedule_sessions")
+        .select("session_type, is_active, player_id, end_date, start_time")
+        .eq("id", privateSessionId)
+        .maybeSingle(),
+      admin
+        .from("schedule_session_players")
+        .select("id", { count: "exact", head: true })
+        .eq("schedule_session_id", privateSessionId),
+      admin
+        .from("subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("private_session_id", privateSessionId)
+        .neq("status", "cancelled"),
+    ]);
+    const problem = privatePaymentProblem({
+      callerId: user.id,
+      session,
+      playerCount: playerCount ?? 0,
+      packagePlayers: pkg.private_session_players ?? null,
+      hasLivePayment: (liveCount ?? 0) > 0,
+    });
+    if (problem) return { error: problem };
+    if (session.end_date) privateWhen = sessionWhen(session.end_date, session.start_time);
+  }
+  // Players can't write subscriptions themselves (they could set any status or balance), so
+  // the server writes them, from the package's values. A normal subscription never sends the
+  // link to a private session.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subWriter = createAdminClient() as any;
+  const sessionLink = privateSessionId ? { private_session_id: privateSessionId } : {};
 
   // Validate and calculate promo discount
   let finalPrice = pkg.price;
@@ -130,7 +172,7 @@ export async function submitSubscription(formData: FormData) {
           return d.toISOString().split("T")[0];
         })();
 
-    const { data: freeSub, error: freeSubError } = await supabase
+    const { data: freeSub, error: freeSubError } = await subWriter
       .from("subscriptions")
       .insert({
         player_id: user.id,
@@ -141,10 +183,13 @@ export async function submitSubscription(formData: FormData) {
         start_date: startDate.toISOString().split("T")[0],
         end_date: endDate,
         promo_code_id: validPromoId,
+        ...sessionLink,
       })
       .select()
       .single();
 
+    // A second payment for the same session, e.g. a double click, hits the unique index
+    if (freeSubError?.code === "23505") return { error: ALREADY_PAID };
     if (freeSubError) return { error: freeSubError.message };
 
     if (validPromoId) {
@@ -159,7 +204,9 @@ export async function submitSubscription(formData: FormData) {
 
     await notifyAdmins({
       title: "New Subscription",
-      body: `${playerName} subscribed to ${pkg.name} for free${validPromoId ? " with a promo code" : ""}. The subscription is active.`,
+      body: privateWhen
+        ? `${playerName} paid for their private session on ${privateWhen} with a promo code. Nothing to review.`
+        : `${playerName} subscribed to ${pkg.name} for free${validPromoId ? " with a promo code" : ""}. The subscription is active.`,
       type: "subscription",
       link: `/admin/players/${user.id}`,
     });
@@ -171,7 +218,7 @@ export async function submitSubscription(formData: FormData) {
   }
 
   // Create subscription (pending)
-  const { data: subscription, error: subError } = await supabase
+  const { data: subscription, error: subError } = await subWriter
     .from("subscriptions")
     .insert({
       player_id: user.id,
@@ -180,10 +227,13 @@ export async function submitSubscription(formData: FormData) {
       sessions_total: pkg.session_count,
       status: "pending",
       promo_code_id: validPromoId,
+      ...sessionLink,
     })
     .select()
     .single();
 
+  // A second payment for the same session, e.g. a double click, hits the unique index
+  if (subError?.code === "23505") return { error: ALREADY_PAID };
   if (subError) return { error: subError.message };
 
   // Handle screenshot upload
@@ -213,9 +263,8 @@ export async function submitSubscription(formData: FormData) {
   if (payError) {
     // Don't leave a subscription behind without its payment. Players can't delete
     // subscriptions under RLS, so clean up with the service role.
-    const admin = createAdminClient();
-    await admin.from("subscriptions").delete().eq("id", subscription.id);
-    if (screenshotUrl) await admin.storage.from("payment-screenshots").remove([screenshotUrl]);
+    await subWriter.from("subscriptions").delete().eq("id", subscription.id);
+    if (screenshotUrl) await subWriter.storage.from("payment-screenshots").remove([screenshotUrl]);
     return { error: payError.message };
   }
 
@@ -233,7 +282,9 @@ export async function submitSubscription(formData: FormData) {
   // Notify admins of new subscription
   await notifyAdmins({
     title: "New Subscription",
-    body: `${playerName} subscribed to ${pkg.name}. Payment pending review.`,
+    body: privateWhen
+      ? `${playerName} paid for their private session on ${privateWhen}. Payment pending review.`
+      : `${playerName} subscribed to ${pkg.name}. Payment pending review.`,
     type: "payment",
     link: "/admin/payments?statusFilter=Pending",
   });

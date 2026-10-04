@@ -37,6 +37,7 @@ export interface RawProfile {
   last_name: string;
   avatar_url: string | null;
   date_of_birth: string;
+  phone: string | null;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -53,6 +54,7 @@ export function toBirthdayPlayer(p: RawProfile): BirthdayPlayer {
     lastName: p.last_name.trim(),
     avatarUrl: p.avatar_url,
     dateOfBirth: p.date_of_birth,
+    phone: p.phone,
   };
 }
 
@@ -102,7 +104,7 @@ export async function loadBirthdays(supabase: SupabaseClient, from: string, to: 
     fetchAll<RawProfile>((a, b) =>
       client
         .from("profiles")
-        .select("id, first_name, last_name, avatar_url, date_of_birth")
+        .select("id, first_name, last_name, avatar_url, date_of_birth, phone")
         .not("date_of_birth", "is", null)
         .eq("is_active", true)
         .order("id")

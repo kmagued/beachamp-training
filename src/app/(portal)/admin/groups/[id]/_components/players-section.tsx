@@ -7,6 +7,7 @@ import { Users, Plus, X, Search, Check, ChevronUp, ChevronDown } from "lucide-re
 import { addPlayersToGroup, removePlayersFromGroup } from "@/app/_actions/training";
 import type { GroupPlayerRow, AvailablePlayer } from "./types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PLAYERS_FILTER } from "@/lib/players/filter";
 
 type SortField = "name" | "sessions" | "status";
 type SortDir = "asc" | "desc";
@@ -92,7 +93,7 @@ export function PlayersSection({ groupId, groupName, players, onRefresh, supabas
     const { data: allPlayers } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, playing_level")
-      .eq("role", "player")
+      .or(PLAYERS_FILTER)
       .eq("is_active", true)
       .order("first_name");
 

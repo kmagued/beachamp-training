@@ -14,6 +14,8 @@ export interface BirthdayPlayer {
   avatarUrl: string | null;
   /** YYYY-MM-DD */
   dateOfBirth: string;
+  /** Registered phone, for sending birthday wishes on WhatsApp */
+  phone: string | null;
 }
 
 /** A schedule row: a weekly group session, or a one-off private session on `endDate` */
