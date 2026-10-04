@@ -13,15 +13,23 @@
 --   Payments: a player still records their own payment, but only as
 --   pending, for an admin to review.
 --
---   NOT safe to apply ahead of the code. Apply it AFTER deploying the
---   feat/player-coaches code. Until then the live subscribe page inserts
---   subscriptions as the player, and subscribing would fail.
+--   NOT safe to apply ahead of the code, so it is kept out of
+--   supabase/migrations (db push applies every pending file there). The
+--   live subscribe page still inserts subscriptions as the player until
+--   the feat/player-coaches code is deployed; applying this first would
+--   make every new subscription and renewal fail.
+--
+--   AFTER that code is live: copy this file into supabase/migrations with
+--   a new timestamp (e.g. 20261010000000_lock_player_subscription_writes.sql),
+--   push, then check pg_policies for subscriptions and payments.
+--   Re-runnable: every DROP and CREATE is guarded.
 -- ═══════════════════════════════════════════════════════════════
 
 DROP POLICY IF EXISTS "Players can create own subscriptions" ON subscriptions;
 DROP POLICY IF EXISTS "Players can update own subscriptions" ON subscriptions;
 
 DROP POLICY IF EXISTS "Players can create own payments" ON payments;
+DROP POLICY IF EXISTS "Players can create own pending payments" ON payments;
 CREATE POLICY "Players can create own pending payments"
   ON payments FOR INSERT
   WITH CHECK (auth.uid() = player_id AND status = 'pending');
