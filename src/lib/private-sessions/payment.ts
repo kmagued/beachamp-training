@@ -72,6 +72,15 @@ export function privatePaymentProblem(input: {
   return null;
 }
 
+/** A subscription write's error as a message for the admin, or null. Re-opening a rejected
+ *  payment for a private session that has since been paid again hits the one-live-payment
+ *  index (23505). */
+export function subscriptionWriteProblem(error: { code?: string; message: string } | null): string | null {
+  if (!error) return null;
+  if (error.code === "23505") return "This private session already has a live payment. Reject that one first.";
+  return error.message;
+}
+
 /** "Sat 10 Oct at 8:00 PM" */
 export function sessionWhen(date: string, time: string): string {
   return `${formatDay(date)} at ${formatTime(time)}`;

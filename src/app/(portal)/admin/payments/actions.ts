@@ -9,6 +9,7 @@ import { createNotification, notifyAdmins } from "@/lib/notifications/send";
 import { computeRenewalStartDate } from "@/lib/subscriptions/renewal";
 import { isAdminCaller } from "@/lib/auth/admin-caller";
 import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { subscriptionWriteProblem } from "@/lib/private-sessions/payment";
 
 export async function confirmPayment(paymentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,18 +32,6 @@ export async function confirmPayment(paymentId: string) {
   if (!payment) return { error: "Payment not found" };
   if (payment.status !== "pending") return { error: "Payment is not pending" };
 
-  // Update payment status
-  const { error: payError } = await supabase
-    .from("payments")
-    .update({
-      status: "confirmed",
-      confirmed_by: user.id,
-      confirmed_at: new Date().toISOString(),
-    })
-    .eq("id", paymentId);
-
-  if (payError) return { error: payError.message };
-
   // Activate subscription (only if payment has one)
   if (payment.subscription_id && payment.subscriptions?.packages) {
     const pkg = payment.subscriptions.packages;
@@ -54,7 +43,7 @@ export async function confirmPayment(paymentId: string) {
         .from("subscriptions")
         .update({ status: "active" })
         .eq("id", payment.subscription_id);
-      if (subError) return { error: subError.message };
+      if (subError) return { error: subscriptionWriteProblem(subError) };
     } else {
       const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
       const isSingleSession = pkg.session_count === 1;
@@ -76,9 +65,21 @@ export async function confirmPayment(paymentId: string) {
         })
         .eq("id", payment.subscription_id);
 
-      if (subError) return { error: subError.message };
+      if (subError) return { error: subscriptionWriteProblem(subError) };
     }
   }
+
+  // The payment is confirmed only once its subscription is active
+  const { error: payError } = await supabase
+    .from("payments")
+    .update({
+      status: "confirmed",
+      confirmed_by: user.id,
+      confirmed_at: new Date().toISOString(),
+    })
+    .eq("id", paymentId);
+
+  if (payError) return { error: payError.message };
 
   // Notify player that payment is confirmed
   if (payment.player_id) {
@@ -245,10 +246,11 @@ export async function updatePayment(
         if (pkg) {
           // For pending_payment subs (auto-created after attendance), keep existing dates
           if (subStatus === "pending_payment") {
-            await supabase
+            const { error: subError } = await supabase
               .from("subscriptions")
               .update({ status: "active" })
               .eq("id", payment.subscription_id);
+            if (subError) return { error: subscriptionWriteProblem(subError) };
           } else {
             const startDate = await computeRenewalStartDate(supabase, payment.player_id, payment.subscription_id);
             const isSingleSession = pkg.session_count === 1;
@@ -260,7 +262,7 @@ export async function updatePayment(
                   return d.toISOString().split("T")[0];
                 })();
 
-            await supabase
+            const { error: subError } = await supabase
               .from("subscriptions")
               .update({
                 status: "active",
@@ -268,6 +270,7 @@ export async function updatePayment(
                 end_date: endDateStr,
               })
               .eq("id", payment.subscription_id);
+            if (subError) return { error: subscriptionWriteProblem(subError) };
           }
         }
       }
@@ -277,20 +280,22 @@ export async function updatePayment(
       paymentUpdate.rejection_reason = null;
 
       if (payment.subscription_id) {
-        await supabase
+        const { error: subError } = await supabase
           .from("subscriptions")
           .update({ status: "pending", start_date: null, end_date: null })
           .eq("id", payment.subscription_id);
+        if (subError) return { error: subscriptionWriteProblem(subError) };
       }
     } else if (updates.status === "rejected") {
       paymentUpdate.confirmed_by = null;
       paymentUpdate.confirmed_at = null;
 
       if (payment.subscription_id) {
-        await supabase
+        const { error: subError } = await supabase
           .from("subscriptions")
           .update({ status: "cancelled" })
           .eq("id", payment.subscription_id);
+        if (subError) return { error: subscriptionWriteProblem(subError) };
       }
     }
   }

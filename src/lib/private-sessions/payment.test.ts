@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ALREADY_PAID,
   heldForAnotherSession,
+  subscriptionWriteProblem,
   isChargedOnSession,
   newestPlanSubscription,
   paymentPrompt,
@@ -125,4 +126,16 @@ test("heldForAnotherSession: usable at its own session, once its session is dele
   assert.equal(heldForAnotherSession({ private_session_id: "deleted" }, "tuesday-group", scheduled), false);
   assert.equal(heldForAnotherSession({ private_session_id: null }, "tuesday-group", scheduled), false);
   assert.equal(heldForAnotherSession({}, "tuesday-group", scheduled), false);
+});
+
+test("subscriptionWriteProblem: a second live payment for a private session reads as a clear refusal", () => {
+  assert.equal(
+    subscriptionWriteProblem({ code: "23505", message: "duplicate key value violates unique constraint" }),
+    "This private session already has a live payment. Reject that one first."
+  );
+});
+
+test("subscriptionWriteProblem: no error is no problem; other errors pass through", () => {
+  assert.equal(subscriptionWriteProblem(null), null);
+  assert.equal(subscriptionWriteProblem({ code: "42501", message: "permission denied" }), "permission denied");
 });
