@@ -6,7 +6,7 @@ import { Button, Badge, Skeleton, Drawer, Select } from "@/components/ui";
 import { submitAttendance, removeAttendanceRecords } from "@/app/_actions/training";
 import { createPendingPaymentForSession } from "@/app/(portal)/admin/payments/actions";
 import { hasLapsed } from "@/lib/subscriptions/expiry";
-import { isChargedOnSession } from "@/lib/private-sessions/payment";
+import { heldForAnotherSession, isChargedOnSession } from "@/lib/private-sessions/payment";
 import { attendanceOrder } from "@/lib/attendance/order";
 import { withSingleSessionFirst } from "@/lib/utils/single-session-package";
 import {
@@ -154,6 +154,25 @@ export function AttendanceTab({
         .in("status", ["active", "pending"])
         .order("created_at", { ascending: false });
 
+      // Payments held for other private sessions that are still scheduled aren't offered here
+      const linkedIds = [
+        ...new Set(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((subscriptions || []) as any[])
+            .map((sub) => sub.private_session_id as string | null | undefined)
+            .filter((id): id is string => !!id && id !== scheduleSessionId)
+        ),
+      ];
+      const scheduledHeld = new Set<string>();
+      if (linkedIds.length > 0) {
+        const { data: scheduled } = await supabase
+          .from("schedule_sessions")
+          .select("id")
+          .in("id", linkedIds)
+          .eq("is_active", true);
+        for (const row of (scheduled || []) as { id: string }[]) scheduledHeld.add(row.id);
+      }
+
       const subMap = new Map<string, PlayerSubscription[]>();
       if (subscriptions) {
         for (const sub of subscriptions) {
@@ -161,6 +180,7 @@ export function AttendanceTab({
           // judged against the session's own date rather than today
           if (sub.sessions_remaining <= 0) continue;
           if (hasLapsed(sub.end_date, sessionDate)) continue;
+          if (heldForAnotherSession(sub, scheduleSessionId, scheduledHeld)) continue;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pkgName = (sub as any).packages?.name || "Package";
           const entry: PlayerSubscription = {

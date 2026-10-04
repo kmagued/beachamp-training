@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ALREADY_PAID,
+  heldForAnotherSession,
   isChargedOnSession,
   newestPlanSubscription,
   paymentPrompt,
@@ -111,4 +112,17 @@ test("newestPlanSubscription: the newest subscription that isn't paying for a pr
 test("newestPlanSubscription: rows from a database without the link column are plans", () => {
   const row: { id: string; private_session_id?: string | null } = { id: "monthly" };
   assert.equal(newestPlanSubscription([row]), row);
+});
+
+test("heldForAnotherSession: a payment for another scheduled private session is kept for it", () => {
+  const scheduled = new Set(["saturday"]);
+  assert.equal(heldForAnotherSession({ private_session_id: "saturday" }, "tuesday-group", scheduled), true);
+});
+
+test("heldForAnotherSession: usable at its own session, once its session is deleted, or when unlinked", () => {
+  const scheduled = new Set(["saturday"]);
+  assert.equal(heldForAnotherSession({ private_session_id: "saturday" }, "saturday", scheduled), false);
+  assert.equal(heldForAnotherSession({ private_session_id: "deleted" }, "tuesday-group", scheduled), false);
+  assert.equal(heldForAnotherSession({ private_session_id: null }, "tuesday-group", scheduled), false);
+  assert.equal(heldForAnotherSession({}, "tuesday-group", scheduled), false);
 });

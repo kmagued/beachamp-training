@@ -41,6 +41,17 @@ export function newestPlanSubscription<T extends { private_session_id?: string |
   return subs.find((s) => !s.private_session_id) ?? null;
 }
 
+/** Is this a payment held for another private session that's still on the schedule
+ *  (`scheduledPrivateIds`)? Such a payment is only used at its own session; once that
+ *  session is deleted it's an ordinary single session again. */
+export function heldForAnotherSession(
+  sub: { private_session_id?: string | null },
+  sessionId: string,
+  scheduledPrivateIds: Set<string>
+): boolean {
+  return !!sub.private_session_id && sub.private_session_id !== sessionId && scheduledPrivateIds.has(sub.private_session_id);
+}
+
 export const ALREADY_PAID = "This session is already paid or under review";
 
 /** Why this player can't pay for this private session with this package, or null */
