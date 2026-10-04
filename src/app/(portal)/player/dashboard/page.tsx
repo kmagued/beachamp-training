@@ -21,6 +21,7 @@ import { PlanCard } from "./_components/plan-card";
 import { RenewalBanner } from "./_components/renewal-banner";
 import { PrivateSessionsCard } from "./_components/private-sessions-card";
 import { loadPlayerPrivateSessions } from "@/lib/private-sessions/load";
+import { newestPlanSubscription } from "@/lib/private-sessions/payment";
 import { cairoToday } from "@/lib/utils/cairo-time";
 
 export default async function PlayerDashboard() {
@@ -30,26 +31,26 @@ export default async function PlayerDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = (await createClient()) as any;
 
-  const { data: subscription } = await supabase
+  // The plan card shows the newest subscription that isn't a private session's payment (those
+  // show on the private sessions card). Picked here, not filtered in the query, so the card
+  // still works on a database that doesn't have private_session_id yet.
+  const { data: activeSubs } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .eq("status", "active")
-    // A paid private session shows on the private sessions card, not as the player's plan
-    .is("private_session_id", null)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle() as { data: (Subscription & { packages: { name: string; session_count: number } }) | null };
+    .limit(20) as { data: (Subscription & { packages: { name: string; session_count: number } })[] | null };
+  const subscription = newestPlanSubscription(activeSubs ?? []);
 
-  const { data: pendingSubscription } = await supabase
+  const { data: pendingSubs } = await supabase
     .from("subscriptions")
     .select("*, packages(*)")
     .eq("player_id", currentUser.id)
     .in("status", ["pending", "pending_payment"])
-    .is("private_session_id", null)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle() as { data: (Subscription & { packages: { name: string } }) | null };
+    .limit(20) as { data: (Subscription & { packages: { name: string } })[] | null };
+  const pendingSubscription = newestPlanSubscription(pendingSubs ?? []);
 
   // For an unpaid (pending_payment) sub, load its payment so the player can
   // upload an Instapay screenshot right from the dashboard.

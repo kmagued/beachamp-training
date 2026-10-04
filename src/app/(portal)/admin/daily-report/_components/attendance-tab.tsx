@@ -189,7 +189,7 @@ export function AttendanceTab({ date }: { date: string }) {
       if (allPlayerIds.length > 0) {
         const { data: subs } = await supabase
           .from("subscriptions")
-          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, private_session_id, packages(name)")
+          .select("*, packages(name)")
           .in("player_id", allPlayerIds)
           .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });
@@ -477,7 +477,7 @@ export function AttendanceTab({ date }: { date: string }) {
       if (removedPlayerIds.length > 0) {
         const { data: updatedSubs } = await supabase
           .from("subscriptions")
-          .select("id, player_id, sessions_remaining, sessions_total, end_date, status, private_session_id, packages(name)")
+          .select("*, packages(name)")
           .in("player_id", removedPlayerIds)
           .in("status", ["active", "pending"])
           .order("created_at", { ascending: false });

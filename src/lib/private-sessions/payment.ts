@@ -35,6 +35,12 @@ export function isChargedOnSession(
   return session.session_type !== "private" || !session.player_id || session.player_id === playerId;
 }
 
+/** The player's plan: the newest of these (newest first) that isn't a private session's
+ *  payment. A row read from a database that doesn't have private_session_id yet is a plan. */
+export function newestPlanSubscription<T extends { private_session_id?: string | null }>(subs: T[]): T | null {
+  return subs.find((s) => !s.private_session_id) ?? null;
+}
+
 export const ALREADY_PAID = "This session is already paid or under review";
 
 /** Why this player can't pay for this private session with this package, or null */

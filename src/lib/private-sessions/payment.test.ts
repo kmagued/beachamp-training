@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ALREADY_PAID,
   isChargedOnSession,
+  newestPlanSubscription,
   paymentPrompt,
   paymentState,
   privatePackageFor,
@@ -96,4 +97,18 @@ test("paymentPrompt: what the payer is told on confirmation", () => {
     paymentPrompt("Sat 10 Oct at 8:00 PM", 1000),
     "Your private session on Sat 10 Oct at 8:00 PM is confirmed. You can pay 1,000 EGP from your dashboard."
   );
+});
+
+test("newestPlanSubscription: the newest subscription that isn't paying for a private session", () => {
+  const privatePay = { id: "private", private_session_id: "s1" };
+  const monthly = { id: "monthly", private_session_id: null };
+  const older = { id: "older", private_session_id: null };
+  assert.equal(newestPlanSubscription([privatePay, monthly, older]), monthly);
+  assert.equal(newestPlanSubscription([privatePay]), null);
+  assert.equal(newestPlanSubscription([]), null);
+});
+
+test("newestPlanSubscription: rows from a database without the link column are plans", () => {
+  const row: { id: string; private_session_id?: string | null } = { id: "monthly" };
+  assert.equal(newestPlanSubscription([row]), row);
 });

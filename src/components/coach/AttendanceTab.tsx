@@ -148,7 +148,8 @@ export function AttendanceTab({
 
       const { data: subscriptions } = await supabase
         .from("subscriptions")
-        .select("id, player_id, sessions_remaining, status, end_date, private_session_id, packages(name)")
+        // Every column: private_session_id may not exist yet on an older database
+        .select("*, packages(name)")
         .in("player_id", playerIds.length > 0 ? playerIds : ["__none__"])
         .in("status", ["active", "pending"])
         .order("created_at", { ascending: false });
