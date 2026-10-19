@@ -7,6 +7,7 @@ import {
   homePath,
   isPlayer,
   isPrefetch,
+  notificationsHref,
   portalOfPath,
   portalsFor,
   switchesFor,
@@ -64,17 +65,23 @@ test("coachOrAdmin: every admin, coaching or not, and anyone who coaches", () =>
   assert.equal(coachOrAdmin(player), false);
 });
 
-test("portalsFor: only a player who coaches has two views, player first", () => {
+test("portalsFor: a player who coaches has two views, player first", () => {
   assert.deepEqual(portalsFor(player), ["player"]);
   assert.deepEqual(portalsFor(playerCoach), ["player", "coach"]);
   assert.deepEqual(portalsFor(coach), ["coach"]);
   assert.deepEqual(portalsFor(admin), ["admin"]);
-  assert.deepEqual(portalsFor(adminCoach), ["admin"]);
 });
 
 test("portalsFor: an admin who plays has the admin view and the player view", () => {
   assert.deepEqual(portalsFor(adminPlayer), ["admin", "player"]);
-  assert.deepEqual(portalsFor(adminPlayerCoach), ["admin", "player"]);
+});
+
+test("portalsFor: an admin who coaches has the admin view and the coach view", () => {
+  assert.deepEqual(portalsFor(adminCoach), ["admin", "coach"]);
+});
+
+test("portalsFor: an admin who plays and coaches has all three, admin first", () => {
+  assert.deepEqual(portalsFor(adminPlayerCoach), ["admin", "player", "coach"]);
 });
 
 test("portalOfPath: the first path segment, matched exactly", () => {
@@ -103,7 +110,7 @@ test("homePath: a remembered view the account doesn't have is ignored", () => {
   assert.equal(homePath(player, "coach"), "/player/dashboard");
   assert.equal(homePath(coach, "player"), "/coach/dashboard");
   assert.equal(homePath(admin, "coach"), "/admin/dashboard");
-  assert.equal(homePath(adminCoach, "coach"), "/admin/dashboard");
+  assert.equal(homePath(adminCoach, "player"), "/admin/dashboard");
 });
 
 test("homePath: an admin who plays lands in the view they used last, admin the first time", () => {
@@ -112,11 +119,24 @@ test("homePath: an admin who plays lands in the view they used last, admin the f
   assert.equal(homePath(admin, "player"), "/admin/dashboard");
 });
 
+test("homePath: an admin who coaches lands in the view they used last, admin the first time", () => {
+  assert.equal(homePath(adminCoach, "coach"), "/coach/dashboard");
+  assert.equal(homePath(adminCoach, undefined), "/admin/dashboard");
+  assert.equal(homePath(adminPlayerCoach, "coach"), "/coach/dashboard");
+  assert.equal(homePath(adminPlayerCoach, "player"), "/player/dashboard");
+});
+
 const visit = new Headers({ rsc: "1" });
 
 test("viewToRemember: an admin who plays opening the player view", () => {
   assert.equal(viewToRemember(adminPlayer, "/player/dashboard", "admin", visit), "player");
   assert.equal(viewToRemember(adminPlayer, "/coach/dashboard", "admin", visit), null);
+});
+
+test("viewToRemember: an admin who coaches opening the coach view", () => {
+  assert.equal(viewToRemember(adminCoach, "/coach/schedule", "admin", visit), "coach");
+  assert.equal(viewToRemember(adminCoach, "/player/dashboard", "admin", visit), null);
+  assert.equal(viewToRemember(adminPlayerCoach, "/coach/dashboard", "player", visit), "coach");
 });
 
 test("viewToRemember: a player who coaches opening the other view", () => {
@@ -158,6 +178,26 @@ test("switchesFor: a player who coaches always gets the Player | Coach switch", 
 test("switchesFor: an admin who plays gets the Admin | Player switch", () => {
   assert.deepEqual(switchesFor("admin", portalsFor(adminPlayer), false), { devPortals: false, views: true });
   assert.deepEqual(switchesFor("admin", portalsFor(adminPlayer), true), { devPortals: true, views: true });
+});
+
+test("switchesFor: an admin who coaches gets the view switch", () => {
+  assert.deepEqual(switchesFor("admin", portalsFor(adminCoach), false), { devPortals: false, views: true });
+  assert.deepEqual(switchesFor("admin", portalsFor(adminPlayerCoach), false), { devPortals: false, views: true });
+});
+
+test("notificationsHref: the bell's links for accounts without an admin view are unchanged", () => {
+  assert.equal(notificationsHref("admin", portalsFor(admin)), "/admin/notifications");
+  assert.equal(notificationsHref("player", portalsFor(player)), "/player/notifications");
+  assert.equal(notificationsHref("coach", portalsFor(coach)), "/coach/notifications");
+  // There's no coach notifications page: a player who coaches reads theirs on the player side
+  assert.equal(notificationsHref("coach", portalsFor(playerCoach)), "/player/notifications");
+  assert.equal(notificationsHref("player", portalsFor(playerCoach)), "/player/notifications");
+  assert.equal(notificationsHref("player", portalsFor(adminPlayer)), "/player/notifications");
+});
+
+test("notificationsHref: an admin in the coach view reads the admin notifications", () => {
+  assert.equal(notificationsHref("coach", portalsFor(adminCoach)), "/admin/notifications");
+  assert.equal(notificationsHref("coach", portalsFor(adminPlayerCoach)), "/admin/notifications");
 });
 
 test("isPrefetch: Next.js link prefetches and browser prefetch hints", () => {

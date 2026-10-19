@@ -43,7 +43,7 @@ import type { Profile } from "@/types/database";
 import { NotificationBell } from "./notification-bell";
 import { MobileTabBar } from "./mobile-tab-bar";
 import { groupBySection, parseOpenSections, sectionOfKey, toggleSection, withSection } from "@/lib/nav/sections";
-import { switchesFor, type Portal } from "@/lib/auth/portals";
+import { notificationsHref, switchesFor, type Portal } from "@/lib/auth/portals";
 
 /** foldSections: section headings fold their links away (for portals with long menus) */
 const portalConfig: Record<Portal, { label: string; shortLabel: string; avatar: string; labelColor: string; accentBg: string; accentText: string; foldSections: boolean }> = {
@@ -223,13 +223,7 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
   const navItems = portal === "admin" ? adminNav : portal === "coach" ? coachNav : playerNav;
 
   const initials = `${(user.first_name || "")[0] || ""}${(user.last_name || "")[0] || ""}`.toUpperCase() || "U";
-  // There's no coach notifications page yet: a player who coaches reads theirs on the player side
-  const notifHref =
-    portal === "admin"
-      ? "/admin/notifications"
-      : portal === "coach" && !portals.includes("player")
-        ? "/coach/notifications"
-        : "/player/notifications";
+  const notifHref = notificationsHref(portal, portals);
   const switches = switchesFor(user.role, portals, process.env.NODE_ENV === "development");
 
   const sortedNav = [...navItems].sort((a, b) => b.href.length - a.href.length);
@@ -483,8 +477,13 @@ export function SidebarLayout({ portal, portals, user, children }: SidebarLayout
               width={240}
               height={80}
               priority
-              // Smaller on phones beside the view switch, and left out on the narrowest ones
-              className={cn("h-12 md:h-16 w-auto object-contain", switches.views && "h-9 sm:h-12 max-[359px]:hidden")}
+              // Smaller on phones beside the view switch, and left out on the narrowest ones,
+              // or on every phone when the switch has three views
+              className={cn(
+                "h-12 md:h-16 w-auto object-contain",
+                switches.views && "h-9 sm:h-12 max-[359px]:hidden",
+                portals.length > 2 && "max-sm:hidden",
+              )}
             />
           </Link>
 

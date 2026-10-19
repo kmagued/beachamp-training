@@ -1,7 +1,8 @@
 // Which views (portals) an account can open, and where it lands after login.
 // A player who coaches is role 'player' with is_coach = true: they have the player view
 // and the coach view. An admin who plays is role 'admin' with is_player = true: they have
-// the admin view and the player view. Each device remembers the last view used.
+// the admin view and the player view. An admin who coaches (is_coach = true) also has the
+// coach view. Each device remembers the last view used.
 
 export type Portal = "player" | "coach" | "admin";
 
@@ -53,7 +54,12 @@ export function coachOrAdmin(a: Account): boolean {
 
 /** The views this account can open, in switcher order */
 export function portalsFor(a: Account): Portal[] {
-  if (a.role === "admin") return a.is_player ? ["admin", "player"] : ["admin"];
+  if (a.role === "admin") {
+    const views: Portal[] = ["admin"];
+    if (a.is_player) views.push("player");
+    if (a.is_coach) views.push("coach");
+    return views;
+  }
   if (a.role === "coach") return ["coach"];
   return a.is_coach ? ["player", "coach"] : ["player"];
 }
@@ -67,6 +73,18 @@ export function switchesFor(
   dev: boolean
 ): { devPortals: boolean; views: boolean } {
   return { devPortals: dev && role === "admin", views: portals.length > 1 };
+}
+
+/** Where a view's notification bell goes. There's no coach notifications page yet, so in
+ *  the coach view an admin reads the admin notifications and a player who coaches reads
+ *  the player ones */
+export function notificationsHref(portal: Portal, portals: Portal[]): string {
+  if (portal === "admin") return "/admin/notifications";
+  if (portal === "coach") {
+    if (portals.includes("admin")) return "/admin/notifications";
+    if (!portals.includes("player")) return "/coach/notifications";
+  }
+  return "/player/notifications";
 }
 
 /** "/coach/groups/1" → "coach"; anything outside the three portals → null */
