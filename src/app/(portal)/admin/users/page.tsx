@@ -207,19 +207,19 @@ function AdminUsersContent() {
             {admins.map((admin) => {
               const isSelf = admin.id === currentUserId;
               return (
-                <div key={admin.id} className="flex items-center justify-between px-5 py-4">
+                <div key={admin.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">
                       {admin.first_name?.[0]}{admin.last_name?.[0]}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-900 truncate">
+                        <p className="text-sm font-medium text-slate-900 truncate min-w-0">
                           {admin.first_name} {admin.last_name}
                         </p>
                         {isSelf && <Badge variant="info">You</Badge>}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400 mt-0.5">
                         {admin.email && (
                           <span className="flex items-center gap-1 truncate">
                             <Mail className="w-3 h-3" /> {admin.email}
@@ -233,7 +233,8 @@ function AdminUsersContent() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                  {/* Under the name on phones, lined up with it past the avatar */}
+                  <div className="flex items-center gap-2 shrink-0 pl-14 sm:pl-0 sm:ml-3">
                     <button
                       onClick={() => handleToggleCoach(admin.id, !admin.is_coach)}
                       title={admin.is_coach ? "Click to remove coach access" : "Click to also assign as coach"}
