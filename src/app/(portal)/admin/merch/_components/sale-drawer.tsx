@@ -115,14 +115,15 @@ export function SaleDrawer({
       onClose={onClose}
       title="Record sale"
       footer={
-        <div className="flex items-center gap-2">
+        // Three buttons don't fit in a row once the amount shows, so the main one takes its own line
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" className="flex-1 px-3" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
           <Button variant="outline" className="flex-1 px-3" onClick={() => submit(true)} disabled={!canSubmit}>
             Save &amp; sell another
           </Button>
-          <Button className="flex-1 px-3" onClick={() => submit(false)} disabled={!canSubmit}>
+          <Button className="flex-1 basis-full px-3" onClick={() => submit(false)} disabled={!canSubmit}>
             {isPending ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />

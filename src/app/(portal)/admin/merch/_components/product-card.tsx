@@ -14,7 +14,7 @@ const CHIP: Record<StockStatus, string> = {
 };
 
 const ACTION =
-  "text-xs font-semibold px-2.5 py-1 rounded-lg border border-primary-100 text-primary bg-white hover:bg-primary-50 transition-colors disabled:opacity-40 disabled:hover:bg-white";
+  "flex-1 sm:flex-none text-xs font-semibold px-2.5 py-1.5 sm:py-1 rounded-lg border border-primary-100 text-primary bg-white hover:bg-primary-50 transition-colors disabled:opacity-40 disabled:hover:bg-white";
 
 export function ProductCard({
   item,
@@ -63,7 +63,7 @@ export function ProductCard({
           <button
             type="button"
             onClick={onEdit}
-            className="text-slate-400 hover:text-slate-600 p-1 shrink-0"
+            className="text-slate-400 hover:text-slate-600 p-2 -m-1 shrink-0"
             title="Edit"
             aria-label={`Edit ${item.name}`}
           >
@@ -92,7 +92,8 @@ export function ProductCard({
           ))}
         </div>
 
-        <div className="mt-auto pt-1 flex items-center justify-between gap-2">
+        {/* Phones: the switch sits above the actions, a half-width card has no room for all three in a row */}
+        <div className="mt-auto pt-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             role="switch"
@@ -117,7 +118,7 @@ export function ProductCard({
             </span>
             {item.is_active ? "Visible" : "Hidden"}
           </button>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 self-stretch sm:self-auto">
             <button type="button" onClick={onStock} className={ACTION}>
               Stock
             </button>

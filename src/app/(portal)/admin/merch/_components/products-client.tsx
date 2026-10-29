@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Boxes, CircleX, Package, Plus, Search, Shirt, ShoppingBag, TriangleAlert } from "lucide-react";
-import { Button, Card, EmptyState, Input, Select, StatCard, Toast } from "@/components/ui";
+import { Button, Card, EmptyState, Input, MobileFilterSheet, Select, StatCard, Toast } from "@/components/ui";
 import type { MerchCategory, MerchItemView, MerchSubcategory } from "@/lib/config/merch";
 import { filterProducts, productStats, type StockFilter } from "@/lib/merch/products";
 import { MerchCategoryChips, countByCategory } from "@/components/merch/merch-shared";
@@ -44,6 +44,20 @@ export function ProductsClient({
   const filtered = useMemo(() => filterProducts(items, { search, categoryId, stock }), [items, search, categoryId, stock]);
   const counts = useMemo(() => countByCategory(items), [items]);
   const filtering = search.trim() !== "" || categoryId !== "all" || stock !== "all";
+
+  // Beside the search on wider screens; in the filter sheet on phones
+  const filterControls = (
+    <>
+      <MerchCategoryChips categories={categories} counts={counts} value={categoryId} onChange={setCategoryId} />
+      <div className="sm:w-44">
+        <Select value={stock} onChange={(e) => setStock(e.target.value as StockFilter)} aria-label="Stock filter">
+          <option value="all">All stock</option>
+          <option value="attention">Low or out</option>
+          <option value="hidden">Hidden from players</option>
+        </Select>
+      </div>
+    </>
+  );
 
   function openDrawer(mode: ProductDrawerMode, item: MerchItemView | null) {
     // A fresh key remounts the drawer so its form starts from this product
@@ -90,7 +104,8 @@ export function ProductsClient({
   }, [restockId]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+    // Extra room at the bottom on phones so the last cards scroll clear of the filter button
+    <div className="p-4 pb-20 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <Toast message={toast?.message ?? null} variant={toast?.variant} onClose={() => setToast(null)} />
 
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
@@ -99,14 +114,14 @@ export function ProductsClient({
           <p className="text-slate-500 text-sm">Your merch catalog, stock and what players can see</p>
         </div>
         {items.length > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="px-4" onClick={() => openSale(null)}>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none px-4" onClick={() => openSale(null)}>
               <span className="flex items-center gap-1.5">
                 <ShoppingBag className="w-4 h-4" />
                 Record sale
               </span>
             </Button>
-            <Button size="sm" className="px-4" onClick={() => openDrawer("create", null)}>
+            <Button size="sm" className="flex-1 sm:flex-none px-4" onClick={() => openDrawer("create", null)}>
               <span className="flex items-center gap-1.5">
                 <Plus className="w-4 h-4" />
                 New product
@@ -166,15 +181,12 @@ export function ProductsClient({
                 aria-label="Search products"
               />
             </div>
-            <MerchCategoryChips categories={categories} counts={counts} value={categoryId} onChange={setCategoryId} />
-            <div className="w-44">
-              <Select value={stock} onChange={(e) => setStock(e.target.value as StockFilter)} aria-label="Stock filter">
-                <option value="all">All stock</option>
-                <option value="attention">Low or out</option>
-                <option value="hidden">Hidden from players</option>
-              </Select>
-            </div>
+            <div className="hidden sm:contents">{filterControls}</div>
           </div>
+
+          <MobileFilterSheet activeCount={(categoryId !== "all" ? 1 : 0) + (stock !== "all" ? 1 : 0)}>
+            {filterControls}
+          </MobileFilterSheet>
 
           {filtered.length === 0 ? (
             <Card className="text-center py-10">

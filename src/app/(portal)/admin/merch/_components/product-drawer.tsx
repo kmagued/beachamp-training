@@ -178,7 +178,8 @@ export function ProductDrawer({
         onClose={onClose}
         title={title}
         footer={
-          <div className="flex items-center gap-2">
+          // Phones: three buttons don't fit in a row, so the main one takes its own line
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <Button variant="secondary" className="flex-1 px-3" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>
@@ -187,7 +188,11 @@ export function ProductDrawer({
                 Save &amp; add another
               </Button>
             )}
-            <Button className="flex-1 px-3" onClick={() => submit(false)} disabled={isPending}>
+            <Button
+              className={cn("flex-1 px-3", !editing && "basis-full sm:basis-0")}
+              onClick={() => submit(false)}
+              disabled={isPending}
+            >
               {isPending ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
