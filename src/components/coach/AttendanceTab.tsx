@@ -507,7 +507,7 @@ export function AttendanceTab({
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="text-xs text-slate-400">
             {formatTime(startTime)} - {formatTime(endTime)} &middot; {sessionDate}
           </p>
@@ -526,15 +526,17 @@ export function AttendanceTab({
           )}
         </div>
         {players.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={selectAllPresent} className="sm:w-auto">
+          // Phones: the quick actions share a row and Submit takes the full width under them,
+          // all four in one row runs Submit off the screen
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <Button size="sm" variant="secondary" onClick={selectAllPresent} className="flex-1 sm:flex-none px-2.5 sm:px-5">
               <span className="flex items-center justify-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 All Present
               </span>
             </Button>
             {hasChanges && (
-              <Button size="sm" variant="secondary" onClick={resetAll} className="sm:w-auto">
+              <Button size="sm" variant="secondary" onClick={resetAll} className="flex-1 sm:flex-none px-2.5 sm:px-5">
                 <span className="flex items-center justify-center gap-1.5">
                   <RotateCcw className="w-3.5 h-3.5" />
                   Reset
@@ -542,7 +544,7 @@ export function AttendanceTab({
               </Button>
             )}
             {markedRecords.length > 0 && (
-              <Button size="sm" variant="secondary" onClick={clearAll} className="sm:w-auto">
+              <Button size="sm" variant="secondary" onClick={clearAll} className="flex-1 sm:flex-none px-2.5 sm:px-5">
                 <span className="flex items-center justify-center gap-1.5">
                   <Trash2 className="w-3.5 h-3.5" />
                   Clear
@@ -558,6 +560,7 @@ export function AttendanceTab({
             ) : (
               <Button
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleOpenConfirm}
                 disabled={(markedRecords.length === 0 && removedPlayerIds.length === 0) || isPending}
               >
