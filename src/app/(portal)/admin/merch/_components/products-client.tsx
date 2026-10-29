@@ -225,7 +225,8 @@ export function ProductsClient({
 
       {drawer && (
         <ProductDrawer
-          key={drawer.key}
+          // Prefixed: the drawers are siblings and all three counters start at 1
+          key={`product-${drawer.key}`}
           open={drawerOpen}
           mode={drawer.mode}
           item={drawer.item}
@@ -243,7 +244,7 @@ export function ProductsClient({
 
       {saleTarget && (
         <SaleDrawer
-          key={saleTarget.key}
+          key={`sale-${saleTarget.key}`}
           open={saleOpen}
           items={items}
           initialItemId={saleTarget.itemId}
@@ -259,7 +260,7 @@ export function ProductsClient({
 
       {stockTarget && (
         <StockDrawer
-          key={stockTarget.key}
+          key={`stock-${stockTarget.key}`}
           item={stockTarget.item}
           open={stockOpen}
           onClose={() => setStockOpen(false)}
