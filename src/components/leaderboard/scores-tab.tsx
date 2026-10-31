@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Toast } from "@/components/ui";
-import { Loader2, Check, Clock, Lock, Trash2 } from "lucide-react";
+import { Loader2, Check, Clock, Lock, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { saveKingOfCourtScores } from "@/app/_actions/king-of-court";
 import { parsePoints } from "@/lib/king-of-court/points";
@@ -68,6 +68,8 @@ export function ScoresTab({
   const [reloadKey, setReloadKey] = useState(0);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  /** Cards that are open. The day's cards start closed, like the Attendance tab's; a single session's starts open */
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(scheduleSessionId ? [scheduleSessionId] : []));
   const [, startTransition] = useTransition();
   const boxRefs = useRef<Record<string, HTMLInputElement | null>>({});
   /** The date on screen now: a save that returns after the date changed must not touch the new page */
@@ -75,6 +77,11 @@ export function ScoresTab({
   useEffect(() => {
     dateRef.current = date;
   }, [date]);
+
+  // Another day starts closed again. A reload after a refused save keeps the open cards open.
+  useEffect(() => {
+    setOpenIds(new Set(scheduleSessionId ? [scheduleSessionId] : []));
+  }, [date, scheduleSessionId]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -171,6 +178,15 @@ export function ScoresTab({
       ...prev,
       [sessionId]: { ...prev[sessionId], inputs: { ...prev[sessionId].inputs, [playerId]: text } },
     }));
+  }
+
+  function toggleOpen(sessionId: string) {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
   }
 
   function clearBoxes(sessionId: string) {
@@ -286,22 +302,43 @@ export function ScoresTab({
         const changed = hasUnsavedChanges(s.inputs, s.saved);
         const hasSaved = Object.keys(s.saved).length > 0;
         const isSaving = savingId === session.id;
+        const isOpen = openIds.has(session.id);
 
         return (
           <Card key={session.id} className="p-0">
-            <div className="px-4 sm:px-5 py-3 sm:py-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-semibold text-slate-900">{session.groups?.name}</h3>
-                  {session.groups?.level && <Badge variant="neutral">{session.groups.level}</Badge>}
+            {/* The toggle stops short of Save, since a button can't sit inside a button */}
+            <div className="flex items-start justify-between gap-3 pr-4 sm:pr-5">
+              <button
+                type="button"
+                onClick={() => toggleOpen(session.id)}
+                aria-expanded={isOpen}
+                className="flex-1 min-w-0 flex items-start gap-2 pl-4 sm:pl-5 py-3 sm:py-4 text-left"
+              >
+                {isOpen ? (
+                  <ChevronDown className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-slate-900">{session.groups?.name}</h3>
+                    {session.groups?.level && <Badge variant="neutral">{session.groups.level}</Badge>}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formatTime(session.start_time)} – {formatTime(session.end_time)}
+                    {session.location && ` · ${session.location}`}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {formatTime(session.start_time)} – {formatTime(session.end_time)}
-                  {session.location && ` · ${session.location}`}
-                </p>
-              </div>
-              {s.players.length > 0 && (
-                <div className="flex items-center gap-2 shrink-0">
+              </button>
+              {s.players.length === 0 ? (
+                // Open, the card says this itself
+                !isOpen && (
+                  <span className="text-xs text-slate-400 shrink-0 py-3 sm:py-4">
+                    {s.attendanceLogged ? "No one present" : "No attendance"}
+                  </span>
+                )
+              ) : (
+                <div className="flex items-center gap-2 shrink-0 py-3 sm:py-4">
                   <span className="text-xs text-slate-400 tabular-nums">
                     {scoredCount}/{s.players.length} scored
                   </span>
@@ -330,7 +367,7 @@ export function ScoresTab({
               )}
             </div>
 
-            {!s.attendanceLogged ? (
+            {!isOpen ? null : !s.attendanceLogged ? (
               <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">Log attendance first. Only players marked present can be scored.</p>
                 <Button size="sm" variant="secondary" onClick={onOpenAttendance}>

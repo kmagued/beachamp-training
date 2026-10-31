@@ -51,6 +51,8 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
   // Session-based court calculator
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [sessionCourts, setSessionCourts] = useState<Record<string, string>>({});
+  /** Hours actually booked per session; starts at the scheduled length, often runs longer or shorter */
+  const [sessionHours, setSessionHours] = useState<Record<string, string>>({});
 
   // Inline new category
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -73,6 +75,11 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
     return (endMinutes - startMinutes) / 60;
   }
 
+  // Hours billed for a session: what the admin typed, or the scheduled length if left blank
+  function getBilledHours(session: CourtSession) {
+    return Number(sessionHours[session.id]) || getSessionHours(session);
+  }
+
   // Session-based total calculation
   const sessionTotal = useMemo(() => {
     if (!hasSessionMode || !isCourtReservation || !useCourtCalculator) return 0;
@@ -82,12 +89,12 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
       const session = sessions!.find((s) => s.id === sid);
       if (!session) return;
       const courts = Number(sessionCourts[sid]) || 1;
-      const hours = getSessionHours(session);
+      const hours = getBilledHours(session);
       total += courts * hours * rate;
     });
     return total;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSessions, sessionCourts, courtHourlyRate, hasSessionMode, isCourtReservation, useCourtCalculator, sessions]);
+  }, [selectedSessions, sessionCourts, sessionHours, courtHourlyRate, hasSessionMode, isCourtReservation, useCourtCalculator, sessions]);
 
   // Auto-calculate amount for court reservations (only when calculator is active)
   useEffect(() => {
@@ -123,6 +130,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
         setUseCourtCalculator(!!editingExpense.court_count);
         setSelectedSessions(new Set());
         setSessionCourts({});
+        setSessionHours({});
         setPaymentStatus(editingExpense.payment_status || "paid_full");
         setPaidAmount(editingExpense.paid_amount ? String(editingExpense.paid_amount) : "");
         setDueDate(editingExpense.due_date || "");
@@ -140,6 +148,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
         setUseCourtCalculator(true);
         setSelectedSessions(new Set());
         setSessionCourts({});
+        setSessionHours({});
         setPaymentStatus("paid_full");
         setPaidAmount("");
         setDueDate("");
@@ -174,7 +183,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
           const session = sessions!.find((s) => s.id === sid);
           if (!session) return;
           totalCourts += Number(sessionCourts[sid]) || 1;
-          totalHours += getSessionHours(session);
+          totalHours += getBilledHours(session);
         });
         formData.set("court_count", String(totalCourts));
         formData.set("court_hours", String(totalHours));
@@ -322,6 +331,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
                       {sessions!.map((session) => {
                         const isSelected = selectedSessions.has(session.id);
                         const hours = getSessionHours(session);
+                        const billedHours = getBilledHours(session);
                         const courtsStr = sessionCourts[session.id] ?? "";
                         const courts = Number(courtsStr) || 1;
                         return (
@@ -340,8 +350,10 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
                                 checked={isSelected}
                                 onChange={(e) => {
                                   const next = new Set(selectedSessions);
-                                  if (e.target.checked) next.add(session.id);
-                                  else next.delete(session.id);
+                                  if (e.target.checked) {
+                                    next.add(session.id);
+                                    setSessionHours((prev) => ({ ...prev, [session.id]: prev[session.id] || String(hours) }));
+                                  } else next.delete(session.id);
                                   setSelectedSessions(next);
                                 }}
                                 className="table-checkbox mt-0.5"
@@ -350,27 +362,45 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
                                 <p className="text-sm font-medium text-slate-900">{session.group_name}</p>
                                 <p className="text-xs text-slate-400">
                                   {session.start_time.slice(0, 5)} – {session.end_time.slice(0, 5)}
-                                  {" · "}{hours}h
+                                  {" · "}{isSelected ? billedHours : hours}h
                                   {session.location && ` · ${session.location}`}
                                 </p>
                               </div>
                             </label>
                             {isSelected && (
-                              <div className="mt-2 ml-7 flex items-center gap-2">
-                                <span className="text-xs text-slate-500 whitespace-nowrap">Courts:</span>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={courtsStr}
-                                  onChange={(e) => setSessionCourts((prev) => ({
-                                    ...prev,
-                                    [session.id]: e.target.value,
-                                  }))}
-                                  className="w-20 h-8 text-xs"
-                                  placeholder="1"
-                                />
+                              <div className="mt-2 ml-7 flex flex-wrap items-center gap-x-3 gap-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-500 whitespace-nowrap">Courts:</span>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={courtsStr}
+                                    onChange={(e) => setSessionCourts((prev) => ({
+                                      ...prev,
+                                      [session.id]: e.target.value,
+                                    }))}
+                                    className="w-20 h-8 text-xs"
+                                    placeholder="1"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-500 whitespace-nowrap">Total hours:</span>
+                                  <Input
+                                    type="number"
+                                    min="0.5"
+                                    step="0.5"
+                                    inputMode="decimal"
+                                    value={sessionHours[session.id] ?? ""}
+                                    onChange={(e) => setSessionHours((prev) => ({
+                                      ...prev,
+                                      [session.id]: e.target.value,
+                                    }))}
+                                    className="w-20 h-8 text-xs"
+                                    placeholder={String(hours)}
+                                  />
+                                </div>
                                 <span className="text-xs text-slate-400">
-                                  = {(courts * hours * (Number(courtHourlyRate) || 0)).toLocaleString()} EGP
+                                  = {(courts * billedHours * (Number(courtHourlyRate) || 0)).toLocaleString()} EGP
                                 </span>
                               </div>
                             )}
@@ -381,7 +411,11 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
                   </div>
                   {sessionTotal > 0 && (
                     <div className="flex items-center justify-between pt-2 border-t border-primary-100">
-                      <span className="text-xs font-medium text-slate-500">Total</span>
+                      <span className="text-xs font-medium text-slate-500">
+                        Total · {sessions!
+                          .filter((s) => selectedSessions.has(s.id))
+                          .reduce((sum, s) => sum + getBilledHours(s), 0)}h
+                      </span>
                       <span className="text-sm font-bold text-primary-700">{sessionTotal.toLocaleString()} EGP</span>
                     </div>
                   )}

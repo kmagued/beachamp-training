@@ -206,7 +206,7 @@ export default function AdminPromoCodesPage() {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 mb-1 block">Discount Value</label>
-              <Input name="discount_value" type="number" required min="1" step="any" placeholder="e.g. 20" defaultValue={editingCode?.discount_value ?? ""} />
+              <Input name="discount_value" type="number" required min="0" step="any" placeholder="e.g. 20" defaultValue={editingCode?.discount_value ?? ""} />
             </div>
           </div>
           <div>
