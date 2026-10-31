@@ -550,6 +550,27 @@ export interface Database {
         };
         Relationships: [];
       };
+      landing_photos: {
+        Row: {
+          slot: number;
+          storage_path: string;
+          uploaded_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          slot: number;
+          storage_path: string;
+          uploaded_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          slot?: number;
+          storage_path?: string;
+          uploaded_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       merch_categories: {
         Row: {
           id: string;

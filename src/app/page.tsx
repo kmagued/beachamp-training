@@ -5,6 +5,8 @@ import { branding, getLevelLabel } from "@/lib/config/branding";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import type { Package } from "@/types/database";
+import { CTA_SLOT, GALLERY_SLOTS, LANDING_PHOTOS_BUCKET, LEVELS_SLOT, landingPhotosFrom } from "@/lib/config/landing-photos";
+import { LandingPhotoGrid, LandingPhotoTile } from "@/components/landing/landing-photo-grid";
 import { TrainingGroupCarousel } from "./_components/training-groups-carousel";
 
 const programs = [
@@ -142,6 +144,16 @@ export default async function LandingPage() {
     photosByGroupMap.set(p.group_id, entry);
   }
   const groupedPhotos = Array.from(photosByGroupMap.values()).filter((g) => g.items.length > 0);
+
+  // Anyone can read landing photos, so no service role here. Empty spots show a placeholder,
+  // except behind the closing call to action, which keeps its plain background.
+  const { data: landingPhotoRows } = (await supabase
+    .from("landing_photos")
+    .select("slot, storage_path")) as { data: { slot: number; storage_path: string }[] | null };
+  const landingPhotos = landingPhotosFrom(
+    landingPhotoRows || [],
+    (path) => supabase.storage.from(LANDING_PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl as string,
+  );
 
   return (
     <div className="min-h-screen bg-white text-primary-900">
@@ -317,6 +329,21 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* ── Gallery ── */}
+      <section id="gallery" className="scroll-mt-20">
+        <div className="max-w-6xl mx-auto px-6 pt-20">
+          <div className="max-w-2xl mb-12">
+            <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
+              On the sand
+            </span>
+            <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
+              Life at {branding.name}
+            </h2>
+          </div>
+          <LandingPhotoGrid photos={GALLERY_SLOTS.map((slot) => landingPhotos[slot])} />
+        </div>
+      </section>
+
       {/* ── Programs ── */}
       <section id="programs" className="scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6 py-20">
@@ -414,17 +441,24 @@ export default async function LandingPage() {
       {/* ── Levels ── */}
       <section className="bg-sand/30">
         <div className="max-w-6xl mx-auto px-6 py-20">
-          <div className="max-w-2xl mb-12">
-            <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
-              Every skill level
-            </span>
-            <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
-              Find your level
-            </h2>
-            <p className="mt-3 text-primary-700/70">
-              We group players by skill level so you always train with the right
-              intensity and competition.
-            </p>
+          <div className="mb-12 grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+            <div className="lg:col-span-7 max-w-2xl">
+              <span className="text-xs font-semibold uppercase tracking-wider text-accent-600">
+                Every skill level
+              </span>
+              <h2 className="font-display mt-3 text-4xl sm:text-5xl tracking-tight text-primary-900">
+                Find your level
+              </h2>
+              <p className="mt-3 text-primary-700/70">
+                We group players by skill level so you always train with the right
+                intensity and competition.
+              </p>
+            </div>
+            <LandingPhotoTile
+              photo={landingPhotos[LEVELS_SLOT]}
+              sizes="(max-width: 1024px) 100vw, 460px"
+              className="lg:col-span-5 aspect-[16/10]"
+            />
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -626,6 +660,12 @@ export default async function LandingPage() {
 
       {/* ── CTA ── */}
       <section className="relative overflow-hidden bg-primary-900 text-white">
+        {landingPhotos[CTA_SLOT].url && (
+          <>
+            <Image src={landingPhotos[CTA_SLOT].url} alt="" fill sizes="100vw" className="object-cover" />
+            <div aria-hidden className="absolute inset-0 bg-primary-900/80" />
+          </>
+        )}
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.04] pointer-events-none mix-blend-overlay"
