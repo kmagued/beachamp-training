@@ -6,7 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Card, Badge, Button, Toast } from "@/components/ui";
 import { Loader2, Check, Clock, Lock, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { saveKingOfCourtScores } from "@/app/_actions/king-of-court";
+import { getKingOfCourtScores, saveKingOfCourtScores } from "@/app/_actions/king-of-court";
 import { parsePoints } from "@/lib/king-of-court/points";
 import { applySavedScores, buildSavePayload, hasUnsavedChanges } from "@/lib/king-of-court/save";
 import { formatMonth, formatTime } from "@/lib/king-of-court/format";
@@ -46,21 +46,26 @@ function boxesFor(players: PresentPlayer[], saved: Record<string, number>): Reco
 
 /**
  * King of Court scoring for a date: a card per group session on the leaderboard. Used by the
- * Daily Report for the whole day, and by a session's page for that one session.
+ * Daily Report for the whole day, and by a session's page (admin or coach) for that one session.
  */
 export function ScoresTab({
   date,
   onOpenAttendance,
   scheduleSessionId,
+  leaderboardPath = "/admin/leaderboard",
 }: {
   date: string;
   onOpenAttendance: () => void;
   /** Only this session, instead of every session that day */
   scheduleSessionId?: string;
+  /** The viewer's own Leaderboard page, linked when the month is closed */
+  leaderboardPath?: string;
 }) {
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [bySession, setBySession] = useState<Record<string, SessionScores>>({});
   const [loading, setLoading] = useState(true);
+  /** Saved scores couldn't be read. Blank boxes would look like nobody had scored, so none are shown. */
+  const [loadError, setLoadError] = useState<string | null>(null);
   /** The date's leaderboard month is closed: its scores are shown but can't be changed */
   const [closed, setClosed] = useState(false);
   const month = monthOfDate(date);
@@ -93,6 +98,7 @@ export function ScoresTab({
 
     async function load() {
       setLoading(true);
+      setLoadError(null);
       const dayOfWeek = new Date(date + "T00:00:00").getDay();
 
       let sessionQuery = supabase
@@ -117,7 +123,7 @@ export function ScoresTab({
       });
       const sessionIds = sessionRows.map((s) => s.id);
 
-      const [{ data: attendance }, { data: scores }, { data: closeRow }] = await Promise.all([
+      const [{ data: attendance }, scores, { data: closeRow }] = await Promise.all([
         sessionIds.length > 0
           ? supabase
               .from("attendance")
@@ -125,17 +131,20 @@ export function ScoresTab({
               .eq("session_date", date)
               .in("schedule_session_id", sessionIds)
           : Promise.resolve({ data: [] as unknown[] }),
-        sessionIds.length > 0
-          ? supabase
-              .from("king_of_court_scores")
-              .select("player_id, schedule_session_id, points")
-              .eq("session_date", date)
-              .in("schedule_session_id", sessionIds)
-          : Promise.resolve({ data: [] as unknown[] }),
+        // Through the server: the scores table's database rules let only admins read it
+        getKingOfCourtScores({ session_date: date, schedule_session_ids: sessionIds }).catch(() => ({
+          error: "Couldn't reach the server",
+        })),
         supabase.from("leaderboard_month_closes").select("month").eq("month", month).maybeSingle(),
       ]);
 
       if (cancelled) return;
+
+      if ("error" in scores) {
+        setLoadError(`Couldn't load the saved scores: ${scores.error}`);
+        setLoading(false);
+        return;
+      }
 
       const attendanceRows = (attendance || []) as unknown as {
         player_id: string;
@@ -143,7 +152,7 @@ export function ScoresTab({
         schedule_session_id: string;
         profiles: PresentPlayer | null;
       }[];
-      const scoreRows = (scores || []) as { player_id: string; schedule_session_id: string; points: number }[];
+      const scoreRows = scores.scores;
 
       const next: Record<string, SessionScores> = {};
       for (const s of sessionRows) {
@@ -258,6 +267,19 @@ export function ScoresTab({
     );
   }
 
+  if (loadError) {
+    return (
+      <Card>
+        <div className="text-center py-10">
+          <p className="text-sm font-medium text-slate-700">{loadError}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => setReloadKey((k) => k + 1)}>
+            Try again
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   if (sessions.length === 0) {
     const weekday = new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
     return (
@@ -289,7 +311,7 @@ export function ScoresTab({
           <Lock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
           <p className="text-sm text-slate-600">
             The {formatMonth(month, "long")} leaderboard is closed, so these scores are read-only.{" "}
-            <Link href={`/admin/leaderboard?month=${month}`} className="font-semibold text-primary hover:underline">
+            <Link href={`${leaderboardPath}?month=${month}`} className="font-semibold text-primary hover:underline">
               Open the Leaderboard
             </Link>
           </p>

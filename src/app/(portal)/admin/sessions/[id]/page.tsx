@@ -16,6 +16,7 @@ export default async function AdminSessionDetailPage({ params }: PageProps) {
     <SessionDetail
       scheduleSessionId={id}
       basePath="/admin"
+      scorerGroupIds={null}
     />
   );
 }

@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/utils/format-date";
 import { AttendanceTab } from "./AttendanceTab";
 import { SessionPlanTab } from "./SessionPlanTab";
 import { ScoresTab } from "@/components/leaderboard/scores-tab";
-import { scoringProblem } from "@/lib/king-of-court/access";
+import { scorerProblem } from "@/lib/king-of-court/access";
 import { getBirthdays } from "@/app/_actions/birthdays";
 import type { BirthdayEntry } from "@/lib/birthdays/celebrations";
 import { ageLine } from "@/lib/birthdays/format";
@@ -47,11 +47,13 @@ interface SessionInfo {
 interface SessionDetailProps {
   scheduleSessionId: string;
   basePath: string; // "/admin" or "/coach"
+  /** Groups whose sessions this viewer may score: null for every group (the admin view) */
+  scorerGroupIds: string[] | null;
 }
 
 const TABS = [
   { key: "attendance", label: "Attendance", icon: ClipboardCheck },
-  // Admins only, and only for sessions that play King of Court (see canScore)
+  // Admins, and coaches assigned to the session's group; only sessions that play King of Court (see canScore)
   { key: "scores", label: "Scores", icon: Trophy },
   { key: "plan", label: "Plan", icon: Target },
 ] as const;
@@ -76,7 +78,7 @@ function getLevelVariant(level: string): "success" | "warning" | "danger" | "inf
   }
 }
 
-export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProps) {
+export function SessionDetail({ scheduleSessionId, basePath, scorerGroupIds }: SessionDetailProps) {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
@@ -197,8 +199,8 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
     );
   }
 
-  // Scores are admin-only, as in the Daily Report; coaches see Attendance and Plan
-  const canScore = basePath === "/admin" && scoringProblem(session) === null;
+  // The save action checks the same rule
+  const canScore = scorerProblem(scorerGroupIds && new Set(scorerGroupIds), session) === null;
   const tabs = TABS.filter((tab) => tab.key !== "scores" || canScore);
 
   return (
@@ -275,6 +277,7 @@ export function SessionDetail({ scheduleSessionId, basePath }: SessionDetailProp
           date={dateParam}
           scheduleSessionId={session.id}
           onOpenAttendance={() => setActiveTab("attendance")}
+          leaderboardPath={`${basePath}/leaderboard`}
         />
       ) : (
         <Card>
