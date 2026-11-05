@@ -40,8 +40,8 @@ export function openingGroup(
 
 /**
  * Why a session can't take King of Court scores, or null if it can: only group sessions
- * whose group is on the leaderboard play it. The save action refuses with this message,
- * and the session page shows its Scores tab only when it's null.
+ * whose group is on the leaderboard play it. scorerProblem builds on it to also check who
+ * is asking.
  */
 export function scoringProblem(
   session: { session_type: string | null; group_id: string | null; in_leaderboard: boolean | null | undefined } | null
@@ -50,5 +50,24 @@ export function scoringProblem(
     return "Scores can only be logged for group sessions";
   }
   if (session.in_leaderboard === false) return "This group isn't on the leaderboard, so it has no scores";
+  return null;
+}
+
+/**
+ * Why this person can't enter the session's scores, or null if they can. Admins score
+ * every session that plays King of Court; coaches only those of the groups they're
+ * assigned to (the same groups as their Leaderboard tabs). `coachedGroupIds` null means
+ * an admin. The save action refuses with this message, and the session page shows its
+ * Scores tab only when it's null.
+ */
+export function scorerProblem(
+  coachedGroupIds: ReadonlySet<string> | null,
+  session: Parameters<typeof scoringProblem>[0]
+): string | null {
+  const notScored = scoringProblem(session);
+  if (notScored) return notScored;
+  if (coachedGroupIds !== null && !coachedGroupIds.has(session!.group_id!)) {
+    return "Only admins and the group's coaches can log its scores";
+  }
   return null;
 }

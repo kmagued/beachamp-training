@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupsForViewer, groupsToShow, openingGroup, scoringProblem, type GroupRow } from "./access";
+import { groupsForViewer, groupsToShow, openingGroup, scorerProblem, scoringProblem, type GroupRow } from "./access";
 
 /** A group row; defaults to active and on the leaderboard */
 function g(id: string, extra: Partial<GroupRow> = {}): GroupRow {
@@ -65,4 +65,27 @@ test("scoringProblem: a group off the leaderboard has no scores", () => {
     scoringProblem({ session_type: "group", group_id: "g1", in_leaderboard: false }),
     "This group isn't on the leaderboard, so it has no scores"
   );
+});
+
+const leaderboardSession = { session_type: "group", group_id: "g1", in_leaderboard: true };
+const NOT_THEIR_GROUP = "Only admins and the group's coaches can log its scores";
+
+test("scorerProblem: admins (no restriction) can score any session that plays King of Court", () => {
+  assert.equal(scorerProblem(null, leaderboardSession), null);
+});
+
+test("scorerProblem: a coach assigned to the session's group can score it", () => {
+  assert.equal(scorerProblem(new Set(["g0", "g1"]), leaderboardSession), null);
+});
+
+test("scorerProblem: a coach not assigned to the session's group can't score it", () => {
+  assert.equal(scorerProblem(new Set(["g2"]), leaderboardSession), NOT_THEIR_GROUP);
+  assert.equal(scorerProblem(new Set(), leaderboardSession), NOT_THEIR_GROUP);
+});
+
+test("scorerProblem: a session that can't be scored says why, whoever asks", () => {
+  const offBoard = { session_type: "group", group_id: "g1", in_leaderboard: false };
+  assert.equal(scorerProblem(new Set(["g1"]), offBoard), scoringProblem(offBoard));
+  assert.equal(scorerProblem(null, offBoard), scoringProblem(offBoard));
+  assert.equal(scorerProblem(new Set(["g1"]), null), scoringProblem(null));
 });

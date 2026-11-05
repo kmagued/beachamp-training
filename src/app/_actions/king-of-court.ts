@@ -4,10 +4,11 @@ import { randomUUID } from "node:crypto";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { cairoMonthKey, cairoToday } from "@/lib/utils/cairo-time";
-import { scoringProblem } from "@/lib/king-of-court/access";
+import { accountOf, coachOrAdmin } from "@/lib/auth/portals";
+import { scorerProblem } from "@/lib/king-of-court/access";
 import { awardNotification, canCloseMonth, monthAwards } from "@/lib/king-of-court/awards";
 import { formatMonth } from "@/lib/king-of-court/format";
-import { loadLeaderboard } from "@/lib/king-of-court/load";
+import { coachGroupIds, loadLeaderboard } from "@/lib/king-of-court/load";
 import { closedMonthBlock } from "@/lib/king-of-court/lock";
 import { isMonth, monthOfDate } from "@/lib/king-of-court/month";
 import { checkScoreSave, type ScoreEntry } from "@/lib/king-of-court/save";
@@ -23,11 +24,11 @@ async function getCurrentUserRole() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, is_coach")
     .eq("id", user.id)
     .single();
 
-  return profile ? { id: profile.id, role: profile.role as string } : null;
+  return profile ? { id: profile.id, role: profile.role as string, is_coach: profile.is_coach === true } : null;
 }
 
 function requireAdmin(user: { role: string } | null) {
@@ -37,22 +38,80 @@ function requireAdmin(user: { role: string } | null) {
   return null;
 }
 
+type Scorer = { scorer: { id: string; groupIds: ReadonlySet<string> | null } } | { error: string };
+
+/** The caller as someone who may enter scores: an admin (every group, `groupIds` null),
+ *  or anyone who can coach, limited to the groups they're assigned to */
+async function getScorer(): Promise<Scorer> {
+  const user = await getCurrentUserRole();
+  if (!user || !coachOrAdmin(accountOf(user))) return { error: "Unauthorized: coach or admin access required" };
+  if (user.role === "admin") return { scorer: { id: user.id, groupIds: null } };
+  try {
+    return { scorer: { id: user.id, groupIds: await coachGroupIds(user.id) } };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not load the groups you coach" };
+  }
+}
+
+/** A session row with its group's leaderboard flag, in the shape scorerProblem takes */
+type SessionRow = { id: string; group_id: string | null; session_type: string | null; groups: { in_leaderboard: boolean } | null };
+const SESSION_COLUMNS = "id, group_id, session_type, groups(in_leaderboard)";
+function asScoredSession(s: SessionRow | null) {
+  return s && { ...s, in_leaderboard: s.groups?.in_leaderboard };
+}
+
 // ═══════════════════════════════════════
-// KING OF COURT SCORES (Admin only)
+// KING OF COURT SCORES (Admins, and coaches for their own groups)
 // ═══════════════════════════════════════
 
+// The points saved for these session occurrences on a date, limited to the sessions the
+// caller may score. Read with the service role because the scores table's database rules
+// are admin-only; a coach gets their own groups' sessions here instead.
+export async function getKingOfCourtScores(data: {
+  session_date: string;
+  schedule_session_ids: string[];
+}): Promise<{ scores: { player_id: string; schedule_session_id: string; points: number }[] } | { error: string }> {
+  const caller = await getScorer();
+  if ("error" in caller) return caller;
+
+  if (!Array.isArray(data.schedule_session_ids)) return { error: "Invalid request" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.session_date)) return { error: "Invalid session date" };
+  if (data.schedule_session_ids.length === 0) return { scores: [] };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  const { data: sessions, error: sessionErr } = await admin
+    .from("schedule_sessions")
+    .select(SESSION_COLUMNS)
+    .in("id", data.schedule_session_ids);
+  if (sessionErr) return { error: sessionErr.message };
+  const allowedIds = ((sessions || []) as SessionRow[])
+    .filter((s) => scorerProblem(caller.scorer.groupIds, asScoredSession(s)) === null)
+    .map((s) => s.id);
+  if (allowedIds.length === 0) return { scores: [] };
+
+  const { data: scores, error } = await admin
+    .from("king_of_court_scores")
+    .select("player_id, schedule_session_id, points")
+    .eq("session_date", data.session_date)
+    .in("schedule_session_id", allowedIds);
+  if (error) return { error: error.message };
+  return { scores: scores || [] };
+}
+
 // Points each present player scored in a group session's King of Court game, logged
-// from the Daily Report. A blank box means the player didn't play: a previously saved
-// row is deleted (cleared_player_ids) rather than kept or stored as 0.
+// from the Daily Report or the session's page. A blank box means the player didn't play:
+// a previously saved row is deleted (cleared_player_ids) rather than kept or stored as 0.
 export async function saveKingOfCourtScores(data: {
   schedule_session_id: string;
   session_date: string;
   scores: ScoreEntry[];
   cleared_player_ids: string[];
 }): Promise<{ success: true } | { error: string; reload?: boolean }> {
-  const user = await getCurrentUserRole();
-  const authErr = requireAdmin(user);
-  if (authErr) return authErr;
+  const caller = await getScorer();
+  if ("error" in caller) return caller;
+  const user = caller.scorer;
 
   if (!Array.isArray(data.scores) || !Array.isArray(data.cleared_player_ids)) {
     return { error: "Invalid request" };
@@ -64,17 +123,17 @@ export async function saveKingOfCourtScores(data: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
+  const { data: session } = await admin
+    .from("schedule_sessions")
+    .select(SESSION_COLUMNS)
+    .eq("id", data.schedule_session_id)
+    .maybeSingle();
+  const notScored = scorerProblem(user.groupIds, asScoredSession(session as SessionRow | null));
+  if (notScored) return { error: notScored };
+
   // The database refuses this too; refusing here lets the Scores tab reload as read-only
   const closed = await closedMonthBlock(admin, monthOfDate(data.session_date));
   if (closed) return { error: closed, reload: true };
-
-  const { data: session } = await admin
-    .from("schedule_sessions")
-    .select("id, group_id, session_type, groups(in_leaderboard)")
-    .eq("id", data.schedule_session_id)
-    .maybeSingle();
-  const notScored = scoringProblem(session && { ...session, in_leaderboard: session.groups?.in_leaderboard });
-  if (notScored) return { error: notScored };
 
   const { data: presentRows, error: attErr } = await admin
     .from("attendance")
@@ -112,7 +171,7 @@ export async function saveKingOfCourtScores(data: {
       group_id: groupOf.get(s.player_id)!,
       session_date: data.session_date,
       points: s.points,
-      entered_by: user!.id,
+      entered_by: user.id,
     }));
     // Upsert on the unique key so re-saving a session updates in place
     const { error } = await admin
@@ -123,6 +182,8 @@ export async function saveKingOfCourtScores(data: {
 
   revalidatePath("/admin/daily-report");
   revalidatePath("/admin/leaderboard");
+  revalidatePath("/coach/leaderboard");
+  revalidatePath("/player/leaderboard");
   return { success: true };
 }
 
