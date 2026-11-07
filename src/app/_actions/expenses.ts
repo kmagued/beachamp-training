@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getSystemSetting, setSystemSetting } from "@/lib/settings/system-settings";
+import { parseCourtRate, readCourtRateSetting } from "@/lib/settings/court-rate";
 
 // ── Helper: get current user role ──
 async function getCurrentUserRole() {
@@ -150,6 +152,23 @@ export async function deleteExpense(id: string) {
   revalidatePath("/admin/finances");
   revalidatePath("/admin/dashboard");
   return { success: true };
+}
+
+// ═══════════════════════════════════════
+// DEFAULT COURT RATE
+// ═══════════════════════════════════════
+
+/** The hourly rate the court reservation calculator starts from */
+export async function getDefaultCourtHourlyRate(): Promise<number> {
+  return readCourtRateSetting(await getSystemSetting<{ rate?: unknown }>("court_hourly_rate"));
+}
+
+export async function setDefaultCourtHourlyRate(input: unknown): Promise<{ error?: string; rate?: number }> {
+  const rate = parseCourtRate(input);
+  if (rate === null) return { error: "Rate must be a number greater than 0" };
+  const res = await setSystemSetting("court_hourly_rate", { rate });
+  if (res.error) return { error: res.error };
+  return { rate };
 }
 
 // ═══════════════════════════════════════

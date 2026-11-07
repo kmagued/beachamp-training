@@ -3,7 +3,14 @@ import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Button, DatePicker, Select } from "@/components/ui";
 import { Loader2, Plus, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { createExpense, updateExpense, createExpenseCategory } from "@/app/_actions/expenses";
+import {
+  createExpense,
+  updateExpense,
+  createExpenseCategory,
+  getDefaultCourtHourlyRate,
+  setDefaultCourtHourlyRate,
+} from "@/app/_actions/expenses";
+import { FALLBACK_COURT_HOURLY_RATE, parseCourtRate } from "@/lib/settings/court-rate";
 import type { ExpenseRow, CategoryRow } from "./types";
 
 export interface CourtSession {
@@ -45,7 +52,12 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
   // Court reservation fields (generic mode)
   const [courtCount, setCourtCount] = useState("");
   const [courtHours, setCourtHours] = useState("");
-  const [courtHourlyRate, setCourtHourlyRate] = useState("250");
+  /** Rate new reservations start from; admins change it with "Save as default" */
+  const [defaultRate, setDefaultRate] = useState(FALLBACK_COURT_HOURLY_RATE);
+  /** What the admin typed or the expense saved; null shows the default, which loads after mount */
+  const [rateInput, setRateInput] = useState<string | null>(null);
+  const courtHourlyRate = rateInput ?? String(defaultRate);
+  const [savingDefaultRate, setSavingDefaultRate] = useState(false);
   const [useCourtCalculator, setUseCourtCalculator] = useState(true);
 
   // Session-based court calculator
@@ -113,6 +125,27 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
     }
   }, [courtCount, courtHours, courtHourlyRate, isCourtReservation, useCourtCalculator, hasSessionMode, sessionTotal]);
 
+  // The drawer mounts this form on open, so the saved default arrives just after first paint
+  useEffect(() => {
+    let cancelled = false;
+    getDefaultCourtHourlyRate()
+      .then((rate) => { if (!cancelled) setDefaultRate(rate); })
+      .catch(() => { /* keep the fallback */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const typedRate = parseCourtRate(courtHourlyRate);
+  const canSaveDefaultRate = typedRate !== null && typedRate !== defaultRate;
+
+  async function handleSaveDefaultRate() {
+    setSavingDefaultRate(true);
+    setError("");
+    const res = await setDefaultCourtHourlyRate(courtHourlyRate);
+    setSavingDefaultRate(false);
+    if (res.error) setError(res.error);
+    else if (res.rate) setDefaultRate(res.rate);
+  }
+
   // Reset form when opening/editing
   useEffect(() => {
     if (open) {
@@ -126,7 +159,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
         setNotes(editingExpense.notes || "");
         setCourtCount(editingExpense.court_count ? String(editingExpense.court_count) : "");
         setCourtHours(editingExpense.court_hours ? String(editingExpense.court_hours) : "");
-        setCourtHourlyRate(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : "250");
+        setRateInput(editingExpense.court_hourly_rate ? String(editingExpense.court_hourly_rate) : null);
         setUseCourtCalculator(!!editingExpense.court_count);
         setSelectedSessions(new Set());
         setSessionCourts({});
@@ -144,7 +177,7 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
         setNotes("");
         setCourtCount("");
         setCourtHours("");
-        setCourtHourlyRate("250");
+        setRateInput(null);
         setUseCourtCalculator(true);
         setSelectedSessions(new Set());
         setSessionCourts({});
@@ -318,8 +351,23 @@ export function ExpenseForm({ open, onClose, categories, editingExpense, onSucce
             <div className="p-4 rounded-xl bg-primary-50/50 border border-primary-100 space-y-3">
               {/* Hourly rate — shared for both modes */}
               <div>
-                <Label>Hourly Rate (EGP)</Label>
-                <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setCourtHourlyRate(e.target.value)} placeholder="250" />
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="mb-0">Hourly Rate (EGP)</Label>
+                  {canSaveDefaultRate ? (
+                    <button
+                      type="button"
+                      onClick={handleSaveDefaultRate}
+                      disabled={savingDefaultRate}
+                      className="text-xs font-medium text-primary hover:text-primary-600 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {savingDefaultRate && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Save as default
+                    </button>
+                  ) : typedRate === defaultRate ? (
+                    <span className="text-xs text-slate-400">Default rate</span>
+                  ) : null}
+                </div>
+                <Input type="number" min="0" value={courtHourlyRate} onChange={(e) => setRateInput(e.target.value)} placeholder={String(defaultRate)} />
               </div>
 
               {hasSessionMode ? (
