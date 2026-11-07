@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { isAdminCaller } from "@/lib/auth/admin-caller";
 
-export type SystemSettingKey = "default_male_group_id" | "default_female_group_id";
+export type SystemSettingKey = "default_male_group_id" | "default_female_group_id" | "court_hourly_rate";
 
 /** Read a setting. Returns null if unset. */
 export async function getSystemSetting<T = Record<string, unknown>>(
